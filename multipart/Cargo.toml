@@ -1,0 +1,8 @@
+[package]
+
+name = "multipart"
+version = "0.0.1"
+authors = ["Austin Bonander <austin.bonander@gmail.com>"]
+
+[dependencies.hyper]
+git = "https://github.com/hyperium/hyper"
