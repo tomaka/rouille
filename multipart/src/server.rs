@@ -5,7 +5,7 @@ use mime::{Mime, AttrExt, ValueExt};
 
 use super::MultipartField;
 
-use std::io::{RefReader, BufferedReader, IoResult, EndOfFile, standard_error};
+use std::io::{RefReader, BufferedReader, IoResult, EndOfFile, standard_error, OtherIoError};
 
 fn is_multipart_formdata(req: &Request) -> bool {
     use mime::{Multipart, Mime, SubExt};
@@ -49,7 +49,68 @@ impl Multipart {
         Ok(Multipart { source: BoundaryReader::from_request(req, boundary.into_bytes()) })
     }
     
-    fn read_content_disposition(&mut self) -> (   
+    fn read_content_disposition(&mut self) -> IoResult<(String, String, Option<String>)> {
+        let line = try!(self.source.read_line());       
+
+        // Find the end of CONT_DISP in the line
+        let disp_type = {
+            const CONT_DISP: &'static str = "Content-Disposition:";
+
+            let disp_idx = try_find!(line[], find_str, CONT_DISP, 
+                "Content-Disposition subheader not found!", line) + CONT_DISP.len(); 
+
+            let disp_type_end = try_find!(line[disp_idx..], find, ';', 
+                "Error parsing Content-Disposition value!", line);
+
+            line[disp_idx .. disp_type_end].trim().into_string();
+        };
+    
+        let field_name = {
+            const NAME: &'static str = "name=\"";
+
+            let name_idx = try_find!(line[], find_str, NAME, 
+                "Error parsing field name!", line) + NAME.len();
+
+            let name_end = try_find!(line[name_idx ..], find, '"',
+                "Error parsing field name!", line);
+
+            line[name_idx .. name_end].into_string(); // No trim here since it's in quotes.
+        };
+
+        let filename = {
+            const FILENAME: &'static str = "filename=\"";
+
+            let filename_idx = line[].find_str(FILENAME).map(|idx| idx + FILENAME.len());
+            let filename_idxs = with(filename_idx, |&start| line[start ..].find('"'));
+            
+            filename_idxs.map(|(start, end)| line[start .. end].into_string())
+        };
+        
+        (disp_type, field_name, filename)            
+    }
+}
+
+fn with<T, U>(left: Option<T>, right: |&T| -> Option<U>) -> Option<(T, U)> {
+    let temp = left.as_ref().and_then(right);
+    match (left, temp) {
+        Some(lval), Some(rval) => Some((lval, rval)),
+        _ => None,    
+    }
+} 
+
+macro_rules! try_find(
+    ($haystack:expr, $fn:ident, $needle:expr, $err:expr, $line:expr) => (
+        try!($haystack.$fn($needle).ok_or(line_error($err, $line.clone())))
+    )
+
+fn try_find<'a>(substr: &'a str, needle: &str, err_msg: &'static str
+
+fn line_error(msg: &'static str, line: String) -> IoError {
+    IoError { 
+        kind: OtherIoError, 
+        desc: msg,
+        detail: Some(line),
+    }
 }
 
 impl<'a> Iterator<(String, MultipartField<'a>)> for Multipart {
