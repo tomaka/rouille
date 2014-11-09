@@ -19,33 +19,33 @@ use super::{MultipartField, TextField, FileField, FileStream, MultipartFile};
 
 const BOUNDARY_LEN: uint = 8;
 
-pub struct Multipart<'a> {
-    fields: Vec<(&'a str, MultipartField<'a>)>,
+pub struct Multipart {
+    fields: Vec<(String, MultipartField)>,
     boundary: String,
 }
 
 /// Shorthand for a writable request (`Request<Streaming>`)
 type ReqWrite = Request<Streaming>;
 
-impl<'a> Multipart<'a> {
+impl Multipart {
 
-    pub fn new() -> Multipart<'a> {
+    pub fn new() -> Multipart {
         Multipart {
             fields: Vec::new(),
             boundary: random_alphanumeric(BOUNDARY_LEN),
         } 
     }
 
-    pub fn add_text(&mut self, name: &'a str, val: &'a str) {
-        self.fields.push((name, TextField(val)));    
+    pub fn add_text(&mut self, name: &str, val: &str) {
+        self.fields.push((name.into_string(), TextField(val.into_string())));    
     }
     
     /// Add the file to the multipart request, guessing its `Content-Type` from its extension
-    pub fn add_file(&mut self, name: &'a str, file: &'a mut File) {
+    pub fn add_file(&mut self, name: &str, file: File) {
         let filename = file.path().filename_str().map(|s| s.into_string());
         let content_type = guess_mime_type(file.path());
 
-        self.fields.push((name, FileField(MultipartFile {
+        self.fields.push((name.into_string(), FileField(MultipartFile {
             filename: filename,
             reader: FileStream(file),
             content_type: content_type,                  
@@ -79,9 +79,8 @@ impl<'a> Multipart<'a> {
 
             try!(match field {
                     TextField(text) => req.write(b"\r\n\r\n")
-                        .and_then(|_| write_line(req, text)), // Style suggestions welcome
+                        .and_then(|_| write_line(req, &*text)), // Style suggestions welcome
                     FileField(file) => write_file(req, file),
-                    _ => unimplemented!(),
                 });
             
             try!(write_boundary(req, boundary[]));     
@@ -96,7 +95,7 @@ fn write_boundary(req: &mut ReqWrite, boundary: &str) -> IoResult<()> {
     write!(req, "--{}\r\n", boundary)
 }
 
-fn write_file<'a>(req: &mut ReqWrite, mut file: MultipartFile<'a>) -> IoResult<()> {
+fn write_file(req: &mut ReqWrite, mut file: MultipartFile) -> IoResult<()> {
     try!(file.filename.map(|filename| write!(req, "; filename=\"{}\"\r\n", filename)).unwrap_or(Ok(())));
     try!(write!(req, "Content-Type: {}\r\n\r\n", file.content_type));
     io::util::copy(&mut file.reader, req)         
@@ -155,7 +154,7 @@ pub fn get_mime_type(ext: &str) -> Mime {
         return mime_type.clone();   
     }
 
-    let mime_type = find_mime_type(&ext);
+    let mime_type = find_mime_type(&*ext);
 
     cache.borrow_mut().insert(ext, mime_type.clone());
 
@@ -165,7 +164,7 @@ pub fn get_mime_type(ext: &str) -> Mime {
 const MIME_TYPES: &'static str = include_str!("../mime_types.json");
 
 /// Load the MIME_TYPES as JSON and try to locate `ext`
-fn find_mime_type(ext: &String) -> Mime {
+fn find_mime_type(ext: &str) -> Mime {
     json::from_str(MIME_TYPES).unwrap()
         .find(ext).and_then(|j| j.as_string())
         .and_then(from_str::<Mime>)

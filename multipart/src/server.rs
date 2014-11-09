@@ -5,7 +5,7 @@ use mime::{Mime, AttrExt, ValueExt};
 
 use super::MultipartField;
 
-use std::io::{RefReader, BufferedReader, IoResult, EndOfFile, standard_error, OtherIoError};
+use std::io::{RefReader, BufferedReader, IoError, IoResult, EndOfFile, standard_error, OtherIoError};
 
 fn is_multipart_formdata(req: &Request) -> bool {
     use mime::{Multipart, Mime, SubExt};
@@ -38,19 +38,27 @@ pub struct Multipart {
     source: BoundaryReader,
 }
 
+macro_rules! try_find(
+    ($haystack:expr, $f:ident, $needle:expr, $err:expr, $line:expr) => (
+        try!($haystack.$f($needle).ok_or(line_error($err, $line.clone())))
+    )
+)
+
 impl Multipart {
 
     /// If the given `Request` is of `Content-Type: multipart/form-data`, return
     /// the wrapped request as `Ok(Multipart)`, otherwise `Err(Request)`.
     pub fn from_request(req: Request) -> Result<Multipart, Request> {
         if !is_multipart_formdata(&req) { return Err(req); }
-        let boundary = try!(req.headers.get::<ContentType>().and_then(get_boundary).ok_or_else(|| req));
 
-        Ok(Multipart { source: BoundaryReader::from_request(req, boundary.into_bytes()) })
+        let boundary = if let Some(boundary) = req.headers.get::<ContentType>()
+            .and_then(get_boundary) { boundary } else { return Err(req); };
+
+        Ok(Multipart { source: BoundaryReader::from_request(req, boundary) })
     }
     
     fn read_content_disposition(&mut self) -> IoResult<(String, String, Option<String>)> {
-        let line = try!(self.source.read_line());       
+        let line = try!(self.source.reader.read_line());       
 
         // Find the end of CONT_DISP in the line
         let disp_type = {
@@ -62,7 +70,7 @@ impl Multipart {
             let disp_type_end = try_find!(line[disp_idx..], find, ';', 
                 "Error parsing Content-Disposition value!", line);
 
-            line[disp_idx .. disp_type_end].trim().into_string();
+            line[disp_idx .. disp_type_end].trim().into_string()
         };
     
         let field_name = {
@@ -74,7 +82,7 @@ impl Multipart {
             let name_end = try_find!(line[name_idx ..], find, '"',
                 "Error parsing field name!", line);
 
-            line[name_idx .. name_end].into_string(); // No trim here since it's in quotes.
+            line[name_idx .. name_end].into_string() // No trim here since it's in quotes.
         };
 
         let filename = {
@@ -86,24 +94,19 @@ impl Multipart {
             filename_idxs.map(|(start, end)| line[start .. end].into_string())
         };
         
-        (disp_type, field_name, filename)            
+        Ok((disp_type, field_name, filename))
     }
 }
 
 fn with<T, U>(left: Option<T>, right: |&T| -> Option<U>) -> Option<(T, U)> {
     let temp = left.as_ref().and_then(right);
     match (left, temp) {
-        Some(lval), Some(rval) => Some((lval, rval)),
+        (Some(lval), Some(rval)) => Some((lval, rval)),
         _ => None,    
     }
 } 
 
-macro_rules! try_find(
-    ($haystack:expr, $fn:ident, $needle:expr, $err:expr, $line:expr) => (
-        try!($haystack.$fn($needle).ok_or(line_error($err, $line.clone())))
-    )
 
-fn try_find<'a>(substr: &'a str, needle: &str, err_msg: &'static str
 
 fn line_error(msg: &'static str, line: String) -> IoError {
     IoError { 
@@ -113,8 +116,8 @@ fn line_error(msg: &'static str, line: String) -> IoError {
     }
 }
 
-impl<'a> Iterator<(String, MultipartField<'a>)> for Multipart {
-    fn next(&'a mut self) -> Option<(String, MultipartField<'a>)> {
+impl Iterator<(String, MultipartField)> for Multipart {
+    fn next(&mut self) -> Option<(String, MultipartField)> {
         unimplemented!();           
     }    
 }
@@ -157,7 +160,7 @@ impl BoundaryReader {
         self.boundary_read = false;    
     }
 
-    fn set_boundary(&'a mut self, boundary: String) {
+    fn set_boundary(&mut self, boundary: String) {
         self.boundary = boundary.into_bytes();    
     }
 }

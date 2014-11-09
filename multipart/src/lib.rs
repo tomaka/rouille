@@ -1,4 +1,4 @@
-#![feature(if_let, slicing_syntax, default_type_params, phase)]
+#![feature(if_let, slicing_syntax, default_type_params, phase, macro_rules)]
 extern crate hyper;
 #[phase(plugin, link)] extern crate log;
 
@@ -15,24 +15,24 @@ use server::BoundaryReader;
 pub mod client;
 pub mod server;
 
-pub struct MultipartFile<'a> {
+pub struct MultipartFile {
     filename: Option<String>,
-    reader: FileEntryReader<'a>,
+    reader: FileEntryReader,
     content_type: Mime,       
 }
 
-pub enum MultipartField<'a> {
-    TextField(&'a str),
-    FileField(MultipartFile<'a>),
-    MultiFiles(Vec<MultipartFile<'a>>),
+pub enum MultipartField {
+    TextField(String),
+    FileField(MultipartFile),
+    // MultiFiles(Vec<MultipartFile>), /* TODO: Multiple files */
 }
 
-pub enum FileEntryReader<'a> {
-    FileStream(&'a mut File),
-    OctetStream(&'a mut BoundaryReader),
+pub enum FileEntryReader {
+    FileStream(File),
+    OctetStream(BoundaryReader),
 }
 
-impl<'a> Reader for FileEntryReader<'a> {
+impl Reader for FileEntryReader {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<uint>{
         match *self {
             FileStream(ref mut rdr) => rdr.read(buf),
