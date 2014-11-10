@@ -3,9 +3,11 @@ use hyper::server::request::Request;
 
 use mime::{Mime, AttrExt, ValueExt};
 
-use super::MultipartField;
+use super::{MultipartField, TextField, MultipartFile, FileField};
 
 use std::io::{RefReader, BufferedReader, IoError, IoResult, EndOfFile, standard_error, OtherIoError};
+
+use std::kinds::marker;
 
 fn is_multipart_formdata(req: &Request) -> bool {
     use mime::{Multipart, Mime, SubExt};
@@ -56,6 +58,46 @@ impl Multipart {
 
         Ok(Multipart { source: BoundaryReader::from_request(req, boundary) })
     }
+
+    pub fn read_entry<'a>(&'a mut self) -> IoResult<(String, MultipartField<'a>)> {
+        let (disp_type, field_name, filename) = try!(self.read_content_disposition());
+
+        if &*disp_type != "form-data" {
+            return Err(IoError {
+                    kind: OtherIoError,
+                    desc: "Content-Disposition value was not \"form-data\"",
+                    detail: Some(format!("Content-Disposition: {}", disp_type)),
+                });
+        }
+      
+        if let Some(content_type) = try!(self.read_content_type()) {
+            let _ = try!(self.source.reader.read_line()); // Consume empty line
+            Ok((field_name, FileField(MultipartFile::from_octet(filename, &mut self.source, content_type[]))))
+        } else {
+            // Empty line consumed by read_content_type()
+            let text = try!(self.source.read_to_string());
+            Ok((field_name, TextField(text)))
+        }                
+    }
+   
+    /// Call `f` for each entry in the multipart request.
+    /// This is a substitute for `Multipart` implementing `Iterator`,
+    /// since `Iterator::next()` can't use bound lifetimes.
+    /// See https://www.reddit.com/r/rust/comments/2lkk4i/concrete_lifetime_vs_bound_lifetime/
+    pub fn foreach_entry(&mut self, f: <'a>|String, MultipartField<'a>|) {
+        loop {
+            match self.read_entry() {
+                Ok((name, field)) => f(name, field),
+                Err(err) => { 
+                    if err.kind != EndOfFile {
+                        error!("Error reading Multipart: {}", err);
+                    }
+
+                    break;
+                },            
+            }    
+        }    
+    } 
     
     fn read_content_disposition(&mut self) -> IoResult<(String, String, Option<String>)> {
         let line = try!(self.source.reader.read_line());       
@@ -96,6 +138,18 @@ impl Multipart {
         
         Ok((disp_type, field_name, filename))
     }
+
+    fn read_content_type(&mut self) -> IoResult<Option<String>> {
+        let line = try!(self.source.reader.read_line());
+
+        const CONTENT_TYPE: &'static str = "Content-Type:";
+        
+        let type_idx = (&*line).find_str(CONTENT_TYPE);
+
+        // FIXME Will not properly parse for multiple files! 
+        // Does not expect boundary=<boundary>
+        Ok(type_idx.map(|start| line[start + CONTENT_TYPE.len()..].trim().into_string()))
+    }
 }
 
 fn with<T, U>(left: Option<T>, right: |&T| -> Option<U>) -> Option<(T, U)> {
@@ -106,8 +160,6 @@ fn with<T, U>(left: Option<T>, right: |&T| -> Option<U>) -> Option<(T, U)> {
     }
 } 
 
-
-
 fn line_error(msg: &'static str, line: String) -> IoError {
     IoError { 
         kind: OtherIoError, 
@@ -116,12 +168,22 @@ fn line_error(msg: &'static str, line: String) -> IoError {
     }
 }
 
-impl Iterator<(String, MultipartField)> for Multipart {
-    fn next(&mut self) -> Option<(String, MultipartField)> {
-        unimplemented!();           
+/* FIXME: Can't have an iterator return a borrowed reference
+impl<'a> Iterator<(String, MultipartField<'a>)> for Multipart {
+    fn next(&mut self) -> Option<(String, MultipartField<'a>)> {
+        match self.read_entry() {
+            Ok(ok) => Some(ok), 
+            Err(err) => { 
+                if err.kind != EndOfFile {
+                    error!("Error reading Multipart: {}", err);
+                }
+
+                None
+             },
+        }
     }    
 }
-
+*/
 
 /// A `Reader` that will yield bytes until it sees a given sequence.
 pub struct BoundaryReader {
@@ -132,7 +194,9 @@ pub struct BoundaryReader {
 }
 
 impl BoundaryReader {
-    fn from_request(request: Request, boundary: String) -> BoundaryReader {
+    fn from_request(request: Request, mut boundary: String) -> BoundaryReader {
+        boundary.prepend("--");
+
         BoundaryReader {
             reader: BufferedReader::new(request),
             boundary: boundary.into_bytes(),
@@ -155,7 +219,7 @@ impl BoundaryReader {
     }
 
     fn consume_boundary(&mut self) {
-        self.reader.consume(self.boundary.len());
+        self.reader.consume(self.last_search_idx + self.boundary.len());
         self.last_search_idx = 0;
         self.boundary_read = false;    
     }
@@ -179,6 +243,48 @@ impl Reader for BoundaryReader {
         self.last_search_idx -= bytes_read;
 
         Ok(bytes_read)        
-    }  
+    } 
+}
+
+trait Prepend<T> {
+    fn prepend(&mut self, t: T);    
+}
+
+impl<S: Str> Prepend<S> for String {
+    fn prepend(&mut self, s: S) {
+        unsafe {
+            self.as_mut_vec().prepend(s.as_slice().as_bytes());    
+        }      
+    }
+}
+
+impl<'a, T> Prepend<&'a [T]> for Vec<T> {
+    fn prepend(&mut self, slice: &[T]) {
+        use std::ptr::copy_memory;
+
+        let old_len = self.len();
+
+        self.reserve(slice.len());
+
+        unsafe {
+            self.set_len(old_len + slice.len());
+            copy_memory(self[mut slice.len()..].as_mut_ptr(), self[..old_len].as_ptr(), old_len);
+            copy_memory(self.as_mut_ptr(), slice.as_ptr(), slice.len());
+        }
+    }    
+}
+
+#[test]
+fn test_prepend() {
+    let mut vec = vec![3u64, 4, 5];
+    vec.prepend([1u64, 2]);
+    assert_eq!(vec[], [1u64, 2, 3, 4, 5][]);
+}
+
+#[test]
+fn test_prepend_string() {
+    let mut string = "World!".into_string();
+    string.prepend("Hello, ");
+    assert_eq!(&*string, "Hello, World!");
 }
 
