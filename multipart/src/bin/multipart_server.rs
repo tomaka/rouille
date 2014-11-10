@@ -6,7 +6,9 @@ use self::hyper::status;
 use std::io::net::ip::Ipv4Addr;
 
 fn hello(mut incoming: Incoming) {
-    for (mut req, mut res) in incoming {
+    for connection in incoming {
+        let (mut req, mut res) = connection.open().unwrap();
+        
         *res.status_mut() = status::Ok;
 
         println!("{}", req.headers);
