@@ -84,7 +84,7 @@ impl Multipart {
     /// This is a substitute for `Multipart` implementing `Iterator`,
     /// since `Iterator::next()` can't use bound lifetimes.
     /// See https://www.reddit.com/r/rust/comments/2lkk4i/concrete_lifetime_vs_bound_lifetime/
-    pub fn foreach_entry(&mut self, f: <'a>|String, MultipartField<'a>|) {
+    pub fn foreach_entry(&mut self, f: for<'a>|String, MultipartField<'a>|) {
         loop {
             match self.read_entry() {
                 Ok((name, field)) => f(name, field),
