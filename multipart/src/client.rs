@@ -47,7 +47,12 @@ impl<'a> Multipart<'a> {
 
     /// Apply the appropriate headers to the `Request<Fresh>` and send the data.
     pub fn send(self, mut req: Request<Fresh>) -> HttpResult<Response> {
+        use hyper::method;
+        assert!(req.method() == method::Post, "Multipart request must use POST method!");
+
         self.apply_headers(&mut req);
+
+        debug!("Fields: {}; Boundary: {}", self.fields[], self.boundary[]);
 
         debug!("{}", req.headers());
 
@@ -68,11 +73,10 @@ impl<'a> Multipart<'a> {
         try!(write_boundary(req, boundary[]));
 
         for (name, field) in fields.into_iter() {
-            try!(write!(req, "Content-Disposition: form-data; name=\"{}\"", name));
+            try!(write!(req, "Content-Disposition: form-data; name=\"{}\"\r\n\r\n", name));
 
             try!(match field {
-                    TextField(text) => req.write(b"\r\n\r\n")
-                        .and_then(|_| write_line(req, &*text)), // Style suggestions welcome
+                    TextField(text) => write_line(req, &*text), // Style suggestions welcome
                     FileField(file) => write_file(req, file),
                 });
             
@@ -102,8 +106,9 @@ fn write_line(req: &mut ReqWrite, s: &str) -> IoResult<()> {
 /// Generate a random alphanumeric sequence of length `len`
 fn random_alphanumeric(len: uint) -> String {
     use std::rand::{task_rng, Rng};
-    
-    task_rng().gen_ascii_chars().take(len).collect()    
+    use std::char::to_lowercase;
+
+    task_rng().gen_ascii_chars().map(to_lowercase).take(len).collect()    
 }
 
 fn io_to_http<T>(res: IoResult<T>) -> HttpResult<T> {

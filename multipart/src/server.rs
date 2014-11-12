@@ -5,6 +5,8 @@ use mime::{Mime, AttrExt, ValueExt};
 
 use super::{MultipartField, TextField, MultipartFile, FileField};
 
+use std::cmp;
+
 use std::io::{RefReader, BufferedReader, IoError, IoResult, EndOfFile, standard_error, OtherIoError};
 
 use std::kinds::marker;
@@ -37,7 +39,7 @@ fn get_boundary(ct: &ContentType) -> Option<String> {
 }
 
 pub struct Multipart {
-    source: BoundaryReader,
+    source: BoundaryReader<Request>,
 }
 
 macro_rules! try_find(
@@ -50,16 +52,32 @@ impl Multipart {
 
     /// If the given `Request` is of `Content-Type: multipart/form-data`, return
     /// the wrapped request as `Ok(Multipart)`, otherwise `Err(Request)`.
-    pub fn from_request(req: Request) -> Result<Multipart, Request> {
+    pub fn from_request(mut req: Request) -> Result<Multipart, Request> {
+        use std::io::stdio::stdout_raw;
+
         if !is_multipart_formdata(&req) { return Err(req); }
 
         let boundary = if let Some(boundary) = req.headers.get::<ContentType>()
             .and_then(get_boundary) { boundary } else { return Err(req); };
 
-        Ok(Multipart { source: BoundaryReader::from_request(req, boundary) })
+        Ok(Multipart { source: BoundaryReader::from_reader(req, format!("--{}\r\n", boundary)) })
     }
 
     pub fn read_entry<'a>(&'a mut self) -> IoResult<(String, MultipartField<'a>)> {
+        debug!("Read entry!");
+
+        loop {
+            let string = self.source.read_to_string().unwrap();
+            self.source.consume_boundary();
+
+            if string.is_empty() {
+                break;
+            }
+
+            debug!("{}", string);
+        }
+
+        try!(self.source.consume_boundary());
         let (disp_type, field_name, filename) = try!(self.read_content_disposition());
 
         if &*disp_type != "form-data" {
@@ -71,12 +89,15 @@ impl Multipart {
         }
       
         if let Some(content_type) = try!(self.read_content_type()) {
-            let _ = try!(self.source.reader.read_line()); // Consume empty line
+            let _ = try!(self.source.read_line()); // Consume empty line
             Ok((field_name, FileField(MultipartFile::from_octet(filename, &mut self.source, content_type[]))))
         } else {
             // Empty line consumed by read_content_type()
             let text = try!(self.source.read_to_string());
-            Ok((field_name, TextField(text)))
+            // The last two characters are "\r\n".
+            // We can't do a simple trim because the content might be terminated
+            // with line separators we want to preserve.
+            Ok((field_name, TextField(text[..text.len() - 2].into_string()))) 
         }                
     }
    
@@ -86,6 +107,8 @@ impl Multipart {
     /// See https://www.reddit.com/r/rust/comments/2lkk4i/concrete_lifetime_vs_bound_lifetime/
     pub fn foreach_entry(&mut self, f: for<'a>|String, MultipartField<'a>|) {
         loop {
+            debug!("Loop!");
+
             match self.read_entry() {
                 Ok((name, field)) => f(name, field),
                 Err(err) => { 
@@ -100,20 +123,29 @@ impl Multipart {
     } 
     
     fn read_content_disposition(&mut self) -> IoResult<(String, String, Option<String>)> {
-        let line = try!(self.source.reader.read_line());       
+        debug!("Read content disposition!");
+        let line = try!(self.source.read_line());       
+
+        debug!("Line: {}", line);
 
         // Find the end of CONT_DISP in the line
         let disp_type = {
             const CONT_DISP: &'static str = "Content-Disposition:";
 
             let disp_idx = try_find!(line[], find_str, CONT_DISP, 
-                "Content-Disposition subheader not found!", line) + CONT_DISP.len(); 
+                "Content-Disposition subheader not found!", line) + CONT_DISP.len();
+                
+            debug!("Disp idx: {} Line len: {}", disp_idx, line.len());  
 
             let disp_type_end = try_find!(line[disp_idx..], find, ';', 
                 "Error parsing Content-Disposition value!", line);
 
-            line[disp_idx .. disp_type_end].trim().into_string()
+            debug!("Disp end: {}", disp_type_end);
+
+            line[disp_idx .. disp_idx + disp_type_end].trim().into_string()
         };
+   
+        debug!("Disp-type: {}", disp_type);
     
         let field_name = {
             const NAME: &'static str = "name=\"";
@@ -121,11 +153,17 @@ impl Multipart {
             let name_idx = try_find!(line[], find_str, NAME, 
                 "Error parsing field name!", line) + NAME.len();
 
+            debug!("Name idx: {}", name_idx);
+
             let name_end = try_find!(line[name_idx ..], find, '"',
                 "Error parsing field name!", line);
 
-            line[name_idx .. name_end].into_string() // No trim here since it's in quotes.
+            debug!("Name end: {}", name_end);
+
+            line[name_idx .. name_idx + name_end].into_string() // No trim here since it's in quotes.
         };
+
+        debug!("Field name: {}", field_name);
 
         let filename = {
             const FILENAME: &'static str = "filename=\"";
@@ -133,14 +171,17 @@ impl Multipart {
             let filename_idx = line[].find_str(FILENAME).map(|idx| idx + FILENAME.len());
             let filename_idxs = with(filename_idx, |&start| line[start ..].find('"'));
             
-            filename_idxs.map(|(start, end)| line[start .. end].into_string())
+            filename_idxs.map(|(start, end)| line[start .. start + end].into_string())
         };
+
+        debug!("Filename: {}", filename);
         
         Ok((disp_type, field_name, filename))
     }
 
     fn read_content_type(&mut self) -> IoResult<Option<String>> {
-        let line = try!(self.source.reader.read_line());
+        debug!("Read content type!");
+        let line = try!(self.source.read_line());
 
         const CONTENT_TYPE: &'static str = "Content-Type:";
         
@@ -186,105 +227,220 @@ impl<'a> Iterator<(String, MultipartField<'a>)> for Multipart {
 */
 
 /// A `Reader` that will yield bytes until it sees a given sequence.
-pub struct BoundaryReader {
-    reader: BufferedReader<Request>,
+pub struct BoundaryReader<S> {
+    reader: S,
     boundary: Vec<u8>,
     last_search_idx: uint,
     boundary_read: bool,
+    buf: Vec<u8>,
+    buf_len: uint,
 }
 
-impl BoundaryReader {
-    fn from_request(request: Request, mut boundary: String) -> BoundaryReader {
-        boundary.prepend("--");
+fn eof<T>() -> IoResult<T> {
+    Err(standard_error(EndOfFile))    
+}
+
+const BUF_SIZE: uint = 1024 * 64; // 64k buffer
+
+impl<S> BoundaryReader<S> where S: Reader {
+    fn from_reader(reader: S, boundary: String) -> BoundaryReader<S> {
+        let mut buf = Vec::with_capacity(BUF_SIZE);
+        unsafe { buf.set_len(BUF_SIZE); }
 
         BoundaryReader {
-            reader: BufferedReader::new(request),
+            reader: reader,
             boundary: boundary.into_bytes(),
             last_search_idx: 0,
-            boundary_read: false,    
+            boundary_read: false,
+            buf: buf,
+            buf_len: 0,  
         }
     }
 
-    fn read_to_boundary(&mut self) -> IoResult<bool> {
+    fn read_to_boundary(&mut self) -> IoResult<()> {
+        debug!("Read to boundary!");
+
          if !self.boundary_read {
-            let lookahead = try!(self.reader.fill_buf());
-        
-            self.last_search_idx = lookahead[self.last_search_idx..]
-                .position_elem(&b'-').unwrap_or(lookahead.len() - 1);
+            try!(self.true_fill_buf());
 
-            Ok(lookahead[self.last_search_idx..].starts_with(self.boundary[]))
+            debug!("Exited true_fill_buf");
+
+            if self.buf_len == 0 { return eof(); }
+            
+            let lookahead = self.buf[self.last_search_idx .. self.buf_len];
+
+            debug!("Buf len: {}", self.buf_len);
+
+            debug!("Lookahead: {}", lookahead.to_ascii().as_str_ascii());
+             
+            let search_idx = lookahead.position_elem(&self.boundary[0])
+                .unwrap_or(lookahead.len() - 1);
+
+            debug!("Search idx: {}", search_idx);
+
+            self.boundary_read = lookahead[search_idx..]
+                .starts_with(self.boundary[]);
+
+            debug!("Boundary read: {} Boundary: {}", self.boundary_read, self.boundary.to_ascii().as_str_ascii());
+
+            self.last_search_idx += search_idx;
+
+            if !self.boundary_read {
+                self.last_search_idx += 1;    
+            }
+
         } else if self.last_search_idx == 0 {
-            Err(standard_error(EndOfFile))                
-        } else { Ok(true) } 
+            return Err(standard_error(EndOfFile))                
+        }
+        
+        Ok(()) 
     }
 
-    fn consume_boundary(&mut self) {
-        self.reader.consume(self.last_search_idx + self.boundary.len());
+    /// Read bytes until the reader is full
+    fn true_fill_buf(&mut self) -> IoResult<()> {
+        debug!("True fill buf! Buf len: {}", self.buf_len);
+
+        let mut bytes_read = 1u;
+        
+        while bytes_read != 0 {
+            debug!("Bytes read loop!");
+
+            bytes_read = match self.reader.read(self.buf[mut self.buf_len..]) {
+                Ok(read) => read,
+                Err(err) => if err.kind == EndOfFile { break; } else { return Err(err); },
+            };
+
+            debug!("Bytes read: {}", bytes_read);
+
+            self.buf_len += bytes_read;
+        }
+
+        debug!("Exited bytes read loop!");
+
+        Ok(())
+    }
+
+    fn _consume(&mut self, amt: uint) {
+        use std::ptr::copy_memory;
+
+        debug!("Consume! Amt: {}", amt);
+        
+        assert!(amt <= self.buf_len);
+
+        let src = self.buf[amt..].as_ptr();
+        let dest = self.buf[mut].as_mut_ptr();
+
+        unsafe { copy_memory(dest, src, self.buf_len - amt); }
+        
+        self.buf_len -= amt;
+        self.last_search_idx -= amt; 
+    }
+
+    fn consume_boundary(&mut self) -> IoResult<()> {
+        debug!("Consume boundary!");
+
+        while !self.boundary_read {
+            debug!("Boundary read loop!");
+
+            match self.read_to_boundary() {
+                Ok(_) => (),
+                Err(e) => if e.kind == EndOfFile { 
+                    break; 
+                } else { 
+                    return Err(e);
+                }
+            }
+        }
+       
+        let consume_amt = cmp::min(self.buf_len, self.last_search_idx + self.boundary.len());
+
+        debug!("Consume amt: {} Buf len: {}", consume_amt, self.buf_len);
+
+        self._consume(consume_amt);
         self.last_search_idx = 0;
-        self.boundary_read = false;    
+        self.boundary_read = false;  
+        
+        Ok(())  
     }
 
+    #[allow(unused)]
     fn set_boundary(&mut self, boundary: String) {
         self.boundary = boundary.into_bytes();    
     }
 }
 
-impl Reader for BoundaryReader {
+impl<S> Reader for BoundaryReader<S> where S: Reader {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
         use std::cmp;        
+        use std::slice::bytes::copy_memory;
 
-        self.boundary_read = try!(self.read_to_boundary());
+        debug!("Read!");
+
+        try!(self.read_to_boundary()); 
 
         let trunc_len = cmp::min(buf.len(), self.last_search_idx);
+        copy_memory(buf, self.buf[..trunc_len]); 
 
-        let trunc_buf = buf[mut ..trunc_len]; // Truncate the buffer so we don't read ahead
+        self._consume(trunc_len);
 
-        let bytes_read = self.reader.read(trunc_buf).unwrap();
-        self.last_search_idx -= bytes_read;
-
-        Ok(bytes_read)        
+        Ok(trunc_len)        
     } 
 }
 
-trait Prepend<T> {
-    fn prepend(&mut self, t: T);    
-}
+impl<S> Buffer for BoundaryReader<S> where S: Reader {
+    fn fill_buf<'a>(&'a mut self) -> IoResult<&'a [u8]> {
+        debug!("Fill buf!");
 
-impl<S: Str> Prepend<S> for String {
-    fn prepend(&mut self, s: S) {
-        unsafe {
-            self.as_mut_vec().prepend(s.as_slice().as_bytes());    
-        }      
+        try!(self.read_to_boundary());
+       
+        let buf = self.buf[..self.last_search_idx];
+        
+        debug!("Buf: {}", buf.to_ascii().as_str_ascii());
+
+        Ok(buf)    
+    }
+
+    fn consume(&mut self, amt: uint) {
+        assert!(amt <= self.last_search_idx);
+        self._consume(amt);
     }
 }
 
-impl<'a, T> Prepend<&'a [T]> for Vec<T> {
-    fn prepend(&mut self, slice: &[T]) {
-        use std::ptr::copy_memory;
-
-        let old_len = self.len();
-
-        self.reserve(slice.len());
-
-        unsafe {
-            self.set_len(old_len + slice.len());
-            copy_memory(self[mut slice.len()..].as_mut_ptr(), self[..old_len].as_ptr(), old_len);
-            copy_memory(self.as_mut_ptr(), slice.as_ptr(), slice.len());
-        }
-    }    
-}
-
 #[test]
-fn test_prepend() {
-    let mut vec = vec![3u64, 4, 5];
-    vec.prepend([1u64, 2]);
-    assert_eq!(vec[], [1u64, 2, 3, 4, 5][]);
-}
+fn test_boundary() {
+    use std::io::BufReader;
 
-#[test]
-fn test_prepend_string() {
-    let mut string = "World!".into_string();
-    string.prepend("Hello, ");
-    assert_eq!(&*string, "Hello, World!");
+    const BOUNDARY: &'static str = "--boundary\r\n";
+    const TEST_VAL: &'static str = "\r
+--boundary\r
+dashed-value-1\r
+--boundary\r
+dashed-value-2\r
+--boundary\r
+";
+
+    let test_reader = BufReader::new(TEST_VAL.as_bytes());
+    let mut reader = BoundaryReader::from_reader(test_reader, BOUNDARY.into_string());
+
+    debug!("Read 1");
+    let string = reader.read_to_string().unwrap();
+    debug!("{}", string);
+    assert!(string[].trim().is_empty());
+
+    debug!("Consume 1");
+    reader.consume_boundary().unwrap();
+
+    debug!("Read 2");
+    assert_eq!(reader.read_to_string().unwrap()[].trim(), "dashed-value-1");
+
+    debug!("Consume 2");
+    reader.consume_boundary().unwrap();
+
+    debug!("Read 3");
+    assert_eq!(reader.read_to_string().unwrap()[].trim(), "dashed-value-2");
+
+    debug!("Consume 3");
+    reader.consume_boundary().unwrap();
+   
 }
 

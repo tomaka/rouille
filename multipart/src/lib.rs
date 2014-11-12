@@ -7,6 +7,7 @@ extern crate serialize;
 
 use self::mime::Mime;
 
+use std::fmt::{Formatter, FormatError, Show};
 use std::kinds::marker;
 use std::io::fs::File;
 use std::io::{AsRefReader, RefReader, IoResult};
@@ -15,6 +16,7 @@ use server::BoundaryReader;
 
 pub mod client;
 pub mod server;
+
 
 pub struct MultipartFile<'a> {
     _marker: marker::ContravariantLifetime<'a>,
@@ -43,7 +45,13 @@ impl<'a> MultipartFile<'a> {
     }
 }
 
+impl<'a> Show for MultipartFile<'a> {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), FormatError> {
+        write!(fmt, "Filename: {} Content-Type: {}", self.filename, self.content_type)    
+    } 
+}
 
+#[deriving(Show)]
 pub enum MultipartField<'a> {
     TextField(String),
     FileField(MultipartFile<'a>),
@@ -140,14 +148,14 @@ mod test {
 
     #[test]
     fn client_api_test() {        
-        let request = ClientReq::get(Url::parse("http://localhost:1337/").unwrap()).unwrap();
+        let request = ClientReq::post(Url::parse("http://localhost:1337/").unwrap()).unwrap();
 
         let mut multipart = ClientMulti::new();
 
         multipart.add_text("hello", "world");
         multipart.add_text("goodnight", "sun");
 
-        multipart.send(request);        
+        multipart.send(request).unwrap();        
     }
        
 }
