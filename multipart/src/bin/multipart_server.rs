@@ -1,3 +1,5 @@
+#![feature(unboxed_closures)]
+
 extern crate hyper;
 extern crate multipart;
 
@@ -14,7 +16,7 @@ fn hello(mut incoming: Incoming) {
        
         let mut multipart = Multipart::from_request(req).ok().expect("Could not create multipart!");
 
-        multipart.foreach_entry(|name, content| println!("Name: {} Content: {}", name, content));
+        multipart.foreach_entry(|&mut: name, content| println!("Name: {} Content: {}", name, content));
         
         *res.status_mut() = status::Ok;
 

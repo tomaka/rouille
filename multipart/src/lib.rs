@@ -19,10 +19,9 @@ pub mod server;
 
 
 pub struct MultipartFile<'a> {
-    _marker: marker::ContravariantLifetime<'a>,
     filename: Option<String>,
     content_type: Mime,
-    reader: &'a mut Reader +'a ,
+    reader: &'a mut Reader + 'a,
 }
 
 impl<'a> MultipartFile<'a> {
@@ -31,7 +30,6 @@ impl<'a> MultipartFile<'a> {
             filename: filename,
             reader: reader,
             content_type: from_str(cont_type).unwrap_or_else(mime_guess::octet_stream),
-            _marker: marker::ContravariantLifetime,    
         }    
     }
 
@@ -40,7 +38,6 @@ impl<'a> MultipartFile<'a> {
             filename: filename,
             reader: reader,
             content_type: mime,
-            _marker: marker::ContravariantLifetime,
         }
     }
 }
