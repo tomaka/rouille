@@ -1,4 +1,4 @@
-#![feature(if_let, slicing_syntax, default_type_params, phase, macro_rules)]
+#![feature(if_let, slicing_syntax, default_type_params, phase, unboxed_closures, macro_rules)]
 extern crate hyper;
 #[phase(plugin, link)] extern crate log;
 
@@ -53,8 +53,8 @@ impl<'a> Show for MultipartFile<'a> {
 
 #[deriving(Show)]
 pub enum MultipartField<'a> {
-    TextField(String),
-    FileField(MultipartFile<'a>),
+    Text(String),
+    File(MultipartFile<'a>),
     // MultiFiles(Vec<MultipartFile>), /* TODO: Multiple files */
 }
 
@@ -66,7 +66,7 @@ impl<'a> Reader for MultipartFile<'a> {
 
 pub mod mime_guess {
     
-    use mime::{mod, Mime};
+    use mime::{Mime, TopLevel, SubLevel};
 
     use serialize::json;
     
@@ -128,7 +128,7 @@ pub mod mime_guess {
     }
 
     pub fn octet_stream() -> Mime {
-        Mime(mime::Application, mime::SubExt("octet-stream".into_string()), Vec::new())   
+        Mime(TopLevel::Application, SubLevel::Ext("octet-stream".into_string()), Vec::new())   
     }
 
 #[test]

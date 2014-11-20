@@ -3,7 +3,7 @@ use hyper::header::common::ContentType;
 use hyper::net::{Fresh, Streaming};
 use hyper::{HttpResult, HttpIoError};
 
-use mime::{mod, Mime};
+use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
 use mime_guess::guess_mime_type;
 
@@ -11,7 +11,7 @@ use std::io::IoResult;
 use std::io::fs::File;
 use std::io;
 
-use super::{MultipartField, TextField, FileField, MultipartFile};
+use super::{MultipartField, MultipartFile};
 
 const BOUNDARY_LEN: uint = 8;
 
@@ -33,7 +33,7 @@ impl<'a> Multipart<'a> {
     }
 
     pub fn add_text(&mut self, name: &str, val: &str) {
-        self.fields.push((name.into_string(), TextField(val.into_string())));    
+        self.fields.push((name.into_string(), MultipartField::Text(val.into_string())));    
     }
     
     /// Add the file to the multipart request, guessing its `Content-Type` from its extension
@@ -42,7 +42,7 @@ impl<'a> Multipart<'a> {
         let content_type = guess_mime_type(file.path());
 
         self.fields.push((name.into_string(), 
-            FileField(MultipartFile::from_file(filename, file, content_type))));
+            MultipartField::File(MultipartFile::from_file(filename, file, content_type))));
     }
 
     /// Apply the appropriate headers to the `Request<Fresh>` and send the data.
@@ -76,8 +76,8 @@ impl<'a> Multipart<'a> {
             try!(write!(req, "Content-Disposition: form-data; name=\"{}\"\r\n\r\n", name));
 
             try!(match field {
-                    TextField(text) => write_line(req, &*text), // Style suggestions welcome
-                    FileField(file) => write_file(req, file),
+                    MultipartField::Text(text) => write_line(req, &*text),
+                    MultipartField::File(file) => write_file(req, file),
                 });
             
             try!(write_boundary(req, boundary[]));     
@@ -116,9 +116,9 @@ fn io_to_http<T>(res: IoResult<T>) -> HttpResult<T> {
 }
 
 fn multipart_mime(bound: &str) -> Mime {
-    mime::Mime(
-        mime::Multipart, mime::SubExt("form-data".into_string()),
-        vec![(mime::AttrExt("boundary".into_string()), mime::ValueExt(bound.into_string()))]
+    Mime(
+        TopLevel::Multipart, SubLevel::Ext("form-data".into_string()),
+        vec![(Attr::Ext("boundary".into_string()), Value::Ext(bound.into_string()))]
     )         
 }
 

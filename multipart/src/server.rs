@@ -1,9 +1,9 @@
 use hyper::header::common::content_type::ContentType;
 use hyper::server::request::Request;
 
-use mime::{Mime, AttrExt, ValueExt};
+use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
-use super::{MultipartField, TextField, MultipartFile, FileField};
+use super::{MultipartField, MultipartFile};
 
 use std::cmp;
 
@@ -12,12 +12,12 @@ use std::io::{RefReader, BufferedReader, IoError, IoResult, EndOfFile, standard_
 use std::kinds::marker;
 
 fn is_multipart_formdata(req: &Request) -> bool {
-    use mime::{Multipart, Mime, SubExt};
+    use mime::{Multipart};
 
     req.headers.get::<ContentType>().map(|ct| {
         let ContentType(ref mime) = *ct;
         match *mime {
-            Mime(Multipart, SubExt(ref subtype), _) => subtype[] == "form-data",
+            Mime(TopLevel::Multipart, SubLevel::Ext(ref subtype), _) => subtype[] == "form-data",
             _ => false,   
         }
     }).unwrap_or(false)
@@ -28,11 +28,11 @@ fn get_boundary(ct: &ContentType) -> Option<String> {
     let Mime(_, _, ref params) = *mime;
     
     params.iter().find(|&&(ref name, _)| 
-        if let AttrExt(ref name) = *name { 
+        if let Attr::Ext(ref name) = *name { 
             name[] == "boundary" 
         } else { false }
     ).and_then(|&(_, ref val)| 
-        if let ValueExt(ref val) = *val { 
+        if let Value::Ext(ref val) = *val { 
             Some(val.clone()) 
         } else { None }
     )        
@@ -90,14 +90,18 @@ impl Multipart {
       
         if let Some(content_type) = try!(self.read_content_type()) {
             let _ = try!(self.source.read_line()); // Consume empty line
-            Ok((field_name, FileField(MultipartFile::from_octet(filename, &mut self.source, content_type[]))))
+            Ok((field_name, 
+                MultipartField::File(
+                    MultipartFile::from_octet(filename, &mut self.source, content_type[])
+                )
+            ))
         } else {
             // Empty line consumed by read_content_type()
             let text = try!(self.source.read_to_string());
             // The last two characters are "\r\n".
             // We can't do a simple trim because the content might be terminated
             // with line separators we want to preserve.
-            Ok((field_name, TextField(text[..text.len() - 2].into_string()))) 
+            Ok((field_name, MultipartField::Text(text[..text.len() - 2].into_string()))) 
         }                
     }
    
@@ -105,7 +109,7 @@ impl Multipart {
     /// This is a substitute for `Multipart` implementing `Iterator`,
     /// since `Iterator::next()` can't use bound lifetimes.
     /// See https://www.reddit.com/r/rust/comments/2lkk4i/concrete_lifetime_vs_bound_lifetime/
-    pub fn foreach_entry(&mut self, f: for<'a>|String, MultipartField<'a>|) {
+    pub fn foreach_entry<F: for<'a> FnMut(String, MultipartField<'a>)>(&mut self, mut f: F) {
         loop {
             debug!("Loop!");
 
