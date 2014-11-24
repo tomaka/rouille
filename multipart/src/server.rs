@@ -7,6 +7,8 @@ use super::{MultipartField, MultipartFile};
 
 use std::cmp;
 
+use std::collections::HashMap;
+
 use std::io::{IoError, IoResult, EndOfFile, standard_error, OtherIoError};
 
 fn is_multipart_formdata(req: &Request) -> bool {
@@ -41,6 +43,7 @@ fn get_boundary(ct: &ContentType) -> Option<String> {
 
 pub struct Multipart<'a> {
     source: BoundaryReader<Request<'a>>,
+    tmp_dir: String,
 }
 
 macro_rules! try_find(
@@ -61,7 +64,7 @@ impl<'a> Multipart<'a> {
 
         debug!("Boundary: {}", boundary);
 
-        Ok(Multipart { source: BoundaryReader::from_reader(req, format!("--{}\r\n", boundary)) })
+        Ok(Multipart { source: BoundaryReader::from_reader(req, format!("--{}\r\n", boundary)), tmp_dir: ::random_alphanumeric(10) })
     }
 
     pub fn read_entry(&'a mut self) -> IoResult<(String, MultipartField<'a>)> { 
@@ -80,7 +83,7 @@ impl<'a> Multipart<'a> {
             let _ = try!(self.source.read_line()); // Consume empty line
             Ok((field_name, 
                 MultipartField::File(
-                    MultipartFile::from_octet(filename, &mut self.source, content_type[])
+                    MultipartFile::from_octet(filename, &mut self.source, content_type[], self.tmp_dir[])
                 )
             ))
         } else {
@@ -96,6 +99,7 @@ impl<'a> Multipart<'a> {
     /// Call `f` for each entry in the multipart request.
     /// This is a substitute for `Multipart` implementing `Iterator`,
     /// since `Iterator::next()` can't use bound lifetimes.
+    ///
     /// See https://www.reddit.com/r/rust/comments/2lkk4i/concrete_lifetime_vs_bound_lifetime/
     pub fn foreach_entry<F: for<'a> FnMut(String, MultipartField<'a>)>(&mut self, mut f: F) {
         loop {
@@ -164,6 +168,35 @@ impl<'a> Multipart<'a> {
         // Does not expect boundary=<boundary>
         Ok(type_idx.map(|start| line[start + CONTENT_TYPE.len()..].trim().into_string()))
     }
+
+    /// Read the request fully, parsing all fields and saving all files to the given directory or a
+    /// temporary, and return the result.
+    ///
+    /// If `dir` is none, chooses a random subdirectory under `std::os::tmpdir()`.
+    pub fn save_all(mut self, dir: Option<&Path>) -> IoResult<Entries> {
+        let dir = dir.map_or_else(|| ::std::os::tmpdir().join(self.tmp_dir[]), |path| path.clone());
+
+        let mut entries = Entries::with_path(dir);
+
+        loop {
+            match self.read_entry() {
+                Ok((name, MultipartField::Text(text))) => { entries.fields.insert(name, text); },
+                Ok((name, MultipartField::File(mut file))) => {
+                    let path = try!(file.save_in(&entries.dir));
+                    entries.files.insert(name, path);
+                },            
+                Err(err) => { 
+                    if err.kind != EndOfFile {
+                        error!("Error reading Multipart: {}", err);
+                    }
+
+                    break;
+                },
+            }
+        }
+
+        Ok(entries)
+    }
 }
 
 fn with<T, U>(left: Option<T>, right: |&T| -> Option<U>) -> Option<(T, U)> {
@@ -180,6 +213,24 @@ fn line_error(msg: &'static str, line: String) -> IoError {
         desc: msg,
         detail: Some(line),
     }
+}
+
+/// A result of `Multipart::save_all()`.
+pub struct Entries {
+    pub fields: HashMap<String, String>,
+    pub files: HashMap<String, Path>,
+    /// The directory the files were saved under.
+    pub dir: Path,
+}
+
+impl Entries {
+    fn with_path(path: Path) -> Entries {
+        Entries {
+            fields: HashMap::new(),
+            files: HashMap::new(),
+            dir: path,
+        }
+    }    
 }
 
 /* FIXME: Can't have an iterator return a borrowed reference

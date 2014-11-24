@@ -10,7 +10,7 @@ use self::mime::Mime;
 use std::fmt::{Formatter, Show};
 use std::fmt::Error as FormatError;
 
-use std::io::{File, IoErrorKind, IoResult};
+use std::io::{File, IoErrorKind, IoResult, TempDir};
 
 use std::io::fs::PathExtensions;
 
@@ -18,18 +18,34 @@ pub mod client;
 pub mod server;
 pub mod mime_guess;
 
+/// A representation of a file in HTTP `multipart/form-data`.
+///
+/// This struct has an input "flavor" and an output "flavor".
+/// The input "flavor" is used internally by `client::Multipart::add_file()`
+/// and is never exposed to the user.
+///
+/// The output "flavor" is returned by `server::Multipart::read_entry()` and represents
+/// a file entry in the incoming multipart request. 
+///
+/// Note that in the output "flavor", the file is not yet saved to the system; 
+/// instead, the struct implements a `Reader` that points 
+/// to the beginning of the file's contents in the HTTP stream. 
+/// You can read it to EOF, or use one of the `save_*()` methods here 
+/// to save it to disk.
 pub struct MultipartFile<'a> {
     filename: Option<String>,
     content_type: Mime,
     reader: &'a mut Reader + 'a,
+    tmp_dir: Option<&'a str>,
 }
 
 impl<'a> MultipartFile<'a> {
-    fn from_octet(filename: Option<String>, reader: &'a mut Reader, cont_type: &str) -> MultipartFile<'a> {
+    fn from_octet(filename: Option<String>, reader: &'a mut Reader, cont_type: &str, tmp_dir: &'a str) -> MultipartFile<'a> {
         MultipartFile {
             filename: filename,
             reader: reader,
             content_type: from_str(cont_type).unwrap_or_else(mime_guess::octet_stream),
+            tmp_dir: Some(tmp_dir),
         }    
     }
 
@@ -38,34 +54,67 @@ impl<'a> MultipartFile<'a> {
             filename: filename,
             reader: reader,
             content_type: mime,
+            tmp_dir: None,
         }
     }
 
-    /// Save this file to `path`, ignoring the filename, if any.
+    /// Save this file to `path`, discarding the filename.
     ///
-    /// Returns the created file on success.
-    pub fn save_as(&mut self, path: &Path) -> IoResult<File> {
+    /// If successful, the file can be found at `path`.
+    pub fn save_as(&mut self, path: &Path) -> IoResult<()> {
         let mut file = try!(File::create(path));
 
-        try!(ref_copy(self.reader, &mut file));
-
-        Ok(file)
+        ref_copy(self.reader, &mut file)
     }
 
     /// Save this file in the directory described by `dir`,
-    /// appending `filename` if any, or a random string.
+    /// appending `filename` if present, or a random string otherwise.
     ///
-    /// Returns the created file on success.
+    /// Returns the created file's path on success.
     ///
     /// ###Panics
     /// If `dir` does not represent a directory.
-    pub fn save_in(&mut self, dir: &Path) -> IoResult<File> {
+    pub fn save_in(&mut self, dir: &Path) -> IoResult<Path> {
         assert!(dir.is_dir(), "Given path is not a directory!");
 
-        let filename = self.filename.as_ref().map_or_else(|| random_alphanumeric(10), |s| s.clone());
-        let path = dir.join(filename);
+        let path = dir.join(self.dest_filename());
        
-        self.save_as(&path)
+        try!(self.save_as(&path));
+
+        Ok(path)
+    }
+
+    /// Save this file in the temp directory `tmpdir` if supplied,
+    /// or a random subdirectory under `std::os::tmp_dir()` otherwise. 
+    /// The same directory is used for all files in the same request).
+    ///
+    ///
+    /// Returns the created file's path on success.
+    pub fn save_temp(&mut self, tmp_dir: Option<&TempDir>) -> IoResult<Path> {
+        use std::os;
+
+        let dir = match tmp_dir {
+            Some(tmp_dir) => tmp_dir.path().clone(),
+            None => os::tmpdir().join(self.tmp_dir.unwrap()),
+        };
+        
+        self.save_in(&dir)
+    }
+
+    fn dest_filename(&self) -> String {
+        self.filename.as_ref().map_or_else(|| random_alphanumeric(10), |s| s.clone())
+    }
+
+    pub fn filename(&self) -> Option<&str> {
+        self.filename.as_ref().map(|s| s[])    
+    }
+
+    /// Get the content type of this file.
+    /// On the client, it is guessed by the file extension.
+    /// On the server, it is retrieved from the request or assumed to be
+    /// `application/octet-stream`.
+    pub fn content_type(&self) -> Mime {
+        self.content_type.clone()    
     }
 }
 
