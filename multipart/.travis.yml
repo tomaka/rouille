@@ -1,0 +1,21 @@
+language: rust
+os:
+- linux
+- osx
+env:
+  global:
+    - secure: eJpqXoY/xuCQRYmLBK9dLLzTGHvsBWe67wRN0fljesRgSnU+H09OsWI22DB9z/e6pMKjZpfDuyRkJaHVj8N7rwEfSeKdywv6uKqs5/Mi7dVINnzVA7jU3E4kLc+EuASF8w5d85kfccGNGs7qM0Uwz/i4da3Gw4B+cSc5cqjWsIY=
+before_script:
+- rustc -v
+- cargo -V
+script:
+- cargo build -v
+- ./target/multipart_server&
+- sleep 5s #Wait for previous script to bind
+- cargo test -v
+- cargo doc -v
+- kill $! #kill ./target/multippart_server
+after_success:
+- cp -R target/doc doc
+- curl http://www.rust-ci.org/artifacts/put?t=$RUSTCI_TOKEN | sh
+- rm -r doc
