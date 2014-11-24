@@ -254,21 +254,13 @@ impl<S> BoundaryReader<S> where S: Reader {
     }
 
     fn read_to_boundary(&mut self) -> IoResult<()> {
-        debug!("Read to boundary!");
-
          if !self.boundary_read {
             try!(self.true_fill_buf());
-
-            debug!("Exited true_fill_buf");
 
             if self.buf_len == 0 { return eof(); }
             
             let lookahead = self.buf[self.last_search_idx .. self.buf_len];
-
-            debug!("Buf len: {}", self.buf_len);
-
-            debug!("Lookahead: {}", lookahead.to_ascii().as_str_ascii());
-             
+ 
             let search_idx = lookahead.position_elem(&self.boundary[0])
                 .unwrap_or(lookahead.len() - 1);
 
@@ -276,8 +268,6 @@ impl<S> BoundaryReader<S> where S: Reader {
 
             self.boundary_read = lookahead[search_idx..]
                 .starts_with(self.boundary[]);
-
-            debug!("Boundary read: {} Boundary: {}", self.boundary_read, self.boundary.to_ascii().as_str_ascii());
 
             self.last_search_idx += search_idx;
 
@@ -294,33 +284,23 @@ impl<S> BoundaryReader<S> where S: Reader {
 
     /// Read bytes until the reader is full
     fn true_fill_buf(&mut self) -> IoResult<()> {
-        debug!("True fill buf! Buf len: {}", self.buf_len);
-
         let mut bytes_read = 1u;
         
         while bytes_read != 0 {
-            debug!("Bytes read loop!");
-
             bytes_read = match self.reader.read(self.buf[mut self.buf_len..]) {
                 Ok(read) => read,
                 Err(err) => if err.kind == EndOfFile { break; } else { return Err(err); },
             };
 
-            debug!("Bytes read: {}", bytes_read);
-
             self.buf_len += bytes_read;
         }
-
-        debug!("Exited bytes read loop!");
 
         Ok(())
     }
 
     fn _consume(&mut self, amt: uint) {
         use std::ptr::copy_memory;
-
-        debug!("Consume! Amt: {}", amt);
-        
+ 
         assert!(amt <= self.buf_len);
 
         let src = self.buf[amt..].as_ptr();
@@ -333,11 +313,7 @@ impl<S> BoundaryReader<S> where S: Reader {
     }
 
     fn consume_boundary(&mut self) -> IoResult<()> {
-        debug!("Consume boundary!");
-
         while !self.boundary_read {
-            debug!("Boundary read loop!");
-
             match self.read_to_boundary() {
                 Ok(_) => (),
                 Err(e) => if e.kind == EndOfFile { 
@@ -370,8 +346,6 @@ impl<S> Reader for BoundaryReader<S> where S: Reader {
         use std::cmp;        
         use std::slice::bytes::copy_memory;
 
-        debug!("Read!");
-
         try!(self.read_to_boundary()); 
 
         let trunc_len = cmp::min(buf.len(), self.last_search_idx);
@@ -385,13 +359,9 @@ impl<S> Reader for BoundaryReader<S> where S: Reader {
 
 impl<S> Buffer for BoundaryReader<S> where S: Reader {
     fn fill_buf<'a>(&'a mut self) -> IoResult<&'a [u8]> {
-        debug!("Fill buf!");
-
         try!(self.read_to_boundary());
        
         let buf = self.buf[..self.last_search_idx];
-        
-        debug!("Buf: {}", buf.to_ascii().as_str_ascii());
 
         Ok(buf)    
     }
