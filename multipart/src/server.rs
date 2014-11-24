@@ -56,8 +56,6 @@ impl<'a> Multipart<'a> {
     pub fn from_request(req: Request<'a>) -> Result<Multipart<'a>, Request<'a>> {
         if !is_multipart_formdata(&req) { return Err(req); }
 
-        debug!("Is multipart!");
-
         let boundary = if let Some(boundary) = req.headers.get::<ContentType>()
             .and_then(get_boundary) { boundary } else { return Err(req); };
 
@@ -66,9 +64,7 @@ impl<'a> Multipart<'a> {
         Ok(Multipart { source: BoundaryReader::from_reader(req, format!("--{}\r\n", boundary)) })
     }
 
-    pub fn read_entry<'a>(&'a mut self) -> IoResult<(String, MultipartField<'a>)> {
-        debug!("Read entry!");
- 
+    pub fn read_entry(&'a mut self) -> IoResult<(String, MultipartField<'a>)> { 
         try!(self.source.consume_boundary());
         let (disp_type, field_name, filename) = try!(self.read_content_disposition());
 
@@ -103,8 +99,6 @@ impl<'a> Multipart<'a> {
     /// See https://www.reddit.com/r/rust/comments/2lkk4i/concrete_lifetime_vs_bound_lifetime/
     pub fn foreach_entry<F: for<'a> FnMut(String, MultipartField<'a>)>(&mut self, mut f: F) {
         loop {
-            debug!("Loop!");
-
             match self.read_entry() {
                 Ok((name, field)) => f(name, field),
                 Err(err) => { 
@@ -119,10 +113,7 @@ impl<'a> Multipart<'a> {
     } 
     
     fn read_content_disposition(&mut self) -> IoResult<(String, String, Option<String>)> {
-        debug!("Read content disposition!");
         let line = try!(self.source.read_line());       
-
-        debug!("Line: {}", line);
 
         // Find the end of CONT_DISP in the line
         let disp_type = {
@@ -130,18 +121,12 @@ impl<'a> Multipart<'a> {
 
             let disp_idx = try_find!(line[], find_str, CONT_DISP, 
                 "Content-Disposition subheader not found!", line) + CONT_DISP.len();
-                
-            debug!("Disp idx: {} Line len: {}", disp_idx, line.len());  
 
             let disp_type_end = try_find!(line[disp_idx..], find, ';', 
                 "Error parsing Content-Disposition value!", line);
 
-            debug!("Disp end: {}", disp_type_end);
-
             line[disp_idx .. disp_idx + disp_type_end].trim().into_string()
         };
-   
-        debug!("Disp-type: {}", disp_type);
     
         let field_name = {
             const NAME: &'static str = "name=\"";
@@ -149,17 +134,11 @@ impl<'a> Multipart<'a> {
             let name_idx = try_find!(line[], find_str, NAME, 
                 "Error parsing field name!", line) + NAME.len();
 
-            debug!("Name idx: {}", name_idx);
-
             let name_end = try_find!(line[name_idx ..], find, '"',
                 "Error parsing field name!", line);
 
-            debug!("Name end: {}", name_end);
-
             line[name_idx .. name_idx + name_end].into_string() // No trim here since it's in quotes.
         };
-
-        debug!("Field name: {}", field_name);
 
         let filename = {
             const FILENAME: &'static str = "filename=\"";
@@ -169,9 +148,7 @@ impl<'a> Multipart<'a> {
             
             filename_idxs.map(|(start, end)| line[start .. start + end].into_string())
         };
-
-        debug!("Filename: {}", filename);
-        
+ 
         Ok((disp_type, field_name, filename))
     }
 
@@ -206,7 +183,7 @@ fn line_error(msg: &'static str, line: String) -> IoError {
 }
 
 /* FIXME: Can't have an iterator return a borrowed reference
-impl<'a> Iterator<(String, MultipartField<'a>)> for Multipart {
+impl<'a> Iterator<(String, MultipartField<'a>)> for Multipart<'a> {
     fn next(&mut self) -> Option<(String, MultipartField<'a>)> {
         match self.read_entry() {
             Ok(ok) => Some(ok), 
