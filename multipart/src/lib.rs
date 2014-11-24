@@ -123,7 +123,7 @@ mod test {
 
         multipart.add_text("hello", "world");
         multipart.add_text("goodnight", "sun");
-        //multipart.sized = true;
+        multipart.sized = true;
 
         multipart.send(request).unwrap();        
     }
