@@ -13,7 +13,7 @@ script:
 - ./target/multipart_server&
 - sleep 5s #Wait for previous script to bind
 - cargo test -v
-- cargo doc -v
+- cargo doc -v --no-deps
 - kill $! #kill ./target/multippart_server
 after_success:
 - cp -R target/doc doc
