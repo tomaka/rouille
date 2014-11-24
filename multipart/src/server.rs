@@ -72,18 +72,7 @@ impl<'a> Multipart<'a> {
 
     pub fn read_entry<'a>(&'a mut self) -> IoResult<(String, MultipartField<'a>)> {
         debug!("Read entry!");
-
-        loop {
-            let string = self.source.read_to_string().unwrap();
-            self.source.consume_boundary();
-
-            if string.is_empty() {
-                break;
-            }
-
-            debug!("{}", string);
-        }
-
+ 
         try!(self.source.consume_boundary());
         let (disp_type, field_name, filename) = try!(self.read_content_disposition());
 
