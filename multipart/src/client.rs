@@ -11,9 +11,8 @@ use mime_guess::guess_mime_type;
 
 use std::io::IoResult;
 use std::io::fs::File;
-use std::io;
 
-use super::{MultipartField, MultipartFile};
+use super::{MultipartField, MultipartFile, ref_copy, random_alphanumeric};
 
 const BOUNDARY_LEN: uint = 8;
 
@@ -66,7 +65,7 @@ impl<'a> Multipart<'a> {
             return self.send_sized(req);    
         }
 
-        let Multipart { fields, boundary, sized } = self;
+        let Multipart { fields, boundary, ..} = self;
 
         apply_headers(&mut req, boundary[], None);
 
@@ -80,7 +79,7 @@ impl<'a> Multipart<'a> {
     fn send_sized(self, mut req: Request<Fresh>) -> HttpResult<Response> {
         let mut body: Vec<u8> = Vec::new();
 
-        let Multipart { fields, boundary, sized } = self;
+        let Multipart { fields, boundary, ..} = self;
 
         try!(write_body(&mut body, fields, boundary[]));
         
@@ -138,13 +137,6 @@ fn write_line(req: &mut Writer, s: &str) -> IoResult<()> {
     req.write_str(s).and_then(|_| req.write(b"\r\n"))        
 }
 
-/// Generate a random alphanumeric sequence of length `len`
-fn random_alphanumeric(len: uint) -> String {
-    use std::rand::{task_rng, Rng};
-    use std::char::to_lowercase;
-
-    task_rng().gen_ascii_chars().map(to_lowercase).take(len).collect()    
-}
 
 fn io_to_http<T>(res: IoResult<T>) -> HttpResult<T> {
     res.map_err(|e| HttpIoError(e))
@@ -157,17 +149,4 @@ fn multipart_mime(bound: &str) -> Mime {
     )         
 }
 
-/// A copy of std::io::util::copy that takes references
-fn ref_copy(r: &mut Reader, w: &mut Writer) -> IoResult<()> {
-    let mut buf = [0, ..1024 * 64];
-    
-    loop {
-        let len = match r.read(&mut buf) {
-            Ok(len) => len,
-            Err(ref e) if e.kind == io::EndOfFile => return Ok(()),
-            Err(e) => return Err(e),
-        };
-        try!(w.write(buf[..len]));
-    }
-}
 

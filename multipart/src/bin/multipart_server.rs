@@ -1,4 +1,5 @@
 #![feature(unboxed_closures, if_let, slicing_syntax)]
+#![allow(dead_code)]
 
 extern crate hyper;
 extern crate multipart;
@@ -51,6 +52,6 @@ fn tcp_listen() {
 }
 
 fn print_req(req: &Request) {
-    println!("Reqeust: \nRemote addr: {}\nMethod: {}\nHeaders: {}\nURI: {}", 
+    println!("Request: \nRemote addr: {}\nMethod: {}\nHeaders: {}\nURI: {}", 
         req.remote_addr, req.method, req.headers, req.uri);    
 }

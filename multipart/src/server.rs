@@ -7,9 +7,7 @@ use super::{MultipartField, MultipartFile};
 
 use std::cmp;
 
-use std::io::{RefReader, BufferedReader, IoError, IoResult, EndOfFile, standard_error, OtherIoError};
-
-use std::kinds::marker;
+use std::io::{IoError, IoResult, EndOfFile, standard_error, OtherIoError};
 
 fn is_multipart_formdata(req: &Request) -> bool {
     use mime::{Multipart};
@@ -55,9 +53,7 @@ impl<'a> Multipart<'a> {
 
     /// If the given `Request` is of `Content-Type: multipart/form-data`, return
     /// the wrapped request as `Ok(Multipart)`, otherwise `Err(Request)`.
-    pub fn from_request(mut req: Request<'a>) -> Result<Multipart<'a>, Request<'a>> {
-        use std::io::stdio::stdout_raw;
-
+    pub fn from_request(req: Request<'a>) -> Result<Multipart<'a>, Request<'a>> {
         if !is_multipart_formdata(&req) { return Err(req); }
 
         debug!("Is multipart!");

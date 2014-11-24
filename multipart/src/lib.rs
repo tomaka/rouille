@@ -10,15 +10,13 @@ use self::mime::Mime;
 use std::fmt::{Formatter, Show};
 use std::fmt::Error as FormatError;
 
-use std::kinds::marker;
-use std::io::fs::File;
-use std::io::{AsRefReader, RefReader, IoResult};
+use std::io::{File, IoErrorKind, IoResult};
 
-use server::BoundaryReader;
+use std::io::fs::PathExtensions;
 
 pub mod client;
 pub mod server;
-
+pub mod mime_guess;
 
 pub struct MultipartFile<'a> {
     filename: Option<String>,
@@ -42,6 +40,33 @@ impl<'a> MultipartFile<'a> {
             content_type: mime,
         }
     }
+
+    /// Save this file to `path`, ignoring the filename, if any.
+    ///
+    /// Returns the created file on success.
+    pub fn save_as(&mut self, path: &Path) -> IoResult<File> {
+        let mut file = try!(File::create(path));
+
+        try!(ref_copy(self.reader, &mut file));
+
+        Ok(file)
+    }
+
+    /// Save this file in the directory described by `dir`,
+    /// appending `filename` if any, or a random string.
+    ///
+    /// Returns the created file on success.
+    ///
+    /// ###Panics
+    /// If `dir` does not represent a directory.
+    pub fn save_in(&mut self, dir: &Path) -> IoResult<File> {
+        assert!(dir.is_dir(), "Given path is not a directory!");
+
+        let filename = self.filename.as_ref().map_or_else(|| random_alphanumeric(10), |s| s.clone());
+        let path = dir.join(filename);
+       
+        self.save_as(&path)
+    }
 }
 
 impl<'a> Show for MultipartFile<'a> {
@@ -63,80 +88,25 @@ impl<'a> Reader for MultipartFile<'a> {
     }
 }
 
-pub mod mime_guess {
+/// A copy of `std::io::util::copy` that takes trait references
+pub fn ref_copy(r: &mut Reader, w: &mut Writer) -> IoResult<()> {
+    let mut buf = [0, ..1024 * 64];
     
-    use mime::{Mime, TopLevel, SubLevel};
-
-    use serialize::json;
-    
-    use std::cell::RefCell;
-
-    use std::collections::HashMap;
-
-
-    /// Guess the MIME type of the `Path` by its extension.
-    ///
-    /// **Guess** is the operative word here, as the contents of a file
-    /// may not or may not match its MIME type/extension.
-    pub fn guess_mime_type(path: &Path) -> Mime {
-        let ext = path.extension_str().unwrap_or("");
-        
-        get_mime_type(ext)
-    }
-
-    pub fn guess_mime_type_filename(filename: &str) -> Mime {
-        let path = Path::new(filename);
-        
-        guess_mime_type(&path)    
-    }
-
-    local_data_key!(mime_types_cache: RefCell<HashMap<String, Mime>>)
-
-    /// Get the MIME type associated with a file extension
-    // MIME Types are cached in a task-local heap
-    pub fn get_mime_type(ext: &str) -> Mime {
-        if ext.is_empty() { return octet_stream(); }
-
-        let ext = ext.into_string();
-       
-        let cache = if let Some(cache) = mime_types_cache.get() { cache }
-        else {
-            mime_types_cache.replace(Some(RefCell::new(HashMap::new())));
-            mime_types_cache.get().unwrap()   
+    loop {
+        let len = match r.read(&mut buf) {
+            Ok(len) => len,
+            Err(ref e) if e.kind == IoErrorKind::EndOfFile => return Ok(()),
+            Err(e) => return Err(e),
         };
-
-        if let Some(mime_type) = cache.borrow().find(&ext) {
-            return mime_type.clone();   
-        }
-
-        let mime_type = find_mime_type(&*ext);
-
-        cache.borrow_mut().insert(ext, mime_type.clone());
-
-        mime_type  
+        try!(w.write(buf[..len]));
     }
+}
 
-    const MIME_TYPES: &'static str = include_str!("../mime_types.json");
+/// Generate a random alphanumeric sequence of length `len`
+fn random_alphanumeric(len: uint) -> String {
+    use std::rand::{task_rng, Rng};
 
-    /// Load the MIME_TYPES as JSON and try to locate `ext`
-    fn find_mime_type(ext: &str) -> Mime {
-        json::from_str(MIME_TYPES).unwrap()
-            .find(ext).and_then(|j| j.as_string())
-            .and_then(from_str::<Mime>)
-            .unwrap_or_else(octet_stream)
-    }
-
-    pub fn octet_stream() -> Mime {
-        Mime(TopLevel::Application, SubLevel::Ext("octet-stream".into_string()), Vec::new())   
-    }
-
-#[test]
-    fn test_mime_type_guessing() {
-        assert!(get_mime_type("gif").to_string() == "image/gif".to_string());
-        assert!(get_mime_type("txt").to_string() == "text/plain".to_string());
-        assert!(get_mime_type("blahblah").to_string() == "application/octet-stream".to_string());     
-    }
-   
+    task_rng().gen_ascii_chars().map(|ch| ch.to_lowercase()).take(len).collect()    
 }
 
 #[cfg(test)]
