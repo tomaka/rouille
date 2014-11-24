@@ -14,13 +14,16 @@ use std::kinds::marker;
 fn is_multipart_formdata(req: &Request) -> bool {
     use mime::{Multipart};
 
-    req.headers.get::<ContentType>().map(|ct| {
+    req.headers.get::<ContentType>().map_or(false, |ct| {
         let ContentType(ref mime) = *ct;
+        
+        debug!("Content-Type: {}", mime);
+
         match *mime {
-            Mime(TopLevel::Multipart, SubLevel::Ext(ref subtype), _) => subtype[] == "form-data",
+            Mime(TopLevel::Multipart, SubLevel::FormData, _) => true,
             _ => false,   
         }
-    }).unwrap_or(false)
+    })
 }
 
 fn get_boundary(ct: &ContentType) -> Option<String> {
@@ -38,8 +41,8 @@ fn get_boundary(ct: &ContentType) -> Option<String> {
     )        
 }
 
-pub struct Multipart {
-    source: BoundaryReader<Request>,
+pub struct Multipart<'a> {
+    source: BoundaryReader<Request<'a>>,
 }
 
 macro_rules! try_find(
@@ -48,17 +51,21 @@ macro_rules! try_find(
     )
 )
 
-impl Multipart {
+impl<'a> Multipart<'a> {
 
     /// If the given `Request` is of `Content-Type: multipart/form-data`, return
     /// the wrapped request as `Ok(Multipart)`, otherwise `Err(Request)`.
-    pub fn from_request(mut req: Request) -> Result<Multipart, Request> {
+    pub fn from_request(mut req: Request<'a>) -> Result<Multipart<'a>, Request<'a>> {
         use std::io::stdio::stdout_raw;
 
         if !is_multipart_formdata(&req) { return Err(req); }
 
+        debug!("Is multipart!");
+
         let boundary = if let Some(boundary) = req.headers.get::<ContentType>()
             .and_then(get_boundary) { boundary } else { return Err(req); };
+
+        debug!("Boundary: {}", boundary);
 
         Ok(Multipart { source: BoundaryReader::from_reader(req, format!("--{}\r\n", boundary)) })
     }

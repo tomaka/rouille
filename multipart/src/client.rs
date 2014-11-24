@@ -1,5 +1,7 @@
 use hyper::client::{Request, Response};
-use hyper::header::common::ContentType;
+
+use hyper::header::common::{ContentType, ContentLength};
+
 use hyper::net::{Fresh, Streaming};
 use hyper::{HttpResult, HttpIoError};
 
@@ -15,9 +17,14 @@ use super::{MultipartField, MultipartFile};
 
 const BOUNDARY_LEN: uint = 8;
 
+type Fields<'a> = Vec<(String, MultipartField<'a>)>;
+
 pub struct Multipart<'a> {
-    fields: Vec<(String, MultipartField<'a>)>,
+    fields: Fields<'a>,
     boundary: String,
+    /// If the request can be sized.
+    /// If true, avoid using chunked requests.
+    pub sized: bool,
 }
 
 /// Shorthand for a writable request (`Request<Streaming>`)
@@ -29,6 +36,7 @@ impl<'a> Multipart<'a> {
         Multipart {
             fields: Vec::new(),
             boundary: random_alphanumeric(BOUNDARY_LEN),
+            sized: false,
         } 
     }
 
@@ -46,60 +54,87 @@ impl<'a> Multipart<'a> {
     }
 
     /// Apply the appropriate headers to the `Request<Fresh>` and send the data.
+    /// If `self.sized == true`, send a sized (non-chunked) request, setting the `Content-Length`
+    /// header. Else, send a chunked request.
     pub fn send(self, mut req: Request<Fresh>) -> HttpResult<Response> {
         use hyper::method;
         assert!(req.method() == method::Post, "Multipart request must use POST method!");
 
-        self.apply_headers(&mut req);
-
         debug!("Fields: {}; Boundary: {}", self.fields[], self.boundary[]);
 
-        debug!("{}", req.headers());
-
-        let mut req = try!(req.start());
-        try!(io_to_http(self.write_request(&mut req)));
-        req.send()
-    }
-    
-    fn apply_headers(&self, req: &mut Request<Fresh>){
-        let headers = req.headers_mut();
-
-        headers.set(ContentType(multipart_mime(self.boundary[])))         
-    }
-
-    fn write_request(self, req: &mut ReqWrite) -> IoResult<()> {
-        let Multipart{ fields, boundary } = self;
-
-        try!(write_boundary(req, boundary[]));
-
-        for (name, field) in fields.into_iter() {
-            try!(write!(req, "Content-Disposition: form-data; name=\"{}\"\r\n\r\n", name));
-
-            try!(match field {
-                    MultipartField::Text(text) => write_line(req, &*text),
-                    MultipartField::File(file) => write_file(req, file),
-                });
-            
-            try!(write_boundary(req, boundary[]));     
+        if self.sized {
+            return self.send_sized(req);    
         }
 
-        Ok(())
+        let Multipart { fields, boundary, sized } = self;
+
+        apply_headers(&mut req, boundary[], None);
+
+        debug!("{}", req.headers());
+        
+        let mut req = try!(req.start());
+        try!(io_to_http(write_body(&mut req, fields, boundary[])));
+        req.send()
+    }
+ 
+    fn send_sized(self, mut req: Request<Fresh>) -> HttpResult<Response> {
+        let mut body: Vec<u8> = Vec::new();
+
+        let Multipart { fields, boundary, sized } = self;
+
+        try!(write_body(&mut body, fields, boundary[]));
+        
+        apply_headers(&mut req, boundary[], Some(body.len()));
+        
+        let mut req = try!(req.start());
+        try!(io_to_http(req.write(body[])));
+        req.send()
+    }    
+}
+
+fn apply_headers(req: &mut Request<Fresh>, boundary: &str, size: Option<uint>){
+    let headers = req.headers_mut();
+
+    headers.set(ContentType(multipart_mime(boundary)));
+
+    if let Some(size) = size {
+        headers.set(ContentLength(size));   
+    }
+}   
+
+fn write_body<'a>(wrt: &mut Writer, fields: Fields<'a>, boundary: &str) -> IoResult<()> {
+    try!(write_boundary(wrt, boundary[]));
+
+    for (name, field) in fields.into_iter() {
+        try!(write_field(wrt, name, field, boundary));
     }
 
+    Ok(())
+} 
+
+fn write_field(wrt: &mut Writer, name: String, field: MultipartField, boundary: &str) -> IoResult<()> {
+    try!(write!(wrt, "Content-Disposition: form-data; name=\"{}\"\r\n\r\n", name));
+
+    try!(match field {
+            MultipartField::Text(text) => write_line(wrt, &*text),
+            MultipartField::File(file) => write_file(wrt, file),
+        });
+    
+    write_boundary(wrt, boundary[])  
+} 
+
+fn write_boundary(wrt: &mut Writer, boundary: &str) -> IoResult<()> {
+    write!(wrt, "--{}\r\n", boundary)
 }
 
-fn write_boundary(req: &mut ReqWrite, boundary: &str) -> IoResult<()> {
-    write!(req, "--{}\r\n", boundary)
-}
-
-fn write_file(req: &mut ReqWrite, mut file: MultipartFile) -> IoResult<()> {
-    try!(file.filename.map(|filename| write!(req, "; filename=\"{}\"\r\n", filename)).unwrap_or(Ok(())));
-    try!(write!(req, "Content-Type: {}\r\n\r\n", file.content_type));
-    io::util::copy(&mut file.reader, req)         
+fn write_file(wrt: &mut Writer, mut file: MultipartFile) -> IoResult<()> {
+    try!(file.filename.map(|filename| write!(wrt, "; filename=\"{}\"\r\n", filename)).unwrap_or(Ok(())));
+    try!(write!(wrt, "Content-Type: {}\r\n\r\n", file.content_type));
+    ref_copy(&mut file.reader, wrt)         
 }
 
 /// Specialized write_line that writes CRLF after a line as per W3C specs
-fn write_line(req: &mut ReqWrite, s: &str) -> IoResult<()> {
+fn write_line(req: &mut Writer, s: &str) -> IoResult<()> {
     req.write_str(s).and_then(|_| req.write(b"\r\n"))        
 }
 
@@ -122,5 +157,17 @@ fn multipart_mime(bound: &str) -> Mime {
     )         
 }
 
-
+/// A copy of std::io::util::copy that takes references
+fn ref_copy(r: &mut Reader, w: &mut Writer) -> IoResult<()> {
+    let mut buf = [0, ..1024 * 64];
+    
+    loop {
+        let len = match r.read(&mut buf) {
+            Ok(len) => len,
+            Err(ref e) if e.kind == io::EndOfFile => return Ok(()),
+            Err(e) => return Err(e),
+        };
+        try!(w.write(buf[..len]));
+    }
+}
 

@@ -7,7 +7,9 @@ extern crate serialize;
 
 use self::mime::Mime;
 
-use std::fmt::{Formatter, FormatError, Show};
+use std::fmt::{Formatter, Show};
+use std::fmt::Error as FormatError;
+
 use std::kinds::marker;
 use std::io::fs::File;
 use std::io::{AsRefReader, RefReader, IoResult};
@@ -151,6 +153,7 @@ mod test {
 
         multipart.add_text("hello", "world");
         multipart.add_text("goodnight", "sun");
+        multipart.sized = true;
 
         multipart.send(request).unwrap();        
     }
