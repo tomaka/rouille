@@ -26,12 +26,12 @@ pub fn guess_mime_type_filename(filename: &str) -> Mime {
 local_data_key!(mime_types_cache: RefCell<HashMap<String, Mime>>)
 
 /// Get the MIME type associated with a file extension
-// MIME Types are cached in a task-local heap
 pub fn get_mime_type(ext: &str) -> Mime {
     if ext.is_empty() { return octet_stream(); }
 
     let ext = ext.into_string();
    
+    // MIME Types are cached in a task-local heap
     let cache = if let Some(cache) = mime_types_cache.get() { cache }
     else {
         mime_types_cache.replace(Some(RefCell::new(HashMap::new())));
@@ -59,6 +59,7 @@ fn find_mime_type(ext: &str) -> Mime {
         .unwrap_or_else(octet_stream)
 }
 
+/// Get the `Mime` type for `application/octet-stream` (generic binary stream)
 pub fn octet_stream() -> Mime {
     Mime(TopLevel::Application, SubLevel::Ext("octet-stream".into_string()), Vec::new())   
 }
