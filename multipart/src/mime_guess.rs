@@ -29,8 +29,8 @@ pub fn guess_mime_type_filename(filename: &str) -> Mime {
 local_data_key!(mime_types_cache: RefCell<HashMap<String, Mime>>)
 
 /// Get the MIME type associated with a file extension
-/// If there is no association for the extension,
-/// `application/octet-stream` is assumed.
+/// If there is no association for the extension, or `ext` is empty,
+/// `application/octet-stream` is returned.
 pub fn get_mime_type(ext: &str) -> Mime {
     if ext.is_empty() { return octet_stream(); }
 
