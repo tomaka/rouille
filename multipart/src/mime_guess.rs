@@ -17,6 +17,9 @@ pub fn guess_mime_type(path: &Path) -> Mime {
     get_mime_type(ext)
 }
 
+/// Extract the extensioin of `filename` and guess its MIME type.
+/// If there is no extension, or the extension has no known MIME association,
+/// `applicaton/octet-stream` is assumed.
 pub fn guess_mime_type_filename(filename: &str) -> Mime {
     let path = Path::new(filename);
     
