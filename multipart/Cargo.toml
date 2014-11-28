@@ -1,10 +1,16 @@
 [package]
 
 name = "multipart"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
-[dependencies.hyper]
-git = "https://github.com/hyperium/hyper"
+description = "An extension to the Hyper HTTP library that provides support for POST multipart/form-data requests on for both client and server."
 
+repository = "http://github.com/cybergeek94/multipart"
 
+documentation = "http://rust-ci.org/cybergeek94/multipart/doc/multipart/"
+
+license = "MIT"
+
+[dependencies]
+hyper = "*"
