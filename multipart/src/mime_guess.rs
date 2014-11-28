@@ -2,10 +2,7 @@ use mime::{Mime, TopLevel, SubLevel};
 
 use serialize::json;
 
-use std::cell::RefCell;
-
 use std::collections::HashMap;
-
 
 /// Guess the MIME type of the `Path` by its extension.
 ///
@@ -26,42 +23,39 @@ pub fn guess_mime_type_filename(filename: &str) -> Mime {
     guess_mime_type(&path)    
 }
 
-local_data_key!(mime_types_cache: RefCell<HashMap<String, Mime>>)
+const MIME_TYPES: &'static str = include_str!("../mime_types.json");
+
+// Lazily initialized task-local hashmap
+// TODO: Make this global since it's read-only
+thread_local!(static MIMES: HashMap<String, Mime> = load_mime_types())
 
 /// Get the MIME type associated with a file extension
 /// If there is no association for the extension, or `ext` is empty,
 /// `application/octet-stream` is returned.
 pub fn get_mime_type(ext: &str) -> Mime {
     if ext.is_empty() { return octet_stream(); }
-
-    let ext = ext.into_string();
-   
-    // MIME Types are cached in a task-local heap
-    let cache = if let Some(cache) = mime_types_cache.get() { cache }
-    else {
-        mime_types_cache.replace(Some(RefCell::new(HashMap::new())));
-        mime_types_cache.get().unwrap()   
-    };
-
-    if let Some(mime_type) = cache.borrow().get(&ext) {
-        return mime_type.clone();   
-    }
-
-    let mime_type = find_mime_type(&*ext);
-
-    cache.borrow_mut().insert(ext, mime_type.clone());
-
-    mime_type  
+ 
+    MIMES.with(|cache| cache.get(ext).cloned()).unwrap_or_else(octet_stream) 
 }
 
-const MIME_TYPES: &'static str = include_str!("../mime_types.json");
+/// Load the known mime types from the MIME_TYPES json 
+fn load_mime_types() -> HashMap<String, Mime> {
+    let map = if let json::Object(map) = json::from_str(MIME_TYPES).unwrap() { map }
+    else { unreachable!("MIME types should be supplied as a map!"); };
+    
+    map.into_iter().filter_map(to_mime_mapping).collect()
+}
 
-/// Load the MIME_TYPES as JSON and try to locate `ext`
-fn find_mime_type(ext: &str) -> Mime {
-    json::from_str(MIME_TYPES).unwrap()
-        .find(ext).and_then(|j| j.as_string())
-        .and_then(from_str::<Mime>)
-        .unwrap_or_else(octet_stream)
+fn to_mime_mapping(val: (String, json::Json)) -> Option<(String, Mime)> {
+    if let (st, json::String(mime)) = val {
+        if st.char_at(0) == '_' { return None; }
+
+        if let Some(mime) = from_str::<Mime>(&*mime) { 
+            return Some((st, mime))
+        }
+    }
+    
+    None    
 }
 
 /// Get the `Mime` type for `application/octet-stream` (generic binary stream)
