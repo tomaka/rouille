@@ -16,12 +16,10 @@ use std::io::net::ip::Ipv4Addr;
 
 use std::rand::random;
 
-fn hello(req: Request, mut res: Response) {  
-    print_req(&req);
-         
+fn ok_serv(req: Request, mut res: Response) { 
     let mut multipart = Multipart::from_request(req).ok().expect("Could not create multipart!");
 
-    multipart.foreach_entry(|&: name, content| println!("Name: {} Content: {}", name, content));
+    multipart.foreach_entry(|&: _, _| ());
     
     *res.status_mut() = status::Ok;
 
@@ -32,12 +30,7 @@ thread_local!(static PORT: u16 = random())
 
 fn server() -> Listening {
     let server = PORT.with(|port| Server::http(Ipv4Addr(127, 0, 0, 1), *port));
-    server.listen(hello).unwrap()
-}
-
-fn print_req(req: &Request) {
-    println!("Request: \nRemote addr: {}\nMethod: {}\nHeaders: {}\nURI: {}", 
-        req.remote_addr, req.method, req.headers, req.uri);    
+    server.listen(ok_serv).unwrap()
 }
 
 #[test]
