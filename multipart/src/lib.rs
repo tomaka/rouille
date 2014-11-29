@@ -124,11 +124,60 @@ impl<'a> Show for MultipartFile<'a> {
     } 
 }
 
+
+/// A field in a `multipart/form-data` request.
+///
+/// Like `MultipartFile`, this is used in both the client and server-side implementations,
+/// but only exposed to the user on the server.
+///
+/// This enum does not include the names of the fields, as those are yielded separately
+/// by `server::Multipart::read_entry()`.
 #[deriving(Show)]
 pub enum MultipartField<'a> {
+    /// A text field.
     Text(String),
+    /// A file field, including the content type and optional filename
+    /// along with a `Reader` implementation for getting the contents.
     File(MultipartFile<'a>),
     // MultiFiles(Vec<MultipartFile>), /* TODO: Multiple files */
+}
+
+impl<'a> MultipartField<'a> {
+
+    /// Borrow this field as a text field, if possible.
+    pub fn as_text<'a>(&'a self) -> Option<&'a str> {
+        match *self {
+            MultipartField::Text(ref s) => Some(s[]),
+            _ => None,
+        }
+    }
+
+    /// Take this field as a text field, if possible,
+    /// returning `self` otherwise.
+    pub fn to_text(self) -> Result<String, MultipartField<'a>> {
+        match self {
+            MultipartField::Text(s) => Ok(s),
+            _ => Err(self),
+        }
+    }
+
+    /// Borrow this field as a file field, if possible
+    /// Mutably borrows so the contents can be read.
+    pub fn as_file<'b>(&'b mut self) -> Option<&'b mut MultipartFile<'a>> {
+        match *self {
+            MultipartField::File(ref mut file) => Some(file),
+            _ => None,
+        }
+    }
+
+    /// Take this field as a file field if possible,
+    /// returning `self` otherwise.
+    pub fn to_file(self) -> Result<MultipartFile<'a>, MultipartField<'a>> {
+        match self {
+            MultipartField::File(file) => Ok(file),
+            _ => Err(self),
+        }
+    }
 }
 
 impl<'a> Reader for MultipartFile<'a> {

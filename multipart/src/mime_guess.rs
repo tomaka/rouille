@@ -1,3 +1,11 @@
+//! Guessing of MIME types by file extension.
+//!
+//! Extension-to-MIME-type mappings are loaded from a JSON file at runtime
+//! and stored in a thread-local heap. To limit memory usage, avoid calling
+//! functions in this module from several threads.
+//!
+//! TODO: Make mapping cache global in a safe manner. 
+
 use mime::{Mime, TopLevel, SubLevel};
 
 use serialize::json;
@@ -7,14 +15,15 @@ use std::collections::HashMap;
 /// Guess the MIME type of the `Path` by its extension.
 ///
 /// **Guess** is the operative word here, as the contents of a file
-/// may not or may not match its MIME type/extension.
+/// may not necessarily match its MIME type/extension.
 pub fn guess_mime_type(path: &Path) -> Mime {
     let ext = path.extension_str().unwrap_or("");
     
     get_mime_type(ext)
 }
 
-/// Extract the extensioin of `filename` and guess its MIME type.
+/// Extract the extension of `filename` and guess its MIME type.
+///
 /// If there is no extension, or the extension has no known MIME association,
 /// `applicaton/octet-stream` is assumed.
 pub fn guess_mime_type_filename(filename: &str) -> Mime {
@@ -26,10 +35,11 @@ pub fn guess_mime_type_filename(filename: &str) -> Mime {
 const MIME_TYPES: &'static str = include_str!("../mime_types.json");
 
 // Lazily initialized task-local hashmap
-// TODO: Make this global since it's read-only
+// TODO: Make this global since it's read-only after init
 thread_local!(static MIMES: HashMap<String, Mime> = load_mime_types())
 
-/// Get the MIME type associated with a file extension
+/// Get the MIME type associated with a file extension.
+///
 /// If there is no association for the extension, or `ext` is empty,
 /// `application/octet-stream` is returned.
 pub fn get_mime_type(ext: &str) -> Mime {
@@ -58,7 +68,7 @@ fn to_mime_mapping(val: (String, json::Json)) -> Option<(String, Mime)> {
     None    
 }
 
-/// Get the `Mime` type for `application/octet-stream` (generic binary stream)
+/// Get the MIME type for `application/octet-stream` (generic binary stream)
 pub fn octet_stream() -> Mime {
     Mime(TopLevel::Application, SubLevel::Ext("octet-stream".into_string()), Vec::new())   
 }
