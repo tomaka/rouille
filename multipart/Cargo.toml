@@ -12,7 +12,7 @@ documentation = "http://rust-ci.org/cybergeek94/multipart/doc/multipart/"
 
 license = "MIT"
 
-keywords = ["multipart", "form", "data", "hyper", "http", "post", "upload"]
+keywords = ["form-data", "hyper", "http", "post", "upload"]
 
 [dependencies]
 hyper = "*"
