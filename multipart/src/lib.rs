@@ -158,4 +158,3 @@ fn random_alphanumeric(len: uint) -> String {
     task_rng().gen_ascii_chars().map(|ch| ch.to_lowercase()).take(len).collect()    
 }
 
-
