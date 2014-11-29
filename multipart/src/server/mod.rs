@@ -7,6 +7,7 @@
 
 use hyper::header::common::content_type::ContentType;
 use hyper::server::request::Request;
+use hyper::method::Method;
 
 use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
@@ -18,14 +19,12 @@ use std::collections::HashMap;
 
 use std::io::{IoError, IoResult, EndOfFile, standard_error, OtherIoError};
 
-pub use self::handler::*;
-
-mod handler;
+pub mod handler;
 
 fn is_multipart_formdata(req: &Request) -> bool {
     use mime::{Multipart};
 
-    req.headers.get::<ContentType>().map_or(false, |ct| {
+    req.method == Method::Post && req.headers.get::<ContentType>().map_or(false, |ct| {
         let ContentType(ref mime) = *ct;
         
         debug!("Content-Type: {}", mime);
@@ -52,11 +51,14 @@ fn get_boundary(ct: &ContentType) -> Option<String> {
     )        
 }
 
-/// A server-side `multipart/form-data` requests.
+/// The server-side implementation of `multipart/form-data` requests.
 ///
 /// Create this with `Multipart::from_request()` passing a `server::Request` object from Hyper,
+/// or give Hyper a `handler::Switch` instance instead,
 /// then read individual entries with `.read_entry()` or process them all at once with
 /// `.foreach_entry()`.
+///
+/// Implements `Deref<Request>` to allow access to read-only fields on `Request` without copying.
 pub struct Multipart<'a> {
     source: BoundaryReader<Request<'a>>,
     tmp_dir: String,
@@ -70,8 +72,11 @@ macro_rules! try_find(
 
 impl<'a> Multipart<'a> {
 
-    /// If the given `Request` is of `Content-Type: multipart/form-data`, return
-    /// the wrapped request as `Ok(Multipart)`, otherwise `Err(Request)`.
+    /// If the given `Request` is a POST request of `Content-Type: multipart/form-data`, 
+    /// return the wrapped request as `Ok(Multipart)`, otherwise `Err(Request)`.
+    ///
+    /// See the `handler` submodule for a convenient wrapper for this function,
+    /// `Switch`, that implements `hyper::server::Handler`.
     pub fn from_request(req: Request<'a>) -> Result<Multipart<'a>, Request<'a>> {
         if !is_multipart_formdata(&req) { return Err(req); }
 
@@ -86,13 +91,7 @@ impl<'a> Multipart<'a> {
     /// Read an entry from this multipart request, returning a pair with the field's name and
     /// contents. This will return an End of File error if there are no more entries.
     ///
-    /// To get to the data, you will need to match on `MultipartField`:
-    ///
-    /// ```rust
-    /// fn process_request(req: &mut Request, res: &mut Response) -> HttpResult<()> {
-    ///     
-    /// }
-    /// ```
+    /// To get to the data, you will need to match on `MultipartField`.
     ///
     /// ##Warning
     /// If the last returned entry had contents of type `MultipartField::File`,
@@ -227,6 +226,12 @@ impl<'a> Multipart<'a> {
 
         Ok(entries)
     }
+}
+
+impl<'a> Deref<Request<'a>> for Multipart<'a> {
+    fn deref(&self) -> &Request<'a> {
+        self.source.borrow_reader()  
+    }    
 }
 
 fn with<T, U>(left: Option<T>, right: |&T| -> Option<U>) -> Option<(T, U)> {
@@ -396,6 +401,10 @@ impl<S> BoundaryReader<S> where S: Reader {
     #[allow(unused)]
     fn set_boundary(&mut self, boundary: String) {
         self.boundary = boundary.into_bytes();    
+    }
+
+    pub fn borrow_reader<'a>(&'a self) -> &'a S {
+        &self.reader
     }
 }
 
