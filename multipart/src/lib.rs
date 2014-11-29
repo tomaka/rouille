@@ -158,23 +158,4 @@ fn random_alphanumeric(len: uint) -> String {
     task_rng().gen_ascii_chars().map(|ch| ch.to_lowercase()).take(len).collect()    
 }
 
-#[cfg(test)]
-mod test {
-   use hyper::Url;
-   use hyper::client::request::Request as ClientReq;
-   use client::Multipart as ClientMulti;
 
-    #[test]
-    fn client_api_test() {        
-        let request = ClientReq::post(Url::parse("http://localhost:1337/").unwrap()).unwrap();
-
-        let mut multipart = ClientMulti::new();
-
-        multipart.add_text("hello", "world");
-        multipart.add_text("goodnight", "sun");
-        multipart.sized = true;
-
-        multipart.send(request).unwrap();        
-    }
-       
-}
