@@ -10,11 +10,8 @@ before_script:
 - cargo -V
 script:
 - cargo build -v
-- ./target/multipart_server&
-- sleep 5s #Wait for previous script to bind
 - cargo test -v
 - cargo doc -v --no-deps
-- kill $! #kill ./target/multippart_server
 after_success:
 - cp -R target/doc doc
 - curl http://www.rust-ci.org/artifacts/put?t=$RUSTCI_TOKEN | sh
