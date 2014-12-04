@@ -8,8 +8,10 @@ use hyper::client::{Request, Response};
 
 use hyper::header::common::{ContentType, ContentLength};
 
+use hyper::method::Method;
+
 use hyper::net::{Fresh, Streaming};
-use hyper::{HttpResult, HttpIoError};
+use hyper::{HttpResult, HttpError};
 
 use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
@@ -85,7 +87,7 @@ impl<'a> Multipart<'a> {
     ///
     /// Use `std::io::util::LimitReader` if you wish to send data from a `Reader`
     /// that will never return EOF otherwise.
-    pub fn add_stream<N: StrAllocating>(&mut self, name: N, reader: &'a mut Reader + 'a, 
+    pub fn add_stream<N: StrAllocating>(&mut self, name: N, reader: &'a mut (Reader + 'a), 
         filename: Option<String>, content_type: Option<Mime>) {
         self.add_field(name,
             MultipartField::File(MultipartFile {
@@ -120,8 +122,7 @@ impl<'a> Multipart<'a> {
     /// If `req` is not a POST request, created with `Request::post()` or passing
     /// `hyper::method::Post` to `Request::new()`.
     pub fn send(self, mut req: Request<Fresh>) -> HttpResult<Response> {
-        use hyper::method;
-        assert!(req.method() == method::Post, "Multipart request must use POST method!");
+        assert!(req.method() == Method::Post, "Multipart request must use POST method!");
 
         debug!("Fields: {}; Boundary: {}", self.fields[], self.boundary[]);
 
@@ -203,7 +204,7 @@ fn write_line(req: &mut Writer, s: &str) -> IoResult<()> {
 
 
 fn io_to_http<T>(res: IoResult<T>) -> HttpResult<T> {
-    res.map_err(|e| HttpIoError(e))
+    res.map_err(|e| HttpError::HttpIoError(e))
 }
 
 fn multipart_mime(bound: &str) -> Mime {

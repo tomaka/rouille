@@ -22,8 +22,6 @@ use std::io::{IoError, IoResult, EndOfFile, standard_error, OtherIoError};
 pub mod handler;
 
 fn is_multipart_formdata(req: &Request) -> bool {
-    use mime::{Multipart};
-
     req.method == Method::Post && req.headers.get::<ContentType>().map_or(false, |ct| {
         let ContentType(ref mime) = *ct;
         

@@ -8,7 +8,7 @@
 
 use mime::{Mime, TopLevel, SubLevel};
 
-use serialize::json;
+use serialize::json::{mod, Json};
 
 use std::collections::HashMap;
 
@@ -50,14 +50,14 @@ pub fn get_mime_type(ext: &str) -> Mime {
 
 /// Load the known mime types from the MIME_TYPES json 
 fn load_mime_types() -> HashMap<String, Mime> {
-    let map = if let json::Object(map) = json::from_str(MIME_TYPES).unwrap() { map }
+    let map = if let Json::Object(map) = json::from_str(MIME_TYPES).unwrap() { map }
     else { unreachable!("MIME types should be supplied as a map!"); };
     
     map.into_iter().filter_map(to_mime_mapping).collect()
 }
 
 fn to_mime_mapping(val: (String, json::Json)) -> Option<(String, Mime)> {
-    if let (st, json::String(mime)) = val {
+    if let (st, Json::String(mime)) = val {
         if st.char_at(0) == '_' { return None; }
 
         if let Some(mime) = from_str::<Mime>(&*mime) { 

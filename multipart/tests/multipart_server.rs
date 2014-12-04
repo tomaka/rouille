@@ -6,7 +6,9 @@ extern crate multipart;
 
 use self::hyper::server::{Listening, Server, Request, Response};
 use self::hyper::client::Request as ClientReq;
-use self::hyper::{status, Url};
+use self::hyper::status::StatusCode;
+use self::hyper::Url;
+
 
 use self::multipart::server::Multipart;
 
@@ -21,7 +23,7 @@ fn ok_serv(req: Request, mut res: Response) {
 
     multipart.foreach_entry(|&: _, _| ());
     
-    *res.status_mut() = status::Ok;
+    *res.status_mut() = StatusCode::Ok;
 
     res.start().unwrap().end().unwrap();
 }

@@ -35,7 +35,7 @@ pub mod mime_guess;
 pub struct MultipartFile<'a> {
     filename: Option<String>,
     content_type: Mime,
-    reader: &'a mut Reader + 'a,
+    reader: &'a mut (Reader + 'a),
     tmp_dir: Option<&'a str>,
 }
 
