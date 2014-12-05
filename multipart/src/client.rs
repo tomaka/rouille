@@ -11,7 +11,7 @@ use hyper::header::common::{ContentType, ContentLength};
 use hyper::method::Method;
 
 use hyper::net::{Fresh, Streaming};
-use hyper::{HttpResult, HttpError};
+use hyper::HttpResult;
 
 use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
@@ -25,7 +25,6 @@ use super::{MultipartField, MultipartFile, ref_copy, random_alphanumeric};
 const BOUNDARY_LEN: uint = 8;
 
 type Fields<'a> = Vec<(String, MultipartField<'a>)>;
-
 
 /// The entry point of the client-side multipart API.
 ///
@@ -137,7 +136,7 @@ impl<'a> Multipart<'a> {
         debug!("{}", req.headers());
         
         let mut req = try!(req.start());
-        try!(io_to_http(write_body(&mut req, fields, boundary[])));
+        try!(write_body(&mut req, fields, boundary[]));
         req.send()
     }
  
@@ -151,7 +150,7 @@ impl<'a> Multipart<'a> {
         apply_headers(&mut req, boundary[], Some(body.len()));
         
         let mut req = try!(req.start());
-        try!(io_to_http(req.write(body[])));
+        try!(req.write(body[]));
         req.send()
     }    
 }
@@ -200,11 +199,6 @@ fn write_file(wrt: &mut Writer, mut file: MultipartFile) -> IoResult<()> {
 /// Specialized write_line that writes CRLF after a line as per W3C specs
 fn write_line(req: &mut Writer, s: &str) -> IoResult<()> {
     req.write_str(s).and_then(|_| req.write(b"\r\n"))        
-}
-
-
-fn io_to_http<T>(res: IoResult<T>) -> HttpResult<T> {
-    res.map_err(|e| HttpError::HttpIoError(e))
 }
 
 fn multipart_mime(bound: &str) -> Mime {
