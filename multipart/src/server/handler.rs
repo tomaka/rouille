@@ -13,11 +13,11 @@ use super::Multipart;
 /// A convenient wrapper for `Multipart::from_request()`.
 pub struct Switch<H, M> {
     normal: H,
-    multipart: M,    
+    multipart: M,
 }
 
 impl<H, M> Switch<H, M> where H: Handler, M: MultipartHandler {
-    /// Create a new `Switch` instance where  
+    /// Create a new `Switch` instance where
     /// `normal` handles normal Hyper requests and `multipart` handles Multipart requests
     pub fn new(normal: H, multipart: M) -> Switch<H, M> {
         Switch {
@@ -28,7 +28,7 @@ impl<H, M> Switch<H, M> where H: Handler, M: MultipartHandler {
 }
 
 impl<H, M> Handler for Switch<H, M> where H: Handler, M: MultipartHandler {
-    fn handle(&self, req: Request, res: Response) {
+    fn handle<'a>(&'a self, req: Request<'a>, res: Response<'a>) {
         match Multipart::from_request(req) {
             Ok(multi) => self.multipart.handle_multipart(multi, res),
             Err(req) => self.normal.handle(req, res),
@@ -38,7 +38,7 @@ impl<H, M> Handler for Switch<H, M> where H: Handler, M: MultipartHandler {
 
 /// A trait defining a type that can handle an incoming multipart request.
 ///
-/// Extends to unboxed closures of the type `Fn(Multipart, Response)`, 
+/// Extends to unboxed closures of the type `Fn(Multipart, Response)`,
 /// and subsequently static functions.
 ///
 /// Since `Multipart` implements `Deref<Request>`, you can still access
@@ -50,13 +50,13 @@ pub trait MultipartHandler: Send + Sync {
 
 impl<F> MultipartHandler for F where F: for<'a> Fn(Multipart<'a>, Response) + Send + Sync {
     fn handle_multipart<'a>(&self, multipart: Multipart<'a>, response: Response) {
-        (*self)(multipart, response);    
+        (*self)(multipart, response);
     }
 }
 
 /// A container for an unboxed closure that implements `hyper::server::Handler`.
 ///
-/// This exists because as of this writing, `Handler` is not automatically implemented for 
+/// This exists because as of this writing, `Handler` is not automatically implemented for
 /// compatible unboxed closures (though this will likely change).
 ///
 /// No private fields, instantiate directly.
@@ -68,8 +68,5 @@ pub struct UnboxedHandler<F> {
 impl<F> Handler for UnboxedHandler<F> where F: Fn(Request, Response) + Send + Sync {
     fn handle(&self, req: Request, res: Response) {
         (self.f)(req, res);
-    } 
+    }
 }
-
-
-
