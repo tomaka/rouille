@@ -14,11 +14,5 @@ license = "MIT"
 
 keywords = ["form-data", "hyper", "http", "post", "upload"]
 
-[dependencies]
-log = "*"
-mime = "*"
-rand = "*"
-rustc-serialize = "*"
-
 [dependencies.hyper]
 git = "https://github.com/hyperium/hyper"
