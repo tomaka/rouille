@@ -17,8 +17,11 @@ keywords = ["form-data", "hyper", "http", "post", "upload"]
 [dependencies]
 log = "*"
 mime = "*"
+mime_guess = "*"
 rand = "*"
 rustc-serialize = "*"
 
 [dependencies.hyper]
-git = "https://github.com/hyperium/hyper"
+version = "*"
+optional = true
+

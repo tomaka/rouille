@@ -11,14 +11,16 @@ use hyper::method::Method;
 
 use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
-use super::{IntoString, MultipartField, MultipartFile};
+use super::{MultipartField, MultipartFile};
 
 use std::cmp;
 use std::collections::HashMap;
-use std::old_io::{IoError, IoResult, EndOfFile, standard_error, OtherIoError};
 use std::ops::Deref;
 
-pub mod handler;
+use std::io;
+use std::io::prelude::*;
+
+use std::path::{Path, PathBuf};
 
 fn is_multipart_formdata(req: &Request) -> bool {
     req.method == Method::Post && req.headers.get::<ContentType>().map_or(false, |ct| {
@@ -93,16 +95,15 @@ impl<'a> Multipart<'a> {
     /// ##Warning
     /// If the last returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry!
-    pub fn read_entry<'b>(&'b mut self) -> IoResult<(String, MultipartField<'b>)> {
+    pub fn read_entry<'b>(&'b mut self) -> io::Result<(String, MultipartField<'b>)> {
         try!(self.source.consume_boundary());
         let (disp_type, field_name, filename) = try!(self.read_content_disposition());
 
-        if &*disp_type != "form-data" {
-            return Err(IoError {
-                    kind: OtherIoError,
-                    desc: "Content-Disposition value was not \"form-data\"",
-                    detail: Some(format!("Content-Disposition: {}", disp_type)),
-                });
+        if disp_type != "form-data" {
+            return Err(io::Error::new(
+                io::ErrorKind::OtherIoError,
+                format!("Content-Disposition value: {:?} expected: \"form-data\"", disp_type),
+            ));
         }
 
         if let Some(content_type) = try!(self.read_content_type()) {
@@ -132,7 +133,7 @@ impl<'a> Multipart<'a> {
             match self.read_entry() {
                 Ok((name, field)) => f(name, field),
                 Err(err) => {
-                    if err.kind != EndOfFile {
+                    if err.kind() != io::ErrorKind::EndOfFile {
                         error!("Error reading Multipart: {}", err);
                     }
 
@@ -142,7 +143,7 @@ impl<'a> Multipart<'a> {
         }
     }
 
-    fn read_content_disposition(&mut self) -> IoResult<(String, String, Option<String>)> {
+    fn read_content_disposition(&mut self) -> io::Result<(String, String, Option<String>)> {
         let line = try!(self.source.read_line());
 
         // Find the end of CONT_DISP in the line
@@ -182,7 +183,7 @@ impl<'a> Multipart<'a> {
         Ok((disp_type, field_name, filename))
     }
 
-    fn read_content_type(&mut self) -> IoResult<Option<String>> {
+    fn read_content_type(&mut self) -> io::Result<Option<String>> {
         debug!("Read content type!");
         let line = try!(self.source.read_line());
 
@@ -195,12 +196,12 @@ impl<'a> Multipart<'a> {
         Ok(type_idx.map(|start| line[start + CONTENT_TYPE.len()..].trim().into_string()))
     }
 
-    /// Read the request fully, parsing all fields and saving all files to the given directory or a
-    /// temporary, and return the result.
+    /// Read the request fully, parsing all fields and saving all files 
+    /// to the given directory (if given) and return the result.
     ///
     /// If `dir` is none, chooses a random subdirectory under `std::os::tmpdir()`.
-    pub fn save_all(mut self, dir: Option<&Path>) -> IoResult<Entries> {
-        let dir = dir.map_or_else(|| ::std::os::tmpdir().join(&self.tmp_dir), |path| path.clone());
+    pub fn save_all(mut self, dir: Option<&Path>) -> io::Result<Entries> {
+        let dir = dir.map_or_else(|| ::std::env::temp_dir().join(&self.tmp_dir), |path| path.clone());
 
         let mut entries = Entries::with_path(dir);
 
@@ -212,7 +213,7 @@ impl<'a> Multipart<'a> {
                     entries.files.insert(name, path);
                 },
                 Err(err) => {
-                    if err.kind != EndOfFile {
+                    if super::is_error_eof(&err) {
                         error!("Error reading Multipart: {}", err);
                     }
 
@@ -240,12 +241,11 @@ fn with<T, U, F: FnOnce(&T) -> Option<U>>(left: Option<T>, right: F) -> Option<(
     }
 }
 
-fn line_error(msg: &'static str, line: String) -> IoError {
-    IoError {
-        kind: OtherIoError,
-        desc: msg,
-        detail: Some(line),
-    }
+fn line_error(msg: &str, line: String) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::Other,
+        format!("Error: {:?} on line of request: {:?}", msg, line)
+    )
 }
 
 /// A result of `Multipart::save_all()`.
@@ -283,7 +283,7 @@ impl<'a> Iterator<(String, MultipartField<'a>)> for Multipart<'a> {
 }
 */
 
-/// A `Reader` that will yield bytes until it sees a given sequence.
+/// A struct implementing `Read` that will yield bytes until it sees a given sequence.
 pub struct BoundaryReader<S> {
     reader: S,
     boundary: Vec<u8>,
@@ -293,13 +293,13 @@ pub struct BoundaryReader<S> {
     buf_len: usize,
 }
 
-fn eof<T>() -> IoResult<T> {
-    Err(standard_error(EndOfFile))
+fn eof<T>() -> io::Result<T> {
+    Err(io::Error::new(io::ErrorKind::EndOfFile, "End of the stream was reached!"))
 }
 
 const BUF_SIZE: usize = 1024 * 64; // 64k buffer
 
-impl<S> BoundaryReader<S> where S: Reader {
+impl<S> BoundaryReader<S> where S: Read {
     fn from_reader(reader: S, boundary: String) -> BoundaryReader<S> {
         let mut buf = Vec::with_capacity(BUF_SIZE);
         unsafe { buf.set_len(BUF_SIZE); }
@@ -314,7 +314,7 @@ impl<S> BoundaryReader<S> where S: Reader {
         }
     }
 
-    fn read_to_boundary(&mut self) -> IoResult<()> {
+    fn read_to_boundary(&mut self) -> io::Result<()> {
          if !self.boundary_read {
             try!(self.true_fill_buf());
 
@@ -336,21 +336,20 @@ impl<S> BoundaryReader<S> where S: Reader {
                 self.last_search_idx += 1;
             }
 
+            Ok(())
         } else if self.last_search_idx == 0 {
-            return Err(standard_error(EndOfFile))
+            eof()
         }
-
-        Ok(())
     }
 
     /// Read bytes until the reader is full
-    fn true_fill_buf(&mut self) -> IoResult<()> {
+    fn true_fill_buf(&mut self) -> io::Result<()> {
         let mut bytes_read = 1usize;
 
         while bytes_read != 0 {
             bytes_read = match self.reader.read(&mut self.buf[self.buf_len..]) {
                 Ok(read) => read,
-                Err(err) => if err.kind == EndOfFile { break; } else { return Err(err); },
+                Err(err) => if super::is_error_eof(&err) { break; } else { return Err(err); },
             };
 
             self.buf_len += bytes_read;
@@ -360,27 +359,27 @@ impl<S> BoundaryReader<S> where S: Reader {
     }
 
     fn _consume(&mut self, amt: usize) {
-        use std::ptr::copy_memory;
+        use std::ptr;
 
         assert!(amt <= self.buf_len);
 
         let src = self.buf[amt..].as_ptr();
         let dest = self.buf.as_mut_ptr();
 
-        unsafe { copy_memory(dest, src, self.buf_len - amt); }
+        unsafe { ptr::copy(dest, src, self.buf_len - amt); }
 
         self.buf_len -= amt;
         self.last_search_idx -= amt;
     }
 
-    fn consume_boundary(&mut self) -> IoResult<()> {
+    fn consume_boundary(&mut self) -> io::Result<()> {
         while !self.boundary_read {
             match self.read_to_boundary() {
                 Ok(_) => (),
-                Err(e) => if e.kind == EndOfFile {
+                Err(err) => if super::is_error_eof(&err) {
                     break;
                 } else {
-                    return Err(e);
+                    return Err(err);
                 }
             }
         }
@@ -406,8 +405,8 @@ impl<S> BoundaryReader<S> where S: Reader {
     }
 }
 
-impl<S> Reader for BoundaryReader<S> where S: Reader {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+impl<S> Read for BoundaryReader<S> where S: Read {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         use std::cmp;
         use std::slice::bytes::copy_memory;
 
@@ -422,8 +421,8 @@ impl<S> Reader for BoundaryReader<S> where S: Reader {
     }
 }
 
-impl<S> Buffer for BoundaryReader<S> where S: Reader {
-    fn fill_buf<'a>(&'a mut self) -> IoResult<&'a [u8]> {
+impl<S> BufRead for BoundaryReader<S> where S: Read {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
         try!(self.read_to_boundary());
 
         let buf = &self.buf[..self.last_search_idx];
@@ -436,6 +435,11 @@ impl<S> Buffer for BoundaryReader<S> where S: Reader {
         self._consume(amt);
     }
 }
+
+pub trait HttpRequest: Read {
+
+}
+
 
 #[test]
 fn test_boundary() {
