@@ -47,7 +47,7 @@ impl<'a> Multipart<'a> {
     /// `name` and `val` can be either owned `String` or `&str`.
     /// Prefer `String` if you're trying to limit allocations and copies.
     pub fn add_text<N: Into<Cow<'a, str>>, V: Into<Cow<'a, str>>>(&mut self, name: N, val: V) {
-        self.add_field(name, MultipartField::Text(val));    
+        self.add_field(name, MultipartField::Text(val.into()));    
     }
     
     /// Add the file to the multipart request, guessing its `Content-Type`
@@ -55,10 +55,11 @@ impl<'a> Multipart<'a> {
     ///
     /// See `add_stream()`.
     pub fn add_file<N: Into<Cow<'a, str>>>(&mut self, name: N, file: &'a mut File) {
-        let filename = file.path().filename_str().map(|s| s.into_string());
+        let filename = file.path().filename_str().map(|s| s.to_owned());
         let content_type = guess_mime_type(file.path());
 
-        self.add_field(name, 
+        self.add_field(
+            name, 
             MultipartField::File(MultipartFile::from_file(filename, file, content_type))
         );
     }
@@ -110,7 +111,7 @@ impl<'a> Multipart<'a> {
     /// ##Panics
     /// If `req` fails sanity checks in `HttpRequest::apply_headers()`.
     pub fn send<R>(self, mut req: R) -> R::RequestResult where R: HttpRequest {
-        debug!("Fields: {}; Boundary: {}", self.fields, self.boundary);
+        debug!("Fields: {:?}; Boundary: {:?}", self.fields, self.boundary);
 
         if self.sized {
             return self.send_sized(req);    
@@ -128,7 +129,7 @@ impl<'a> Multipart<'a> {
 
         let Multipart { fields, boundary, ..} = self;
 
-        try!(write_body(&mut body, fields, boundary));
+        try!(write_body(&mut body, fields, &boundary));
         
         req.apply_headers(&boundary, Some(body.len()));
         req.send(|req| req.write(&body))

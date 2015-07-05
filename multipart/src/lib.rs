@@ -18,7 +18,6 @@ use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
-
 pub mod client;
 pub mod server;
 
@@ -40,16 +39,14 @@ pub struct MultipartFile<'a> {
     filename: Option<String>,
     content_type: Mime,
     reader: &'a mut (Read + 'a),
-    tmp_dir: Option<&'a str>,
 }
 
 impl<'a> MultipartFile<'a> {
-    fn from_octet(filename: Option<String>, reader: &'a mut Read, cont_type: &str, tmp_dir: &'a str) -> MultipartFile<'a> {
+    fn from_octet(filename: Option<String>, reader: &'a mut Read, cont_type: &str) -> MultipartFile<'a> {
         MultipartFile {
             filename: filename,
             reader: reader,
-            content_type: cont_type.parse().unwrap_or_else(mime_guess::octet_stream),
-            tmp_dir: Some(tmp_dir),
+            content_type: cont_type.parse::<Mime>().ok().unwrap_or_else(mime_guess::octet_stream),
         }    
     }
 
@@ -58,7 +55,6 @@ impl<'a> MultipartFile<'a> {
             filename: filename,
             reader: reader,
             content_type: mime,
-            tmp_dir: None,
         }
     }
 
@@ -102,7 +98,7 @@ impl<'a> MultipartFile<'a> {
     }
 
     pub fn filename(&self) -> Option<&str> {
-        self.filename.as_ref().map(|s| s)    
+        self.filename.as_ref().map(String::as_ref)    
     }
 
     /// Get the content type of this file.
@@ -115,8 +111,8 @@ impl<'a> MultipartFile<'a> {
 }
 
 impl<'a> fmt::Debug for MultipartFile<'a> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result<()> {
-        write!(fmt, "Filename: {} Content-Type: {}", self.filename, self.content_type)    
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "Filename: {:?} Content-Type: {:?}", self.filename, self.content_type)    
     } 
 }
 
@@ -150,7 +146,7 @@ impl<'a> MultipartField<'a> {
 
     /// Take this field as a text field, if possible,
     /// returning `self` otherwise.
-    pub fn to_text(self) -> Result<Cow<str>, MultipartField> {
+    pub fn to_text(self) -> Result<Cow<'a, str>, MultipartField<'a>> {
         match self {
             MultipartField::Text(s) => Ok(s),
             _ => Err(self),
@@ -159,7 +155,7 @@ impl<'a> MultipartField<'a> {
 
     /// Borrow this field as a file field, if possible
     /// Mutably borrows so the contents can be read.
-    pub fn as_file<'b>(&'b mut self) -> Option<&'b mut MultipartFile<'a>> {
+    pub fn as_file(&mut self) -> Option<&mut MultipartFile<'a>> {
         match *self {
             MultipartField::File(ref mut file) => Some(file),
             _ => None,
@@ -184,25 +180,23 @@ impl<'a> Read for MultipartFile<'a> {
 
 /// A copy of `std::io::util::copy` that takes trait references
 pub fn ref_copy(r: &mut Read, w: &mut Write) -> io::Result<()> {
-    let mut buf = [0, ..1024 * 64];
+    let mut buf = [0; 1024 * 64];
     
     loop {
-        let len = match r.read(&mut buf) {
-            Ok(len) => len,
-            Err(ref e) if e.kind() == io::ErrorKind::EndOfFile => return Ok(()),
-            Err(e) => return Err(e),
-        };
+        let len = try!(r.read(&mut buf)); 
+        
+        if len == 0 { break; }
+
         try!(w.write(&buf[..len]));
     }
+
+    Ok(())
 }
 
 /// Generate a random alphanumeric sequence of length `len`
 fn random_alphanumeric(len: usize) -> String {
     use rand::Rng;
 
-    rand::thread_rng().gen_ascii_chars().map(|ch| ch.to_lowercase()).take(len).collect()    
+    rand::thread_rng().gen_ascii_chars().flat_map(|ch| ch.to_lowercase()).take(len).collect()    
 }
 
-fn is_error_eof(err: &io::Error) -> bool {
-    err.kind() == io::ErrorKind::EndOfFile
-}

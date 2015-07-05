@@ -1,5 +1,7 @@
 //! Convenient wrappers for `hyper::server::Handler`
 
+use hyper::header::ContentType;
+use hyper::method::Method;
 use hyper::server::{Handler, Request, Response};
 
 use super::Multipart;
@@ -70,3 +72,32 @@ impl<F> Handler for UnboxedHandler<F> where F: Fn(Request, Response) + Send + Sy
         (self.f)(req, res);
     }
 }
+
+fn is_multipart_formdata(req: &Request) -> bool {
+    req.method == Method::Post && req.headers.get::<ContentType>().map_or(false, |ct| {
+        let ContentType(ref mime) = *ct;
+
+        debug!("Content-Type: {}", mime);
+
+        match *mime {
+            Mime(TopLevel::Multipart, SubLevel::FormData, _) => true,
+            _ => false,
+        }
+    })
+}
+
+fn get_boundary(ct: &ContentType) -> Option<String> {
+    let ContentType(ref mime) = *ct;
+    let Mime(_, _, ref params) = *mime;
+
+    params.iter().find(|&&(ref name, _)|
+        if let Attr::Ext(ref name) = *name {
+            "boundary" == &**name
+        } else { false }
+    ).and_then(|&(_, ref val)|
+        if let Value::Ext(ref val) = *val {
+            Some(val.clone())
+        } else { None }
+    )
+}
+
