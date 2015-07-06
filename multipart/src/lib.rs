@@ -18,6 +18,18 @@ use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
+macro_rules! try_all {
+    ($first_expr:expr, $($try_expr:expr),*) => (
+        try!($first_expr $(.and_then(|_| $try_expr))*);
+    )
+}
+
+macro_rules! chain_result {
+    ($first_expr:expr, $($try_expr:expr),*) => (
+        $first_expr $(.and_then(|_| $try_expr))*
+    )
+}
+
 pub mod client;
 pub mod server;
 
@@ -178,25 +190,10 @@ impl<'a> Read for MultipartFile<'a> {
     }
 }
 
-/// A copy of `std::io::util::copy` that takes trait references
-pub fn ref_copy(r: &mut Read, w: &mut Write) -> io::Result<()> {
-    let mut buf = [0; 1024 * 64];
-    
-    loop {
-        let len = try!(r.read(&mut buf)); 
-        
-        if len == 0 { break; }
+const BOUNDARY_LEN: usize = 16;
 
-        try!(w.write(&buf[..len]));
-    }
-
-    Ok(())
-}
-
-/// Generate a random alphanumeric sequence of length `len`
-fn random_alphanumeric(len: usize) -> String {
+fn gen_boundary() -> String {
     use rand::Rng;
 
-    rand::thread_rng().gen_ascii_chars().flat_map(|ch| ch.to_lowercase()).take(len).collect()    
+    "--".chars().chain(thread_rng().gen_ascii_chars().take(BOUNDARY_LEN)).collect()
 }
-

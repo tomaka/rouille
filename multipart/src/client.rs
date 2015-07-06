@@ -2,175 +2,205 @@
 //!
 //! Use this when sending POST requests with files to a server.
 //!
-//! See the `Multipart` struct for more info.
+//! `ChunkedMultipart` sends chunked requests (recommended), 
+//! while `SizedMultipart` sends sized requests.
+//!
+//! Both implement the `MultipartRequest` trait for their core API.
+//!
+//! Sized requests are more human-readable and use less bandwidth 
+//! (as chunking adds [significant visual noise and overhead][chunked-example]),
+//! but they must be able to load their entirety, including the contents of all files
+//! and streams, into memory so the request body can be measured and its size set
+//! in the `Content-Length` header.
+//!
+//! You should really only use sized requests if you intend to inspect the data manually on the
+//! server side, as it will produce a more human-readable request body. Also, of course, if the
+//! server doesn't support chunked requests or otherwise rejects them. 
+//!
+//! [chunked-example]: http://en.wikipedia.org/wiki/Chunked_transfer_encoding#Example 
 use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
-use mime_guess::{guess_mime_type, octet_stream};
-
-use std::borrow::Cow;
+use std::borrow::{Borrow, BorrowMut};
+use std::cell::Cell;
 
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 
-use super::{MultipartField, MultipartFile, ref_copy, random_alphanumeric};
+use std::marker::PhantomData;
 
-const BOUNDARY_LEN: usize = 8;
+pub type Multipart<R: HttpRequest> = ChunkedMultipart;
 
-type Fields<'a> = Vec<(Cow<'a, str>, MultipartField<'a>)>;
+/// The core API for all multipart requests.
+///
+/// As part of the API contract, all errors in writing to the HTTP stream are stashed until the
+/// implementor's concrete `.send()` method is called, or if the last error is inspected with
+/// `.last_err()`.
+///
+/// However, no reading or writing is performed after an error occurs, to avoid wasting CPU cycles
+/// on a request that will not complete, with the exception of API calls after the last error is
+/// cleared with `.take_err()`.
+pub trait MultipartRequest {
+    #[doc(hidden)]
+    type Stream: Write;
+
+    type Error: From<io::Error>;
+
+    #[doc(hidden)]
+    fn stream_mut(&mut self) -> &mut Stream;
+    #[doc(hidden)]
+    fn write_boundary(&mut self) -> io::Result<()>;
+
+    /// Get a reference to the last error returned from writing to the HTTP stream, if any.
+    fn last_err(&self) -> Option<&Self::Error>;
+
+    /// Remove and return the last error to occur, allowing subsequent API calls to proceed
+    /// normally.
+    fn take_err(&mut self) -> Option<Self::Error>;
+
+    /// Write a text field to this multipart request.
+    /// `name` and `val` can be either owned `String` or `&str`.
+    fn write_text<N: Borrow<str>, V: Borrow<str>>(mut self, name: N, val: V) -> Self {
+        if self.last_err.is_none() {
+            self.last_err = chain_result! {
+                self.write_field_headers(name, None, None),
+                self.write_line(val.borrow()),
+                self.write_boundary()
+            }.err().map(E::from)
+        }
+
+        self
+    }
+    
+    /// Write a file to the multipart request, guessing its `Content-Type`
+    /// from its extension and supplying its filename.
+    ///
+    /// See `write_stream()` for more info.
+    fn write_file<N: Borrow<str>, F: BorrowMut<File>>(&mut self, name: N, file: F) -> Self {
+        if self.last_err.is_none() {     
+            self.last_err = chain_result! {
+                { // New borrow scope so we can reborrow `file` after
+                    let file_path = file.borrow().path();
+                    let content_type = mime_guess::guess_mime_type(file_path);
+                    self.write_field_headers(name.borrow(), file_path.filename_str(), content_type)
+                },
+                io::copy(file.borrow_mut(), self.stream_mut()),
+                self.write_boundary()
+            };
+        }
+
+        self
+    }
+
+    /// Write a byte stream to the multipart request as a file field, supplying `filename` if given,
+    /// and `content_type` if given or `application/octet-stream` if not.
+    ///
+    /// ##Warning
+    /// The given `Read` **must** be able to read to EOF (end of file/no more data), meaning
+    /// `Read::read()` returns `Ok(0)`. 
+    /// If it never returns EOF it will be read to infinity and the request will never be completed.
+    ///
+    /// In the case of `SizedMultipart` this also can cause out-of-control memory usage as the
+    /// multipart data has to be written to an in-memory buffer so it can be measured.
+    ///
+    /// Use `Read::take` if you wish to send data from a `Read` that will never end otherwise.
+    fn write_stream<N: Borrow<str>, F: Borrow<str>, Rt: Read, R: Borrow<Rt>>(
+        mut self, name: N, read: R, filename: Option<F>, content_type: Option<Mime>
+    ) -> Self {
+        if self.last_err.is_none() {
+            let content_type = content_type.map_or_else(mime_guess::octet_stream);
+
+            self.last_err = chain_result! {
+                self.write_field_headers(name.borrow(), filename, content_type),
+                io::copy(read.borrow_mut(), self.stream_mut()),
+                self.write_boundary()
+            };
+        }
+
+        self
+    } 
+
+    #[doc(hidden)]
+    fn write_field_headers(&mut self, name: &str, filename: Option<&str>, content_type: Option<Mime>) 
+    -> io::Result<()> {
+        chain_result! {
+            write!(self.stream_mut(), "Content-Disposition: form-data; name=\"{}\"", name),
+            filename.map(|filename| write!(self.stream_mut(), "; filename=\"{}\"", filename))
+                .unwrap_or(Ok(())),
+            content_type.map(|content_type| write!(self.stream_mut(), "\r\nContent-Type: {}", content_type))
+                .unwrap_or(Ok(())),
+            self.write_line("\r\n")
+        }
+    }
+
+    #[doc(hidden)]
+    fn write_line(&mut self, line: &str) -> io::Result<()> {
+        write!(self.stream_mut(), "{}\r\n", line)
+    }
+}
 
 /// The entry point of the client-side multipart API.
 ///
 /// Add text fields with `.add_text()` and files with `.add_file()`,
 /// then obtain a `hyper::client::Request` object and pass it to `.send()`.
-pub struct Multipart<'a> {
-    fields: Fields<'a>,
+pub struct ChunkedMultipart<R: HttpRequest> {
+    request: PhantomData<R>,
+    stream: R::Stream,
     boundary: String,
-    /// If the request can be sized.
-    /// If true, avoid using chunked requests.
-    /// Defaults to `false`.
-    pub sized: bool,
+    last_err: Option<R::Error>,
 }
 
-impl<'a> Multipart<'a> {
-
-    /// Create a new `Multipart` instance with an empty set of fields.
-    pub fn new() -> Multipart<'a> {
-        Multipart {
-            fields: Vec::new(),
-            boundary: random_alphanumeric(BOUNDARY_LEN),
-            sized: false,
-        } 
-    }
-
-    /// Add a text field to this multipart request.
-    /// `name` and `val` can be either owned `String` or `&str`.
-    /// Prefer `String` if you're trying to limit allocations and copies.
-    pub fn add_text<N: Into<Cow<'a, str>>, V: Into<Cow<'a, str>>>(&mut self, name: N, val: V) {
-        self.add_field(name, MultipartField::Text(val.into()));    
-    }
-    
-    /// Add the file to the multipart request, guessing its `Content-Type`
-    /// from its extension and supplying its filename.
+impl<R: HttpRequest> ChunkedMultipart<R> {
+    /// Create a new `ChunkedMultipart` to wrap a request.
     ///
-    /// See `add_stream()`.
-    pub fn add_file<N: Into<Cow<'a, str>>>(&mut self, name: N, file: &'a mut File) {
-        let filename = file.path().filename_str().map(|s| s.to_owned());
-        let content_type = guess_mime_type(file.path());
-
-        self.add_field(
-            name, 
-            MultipartField::File(MultipartFile::from_file(filename, file, content_type))
-        );
-    }
-
-    /// Add a `Read` as a file field, supplying `filename` if given,
-    /// and `content_type` if given or `application/octet-stream` if not.
-    ///
-    /// ##Warning
-    /// The given `Read` **must** be able to read to EOF (end of file/no more data). 
-    /// If it never returns EOF it will be read to infinity (even if it reads 0 bytes forever) 
-    /// and the request will never be completed.
-    ///
-    /// If `sized` is `true`, this adds an additional consequence of out-of-control
-    /// memory usage, as `Multipart` tries to read an infinite amount of data into memory.
-    ///
-    /// Use `std::io::util::LimitReader` if you wish to send data from a `Read`
-    /// that will never return EOF otherwise.
-    pub fn add_stream<N: Into<Cow<'a, str>>>(&mut self, name: N, reader: &'a mut (Read + 'a), 
-        filename: Option<String>, content_type: Option<Mime>) {
-        self.add_field(name,
-            MultipartField::File(MultipartFile {
-                filename: filename,
-                content_type: content_type.unwrap_or_else(octet_stream),
-                reader: reader,
-                tmp_dir: None,
-            })
-        );        
-    }
-
-    fn add_field<N: Into<Cow<'a, str>>>(&mut self, name: N, val: MultipartField<'a>) {
-        self.fields.push((name.into_string(), val));  
-    }
-
-    /// Apply the appropriate headers to the `Request<Fresh>` (obtained from Hyper) and send the data.
-    /// If `self.sized == true`, send a sized (non-chunked) request, setting the `Content-Length`
-    /// header. Else, send a chunked request.
-    ///
-    /// Sized requests are more human-readable and use less bandwidth 
-    /// (as chunking adds [significant visual noise and overhead][chunked-example]),
-    /// but they must be able to load their entirety, including the contents of all files
-    /// and streams, into memory so the request body can be measured and its size set
-    /// in the `Content-Length` header.
-    ///
-    /// Prefer chunked requests when sending very large or numerous files,
-    /// or when human-readability or bandwidth aren't an issue.
-    ///
-    /// [chunked-example]: http://en.wikipedia.org/wiki/Chunked_transfer_encoding#Example 
-    ///
-    /// ##Panics
+    /// ##May Panic
     /// If `req` fails sanity checks in `HttpRequest::apply_headers()`.
-    pub fn send<R>(self, mut req: R) -> R::RequestResult where R: HttpRequest {
-        debug!("Fields: {:?}; Boundary: {:?}", self.fields, self.boundary);
-
-        if self.sized {
-            return self.send_sized(req);    
-        }
-
-        let Multipart { fields, boundary, ..} = self;
-
+    pub fn from_request(mut req: R) -> Result<Multipart<R>, R::Error> {
+        let boundary = ::gen_boundary();
         req.apply_headers(&boundary, None);
 
-        req.send(|req| write_body(&mut req, fields, &boundary))
+        let stream = try!(req.open_stream());
+
+        Multipart {
+            request: PhantomData,
+            stream: stream,
+            boundary: boundary,
+            last_err: None
+        }
     }
- 
-    fn send_sized<R>(self, mut req: R) -> R::RequestResult where R: HttpRequest {
-        let mut body: Vec<u8> = Vec::new();
 
-        let Multipart { fields, boundary, ..} = self;
-
-        try!(write_body(&mut body, fields, &boundary));
-        
-        req.apply_headers(&boundary, Some(body.len()));
-        req.send(|req| req.write(&body))
+    /// Finalize the request and return the response from the server.   
+    pub fn send(self) -> R::Stream::Result where R: HttpRequest {
+        self.stream.finalize()
     }    
 }
 
+impl<R: HttpRequest> MultipartRequest for ChunkedMultipart<R> {
+    type Stream = R::Stream;
+    type Error = R::Error;
 
-fn write_body<W: io::Write>(wrt: &mut W, fields: Fields, boundary: &str) -> io::Result<()> {
-    try!(write_boundary(wrt, boundary));
+    fn stream_mut(&mut self) -> &mut R::Stream { &mut self.stream }
+    fn write_boundary(&mut self) -> io::Result<()> {
+        write!(self.stream, "{}\r\n", boundary)
+    }    
+}
 
-    for (name, field) in fields.into_iter() {
-        try!(write_field(wrt, name, field, boundary));
+/// A struct for sending a sized multipart request. The API varies subtly from `Multipart`.
+///
+/// The request data will be written to a `Vec<u8>` so its size can be measured and the
+/// `Content-Length` header set when the request is sent. 
+pub struct SizedMultipart {
+    stream: Vec<u8>,
+    boundary: String,    
+    last_err: io::Error,
+}
+
+impl SizedMultipart {
+    pub fn new() -> SizedMultipart {
+        SizedMultipart {
+            multipart_data: Vec::new()
+        }
     }
-
-    Ok(())
-} 
-
-fn write_field(wrt: &mut Write, name: String, field: MultipartField, boundary: &str) -> io::Result<()> {
-    try!(write!(wrt, "Content-Disposition: form-data; name=\"{}\"\r\n\r\n", name));
-
-    try!(match field {
-            MultipartField::Text(text) => write_line(wrt, &*text),
-            MultipartField::File(file) => write_file(wrt, file),
-        });
-    
-    write_boundary(wrt, boundary)  
-} 
-
-fn write_boundary(wrt: &mut Write, boundary: &str) -> io::Result<()> {
-    write!(wrt, "--{}\r\n", boundary)
-}
-
-fn write_file(wrt: &mut Write, mut file: MultipartFile) -> io::Result<()> {
-    try!(file.filename.map(|filename| write!(wrt, "; filename=\"{}\"\r\n", filename)).unwrap_or(Ok(())));
-    try!(write!(wrt, "Content-Type: {}\r\n\r\n", file.content_type));
-    ref_copy(&mut file.reader, wrt)         
-}
-
-/// Specialized write_line that writes CRLF after a line as per W3C specs
-fn write_line(req: &mut Write, s: &str) -> io::Result<()> {
-    req.write_str(s).and_then(|_| req.write(b"\r\n"))        
 }
 
 fn multipart_mime(bound: &str) -> Mime {
@@ -181,10 +211,9 @@ fn multipart_mime(bound: &str) -> Mime {
 }
 
 pub trait HttpRequest {
-    type RequestStream: Write;
-    type Response;
-    type RequestErr: From<io::Error>;
-    type RequestResult = Result<Self::Response, Self::RequestErr>;
+    type Stream: Write;
+    type Response: Read;
+    type Error: From<io::Error>;
 
     /// Set the `ContentType` header to `multipart/form-data` and supply the `boundary` value.
     ///
@@ -192,9 +221,18 @@ pub trait HttpRequest {
     fn apply_headers(&mut self, boundary: &str, content_len: Option<usize>);
     /// Open the request stream and invoke the given closure, where the request body will be
     /// written. After the closure returns, finalize the request and return its result.
-    fn send<F>(self, send_fn: F) -> Self::RequestResult 
-        where F: FnOnce(&mut Self::RequestStream) -> io::Result<()>;
+    fn open_stream(self) -> Result<Self::Stream, Self::Error>;
 }
+
+pub trait HttpStream: Write {
+    type Request: HttpRequest;
+    type SendResult = Result<Self::Request::Response, Self::Request::Error>;
+
+    /// Finalize and close the stream, returning the HTTP response object.
+    fn finish(self) -> SendResult;
+}
+
+
 
 #[cfg(feature = "hyper")]
 mod hyper_impl {
