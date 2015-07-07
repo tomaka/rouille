@@ -10,6 +10,8 @@ extern crate hyper;
 
 use mime::Mime;
 
+use rand::Rng;
+
 use std::borrow::Cow;
 use std::fmt;
 
@@ -33,12 +35,14 @@ macro_rules! chain_result {
 pub mod client;
 pub mod server;
 
-
-
 const BOUNDARY_LEN: usize = 16;
 
-fn gen_boundary() -> String {
-    use rand::Rng;
+fn random_alphanumeric(len: usize) -> String {
+    rand::thread_rng().gen_ascii_chars().take(len).collect()
+}
 
-    "--".chars().chain(rand::thread_rng().gen_ascii_chars().take(BOUNDARY_LEN)).collect()
+fn gen_boundary() -> String {
+    let mut boundary = "--".to_owned();
+    boundary.extend(rand::thread_rng().gen_ascii_chars().take(BOUNDARY_LEN));
+    boundary
 }
