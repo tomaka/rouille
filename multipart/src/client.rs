@@ -29,7 +29,7 @@ use std::io::prelude::*;
 
 use std::marker::PhantomData;
 
-pub type Multipart<R: HttpRequest> = ChunkedMultipart;
+pub type Multipart<R: HttpRequest> = ChunkedMultipart<R>;
 
 /// The core API for all multipart requests.
 ///
@@ -47,7 +47,7 @@ pub trait MultipartRequest {
     type Error: From<io::Error>;
 
     #[doc(hidden)]
-    fn stream_mut(&mut self) -> &mut Stream;
+    fn stream_mut(&mut self) -> &mut Self::Stream;
     #[doc(hidden)]
     fn write_boundary(&mut self) -> io::Result<()>;
 
@@ -66,7 +66,7 @@ pub trait MultipartRequest {
                 self.write_field_headers(name, None, None),
                 self.write_line(val.borrow()),
                 self.write_boundary()
-            }.err().map(E::from)
+            }.err().map(Self::Error::from)
         }
 
         self
@@ -81,12 +81,12 @@ pub trait MultipartRequest {
             self.last_err = chain_result! {
                 { // New borrow scope so we can reborrow `file` after
                     let file_path = file.borrow().path();
-                    let content_type = mime_guess::guess_mime_type(file_path);
+                    let content_type = ::mime_guess::guess_mime_type(file_path);
                     self.write_field_headers(name.borrow(), file_path.filename_str(), content_type)
                 },
                 io::copy(file.borrow_mut(), self.stream_mut()),
                 self.write_boundary()
-            };
+            }.err().map(Self::Error::from);
         }
 
         self
@@ -108,13 +108,13 @@ pub trait MultipartRequest {
         mut self, name: N, read: R, filename: Option<F>, content_type: Option<Mime>
     ) -> Self {
         if self.last_err.is_none() {
-            let content_type = content_type.map_or_else(mime_guess::octet_stream);
+            let content_type = content_type.map_or_else(::mime_guess::octet_stream);
 
             self.last_err = chain_result! {
                 self.write_field_headers(name.borrow(), filename, content_type),
                 io::copy(read.borrow_mut(), self.stream_mut()),
                 self.write_boundary()
-            };
+            }.err().map(Self::Error::from);
         }
 
         self
@@ -170,8 +170,8 @@ impl<R: HttpRequest> ChunkedMultipart<R> {
     }
 
     /// Finalize the request and return the response from the server.   
-    pub fn send(self) -> R::Stream::Result where R: HttpRequest {
-        self.stream.finalize()
+    pub fn send(self) -> <<R as HttpRequest>::Stream as HttpStream>::Result where R: HttpRequest {
+        self.last_err.and_then(|_| self.stream.finalize())
     }    
 }
 
@@ -179,10 +179,21 @@ impl<R: HttpRequest> MultipartRequest for ChunkedMultipart<R> {
     type Stream = R::Stream;
     type Error = R::Error;
 
-    fn stream_mut(&mut self) -> &mut R::Stream { &mut self.stream }
+    fn stream_mut(&mut self) -> &mut R::Stream { 
+        &mut self.stream    
+    }
+
     fn write_boundary(&mut self) -> io::Result<()> {
-        write!(self.stream, "{}\r\n", boundary)
-    }    
+        write!(self.stream, "{}\r\n", self.boundary)
+    } 
+
+    fn last_err(&self) -> Option<&Self::Error> {
+        self.last_err.as_ref()
+    }
+
+    fn take_err(&mut self) -> Option<Self::Error> {
+        self.last_err.take()
+    }
 }
 
 /// A struct for sending a sized multipart request. The API varies subtly from `Multipart`.
@@ -190,16 +201,50 @@ impl<R: HttpRequest> MultipartRequest for ChunkedMultipart<R> {
 /// The request data will be written to a `Vec<u8>` so its size can be measured and the
 /// `Content-Length` header set when the request is sent. 
 pub struct SizedMultipart {
-    stream: Vec<u8>,
+    data: Vec<u8>,
     boundary: String,    
-    last_err: io::Error,
+    last_err: Option<io::Error>,
 }
 
 impl SizedMultipart {
     pub fn new() -> SizedMultipart {
         SizedMultipart {
-            multipart_data: Vec::new()
+            data: Vec::new(),
+            boundary: ::gen_boundary(),
+            last_err: None,
         }
+    }
+
+    pub fn send<R>(self, mut req: R) -> <<R as HttpRequest>::Stream as HttpStream>::Result 
+    where R: HttpRequest {
+        let boundary = ::gen_boundary();
+        req.apply_headers(&boundary, Some(self.data.len()));
+        let req = try!(req.open_stream());
+        try!(io::copy(&self.data, &mut req));
+        req.finish()
+    }
+}
+
+impl MultipartRequest for SizedMultipart {
+    type Stream = Vec<u8>;
+    type Error = io::Error;
+
+    #[doc(hidden)]
+    fn stream_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.data 
+    }
+
+    #[doc(hidden)]
+    fn write_boundary(&mut self) -> io::Result<()> {
+        write!(self.stream, "{}\r\n", self.boundary)
+    }
+
+    fn last_err(&self) -> Option<&Self::Error> {
+        self.last_err.as_ref()
+    }
+
+    fn take_err(&mut self) -> Option<Self::Error> {
+        self.last_err.take()
     }
 }
 
@@ -211,7 +256,7 @@ fn multipart_mime(bound: &str) -> Mime {
 }
 
 pub trait HttpRequest {
-    type Stream: Write;
+    type Stream: HttpStream; 
     type Response: Read;
     type Error: From<io::Error>;
 
@@ -226,13 +271,11 @@ pub trait HttpRequest {
 
 pub trait HttpStream: Write {
     type Request: HttpRequest;
-    type SendResult = Result<Self::Request::Response, Self::Request::Error>;
+    type Result = Result<Self::Request::Response, Self::Request::Error>;
 
     /// Finalize and close the stream, returning the HTTP response object.
-    fn finish(self) -> SendResult;
+    fn finish(self) -> Self::Result;
 }
-
-
 
 #[cfg(feature = "hyper")]
 mod hyper_impl {
@@ -244,9 +287,9 @@ mod hyper_impl {
     use std::io;
 
     impl super::HttpRequest for Request<Fresh> {
-        type RequestStream = Request<Streaming>;
+        type Stream = Request<Streaming>;
         type Response = Response;
-        type RequestErr = HyperError;
+        type Error = HyperError;
 
         /// #Panics
         /// If the `Request<Fresh>` method is not `Method::Post`.
@@ -275,5 +318,9 @@ mod hyper_impl {
             req.send()
         }
     } 
+
+    impl super::HttpStream for Request<Streaming> {
+        
+    }
 }
 

@@ -7,13 +7,14 @@
 
 use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
-use super::{MultipartField, MultipartFile};
-
 use std::borrow::Borrow;
 use std::cmp;
 use std::collections::HashMap;
 use std::ops::Deref;
 
+use std::fmt;
+
+use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 
@@ -175,10 +176,9 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// Read the request fully, parsing all fields and saving all files 
     /// to the given directory (if given) and return the result.
     ///
-    /// If `dir` is none, chooses a random subdirectory under `std::os::tmpdir()`.
+    /// If `dir` is none, uses `std::os::tmpdir()`.
     pub fn save_all(mut self, dir: Option<&Path>) -> io::Result<Entries> {
-        let tmp_dir = super::random_alphanumeric(12);
-        let dir = dir.map_or_else(|| ::std::env::temp_dir().join(tmp_dir), |path| path.to_owned());
+        let dir = dir.map_or_else(::std::env::temp_dir, |path| path.to_owned());
 
         let mut entries = Entries::with_path(dir);
 
@@ -248,27 +248,133 @@ impl Entries {
     }
 }
 
-/* FIXME: Can't have an iterator return a borrowed reference
-impl<'a> Iterator<(String, MultipartField<'a>)> for Multipart<'a> {
-    fn next(&mut self) -> Option<(String, MultipartField<'a>)> {
-        match self.read_entry() {
-            Ok(ok) => Some(ok),
-            Err(err) => {
-                if err.kind != EndOfFile {
-                    error!("Error reading Multipart: {}", err);
-                }
-
-                None
-             },
-        }
-    }
-}
-*/
-
 pub trait HttpRequest: Read {
     fn is_multipart(&self) -> bool;
     fn get_boundary(&self) -> Option<&str>;
 }
 
+/// A representation of a file in HTTP `multipart/form-data`.
+///
+/// Note that the file is not yet saved to the system; 
+/// instead, the struct implements a `Reader` that points 
+/// to the beginning of the file's contents in the HTTP stream. 
+/// You can read it to EOF, or use one of the `save_*()` methods here 
+/// to save it to disk.
+pub struct MultipartFile<'a, R> {
+    filename: Option<String>,
+    content_type: Mime,
+    reader: &'a mut BoundaryReader<R>,
+}
+
+impl<'a> MultipartFile<'a> {
+    fn from_octet(filename: Option<String>, reader: &'a mut Read, cont_type: &str) -> MultipartFile<'a> {
+        MultipartFile {
+            filename: filename,
+            reader: reader,
+            content_type: cont_type.parse::<Mime>().ok().unwrap_or_else(::mime_guess::octet_stream),
+        }    
+    }
+
+    fn from_file(filename: Option<String>, reader: &'a mut File, mime: Mime) -> MultipartFile<'a> {
+        MultipartFile {
+            filename: filename,
+            reader: reader,
+            content_type: mime,
+        }
+    }
+
+    /// Save this file to `path`, discarding the filename.
+    ///
+    /// If successful, the file can be found at `path`.
+    pub fn save_as(&mut self, path: &Path) -> io::Result<()> {
+        let mut file = try!(File::create(path));
+        io::copy(self.reader, &mut file)
+    }
+
+    /// Save this file in the directory described by `dir`,
+    /// appending `filename` if present, or a random string otherwise.
+    ///
+    /// Returns the created file's path on success.
+    ///
+    /// ###Panics
+    /// If `dir` does not represent a directory.
+    pub fn save_in(&mut self, dir: &Path) -> io::Result<PathBuf> {
+        assert!(dir.is_dir(), "Given path is not a directory!");
+
+        let path = dir.join(self.dest_filename());
+       
+        try!(self.save_as(&path));
+
+        Ok(path)
+    }
+
+    /// Save this file in the OS temp directory, returned from `std::env::temp_dir()`.
+    ///
+    /// Returns the created file's path on success.
+    pub fn save_temp(&mut self) -> io::Result<PathBuf> {
+        use std::env;
+        
+        self.save_in(&env::temp_dir())
+    }
+
+    pub fn filename(&self) -> Option<&str> {
+        self.filename.as_ref().map(String::as_ref)    
+    }
+
+    /// Get the content type of this file.
+    /// On the client, it is guessed by the file extension.
+    /// On the server, it is retrieved from the request or assumed to be
+    /// `application/octet-stream`.
+    pub fn content_type(&self) -> Mime {
+        self.content_type.clone()    
+    }
+}
+
+impl<'a> Read for MultipartFile<'a> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
+        self.reader.read(buf)
+    }
+}
+
+
+impl<'a> fmt::Debug for MultipartFile<'a> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "Filename: {:?} Content-Type: {:?}", self.filename, self.content_type)    
+    } 
+}
+
+
+/// A field in a `multipart/form-data` request.
+///
+/// This enum does not include the names of the fields, as those are yielded separately
+/// by `server::Multipart::read_entry()`.
+#[derive(Debug)]
+pub enum MultipartField<'a> {
+    /// A text field.
+    Text(&'a str),
+    /// A file field, including the content type and optional filename
+    /// along with a `Read` implementation for getting the contents.
+    File(MultipartFile<'a>),
+    // MultiFiles(Vec<MultipartFile>), /* TODO: Multiple files */
+}
+
+impl<'a> MultipartField<'a> {
+    /// Borrow this field as a text field, if possible.
+    pub fn as_text(&self) -> Option<&str> {
+        match *self {
+            MultipartField::Text(ref s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Borrow this field as a file field, if possible
+    /// Mutably borrows so the contents can be read.
+    pub fn as_file(&mut self) -> Option<&mut MultipartFile<'a>> {
+        match *self {
+            MultipartField::File(ref mut file) => Some(file),
+            _ => None,
+        }
+    }
+}
 
 
