@@ -34,13 +34,13 @@ impl<R> BoundaryReader<R> where R: Read {
         if !self.boundary_read {
             let boundary_0 = self.boundary[0];
 
-            // Style advice requested
-            for (search_idx, maybe_boundary) 
-            in buf[self.search_idx..].windows(self.boundary.len()).enumerate()
-                .filter(|&(_, window)| window[0] == boundary_0) 
-            {
-                self.boundary_read = self.boundary == maybe_boundary;
-                self.search_idx += search_idx;            
+            let lookahead_iter = buf[self.search_idx..].windows(self.boundary.len()).enumerate();
+
+            for (search_idx, maybe_boundary) in lookahead_iter {
+                if maybe_boundary[0] == self.boundary[0] {
+                    self.boundary_read = self.boundary == maybe_boundary;
+                    self.search_idx += search_idx;
+                }
             }
         }
 
