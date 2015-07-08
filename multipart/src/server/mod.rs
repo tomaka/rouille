@@ -57,7 +57,7 @@ impl<R> Multipart<R> where R: HttpRequest {
             return Err(req);     
         }
 
-        let boundary = req.get_boundary().unwrap().into();
+        let boundary = req.get_boundary().unwrap().to_owned();
 
         debug!("Boundary: {}", boundary);
 

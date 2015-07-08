@@ -171,7 +171,6 @@ impl<S: HttpStream> Multipart<S> {
     }
 
     /// Finalize the request and return the response from the server.
-    // God bless this mess everyone!
     pub fn send(self) -> Result<S::Response, S::Error> {
         match self.last_err {
             None => self.stream.finish(),
