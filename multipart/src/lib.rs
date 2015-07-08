@@ -8,17 +8,7 @@ extern crate rustc_serialize;
 #[cfg(feature = "hyper")]
 extern crate hyper;
 
-use mime::Mime;
-
 use rand::Rng;
-
-use std::borrow::Cow;
-use std::fmt;
-
-use std::fs::File;
-use std::io;
-use std::io::prelude::*;
-use std::path::{Path, PathBuf};
 
 macro_rules! try_all {
     ($first_expr:expr, $($try_expr:expr),*) => (

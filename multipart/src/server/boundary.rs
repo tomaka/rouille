@@ -7,6 +7,7 @@ use std::io::prelude::*;
 use std::ptr;
 
 /// A struct implementing `Read` that will yield bytes until it sees a given sequence.
+#[derive(Debug)]
 pub struct BoundaryReader<S> {
     reader: S,
     boundary: Vec<u8>,
@@ -19,7 +20,8 @@ pub struct BoundaryReader<S> {
 const BUF_SIZE: usize = 1024 * 64; // 64k buffer
 
 impl<S> BoundaryReader<S> where S: Read {
-    fn from_reader(reader: S, boundary: String) -> BoundaryReader<S> {
+    #[doc(hidden)]
+    pub fn from_reader(reader: S, boundary: String) -> BoundaryReader<S> {
         let mut buf = vec![0u8; BUF_SIZE];
 
         BoundaryReader {
@@ -40,7 +42,7 @@ impl<S> BoundaryReader<S> where S: Read {
 
             let lookahead = &self.buf[self.last_search_idx .. self.buf_len];
 
-            let search_idx = lookahead.position_elem(&self.boundary[0])
+            let search_idx = lookahead.iter().position(|&byte| byte == self.boundary[0])
                 .unwrap_or(lookahead.len() - 1);
 
             debug!("Search idx: {}", search_idx);
@@ -84,7 +86,8 @@ impl<S> BoundaryReader<S> where S: Read {
         self.last_search_idx -= amt;
     }
 
-    fn consume_boundary(&mut self) -> io::Result<()> {
+    #[doc(hidden)]
+    pub fn consume_boundary(&mut self) -> io::Result<()> {
         while !self.boundary_read {
             try!(self.read_to_boundary()); 
         }
@@ -172,24 +175,30 @@ dashed-value-2\r
     let test_reader = BufReader::new(TEST_VAL.as_bytes());
     let mut reader = BoundaryReader::from_reader(test_reader, BOUNDARY.to_owned());
 
+    let ref mut buf = String::new();
+
     debug!("Read 1");
-    let string = reader.read_to_string().unwrap();
-    debug!("{}", string);
-    assert!(string.trim().is_empty());
+    let _ = reader.read_to_string(buf).unwrap();
+    debug!("{}", buf);
+    assert!(buf.trim().is_empty());
+
+    buf.clear();
 
     debug!("Consume 1");
     reader.consume_boundary().unwrap();
 
     debug!("Read 2");
-    assert_eq!(reader.read_to_string().unwrap().trim(), "dashed-value-1");
+    let _ = reader.read_to_string(buf).unwrap();
+    assert_eq!(buf.trim(), "dashed-value-1");
+    buf.clear();
 
     debug!("Consume 2");
     reader.consume_boundary().unwrap();
 
     debug!("Read 3");
-    assert_eq!(reader.read_to_string().unwrap().trim(), "dashed-value-2");
+    let _ = reader.read_to_string(buf).unwrap();
+    assert_eq!(buf.trim(), "dashed-value-2");
 
     debug!("Consume 3");
     reader.consume_boundary().unwrap();
-
 }

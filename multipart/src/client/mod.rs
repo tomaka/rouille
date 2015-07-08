@@ -135,7 +135,7 @@ impl<S: HttpStream> Multipart<S> {
     /// Use `Read::take` if you wish to send data from a `Read` that will never end otherwise.
     // RFC: How to format this declaration?
     pub fn write_stream<N: Borrow<str>, St: Read, St_: BorrowMut<St>>(
-        mut self, name: N, read: St_, filename: Option<&str>, content_type: Option<Mime>
+        mut self, name: N, mut read: St_, filename: Option<&str>, content_type: Option<Mime>
     ) -> Self {
         if self.last_err.is_none() {
             let content_type = content_type.unwrap_or_else(::mime_guess::octet_stream);

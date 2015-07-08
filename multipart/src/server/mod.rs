@@ -14,7 +14,7 @@ use std::ops::Deref;
 
 use std::fmt;
 
-use std::fs::File;
+use std::fs::{self, File};
 use std::io;
 use std::io::prelude::*;
 
@@ -53,10 +53,11 @@ impl<R> Multipart<R> where R: HttpRequest {
     pub fn from_request(req: R) -> Result<Multipart<R>, R> {
         if !req.is_multipart() { return Err(req); }
 
-        let boundary = match req.get_boundary() {
-            Some(boundary) => format!("{}\r\n", boundary),
-            None => return Err(req),        
-        };
+        if req.get_boundary().is_none() {
+            return Err(req);     
+        }
+
+        let boundary = req.get_boundary().unwrap().into();
 
         debug!("Boundary: {}", boundary);
 
@@ -76,7 +77,7 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// ##Warning
     /// If the last returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry!
-    pub fn read_entry(&mut self) -> io::Result<(String, MultipartField)> {
+    pub fn read_entry(&mut self) -> io::Result<(String, MultipartField<R>)> {
         try!(self.source.consume_boundary());
         let (disp_type, field_name, filename) = try!(self.read_content_disposition());
 
@@ -91,7 +92,7 @@ impl<R> Multipart<R> where R: HttpRequest {
             let _ = try!(self.read_line()); // Consume empty line
             Ok((field_name,
                 MultipartField::File(
-                    MultipartFile::from_octet(filename, &mut self.source, &content_type)
+                    MultipartFile::from_reader(filename, &mut self.source, &content_type)
                 )
             ))
         } else {
@@ -109,7 +110,7 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// since `Iterator::next()` can't use bound lifetimes.
     ///
     /// See https://www.reddit.com/r/rust/comments/2lkk\4\isize/concrete_lifetime_vs_bound_lifetime/
-    pub fn foreach_entry<F>(&mut self, mut foreach: F) where F: FnMut(String, MultipartField) {
+    pub fn foreach_entry<F>(&mut self, mut foreach: F) where F: FnMut(String, MultipartField<R>) {
         loop {
             match self.read_entry() {
                 Ok((name, field)) => foreach(name, field),
@@ -184,7 +185,7 @@ impl<R> Multipart<R> where R: HttpRequest {
 
         loop {
             match self.read_entry() {
-                Ok((name, MultipartField::Text(text))) => { entries.fields.insert(name, text.into_owned()); },
+                Ok((name, MultipartField::Text(text))) => { entries.fields.insert(name, text.to_owned()); },
                 Ok((name, MultipartField::File(mut file))) => {
                     let path = try!(file.save_in(&entries.dir));
                     entries.files.insert(name, path);
@@ -200,11 +201,17 @@ impl<R> Multipart<R> where R: HttpRequest {
     }
 
     fn read_line(&mut self) -> io::Result<&str> {
-        self.source.read_line(&mut self.line_buf).map(|read| &self.line_buf[..read])
+        match self.source.read_line(&mut self.line_buf) {
+            Ok(read) => Ok(&self.line_buf[..read]),
+            Err(err) => Err(err),
+        }
     }
 
     fn read_to_string(&mut self) -> io::Result<&str> {
-        self.source.read_to_string(&mut self.line_buf).map(|read| &self.line_buf[..read])
+        match self.source.read_to_string(&mut self.line_buf) {
+            Ok(read) => Ok(&self.line_buf[..read]),
+            Err(err) => Err(err),
+        }
     }
 }
 
@@ -253,6 +260,39 @@ pub trait HttpRequest: Read {
     fn get_boundary(&self) -> Option<&str>;
 }
 
+/// A field in a `multipart/form-data` request.
+///
+/// This enum does not include the names of the fields, as those are yielded separately
+/// by `server::Multipart::read_entry()`.
+#[derive(Debug)]
+pub enum MultipartField<'a, R: 'a> {
+    /// A text field.
+    Text(&'a str),
+    /// A file field, including the content type and optional filename
+    /// along with a `Read` implementation for getting the contents.
+    File(MultipartFile<'a, R>),
+    // MultiFiles(Vec<MultipartFile>), /* TODO: Multiple files */
+}
+
+impl<'a, R> MultipartField<'a, R> {
+    /// Borrow this field as a text field, if possible.
+    pub fn as_text(&self) -> Option<&str> {
+        match *self {
+            MultipartField::Text(ref s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Borrow this field as a file field, if possible
+    /// Mutably borrows so the contents can be read.
+    pub fn as_file(&mut self) -> Option<&mut MultipartFile<'a, R>> {
+        match *self {
+            MultipartField::File(ref mut file) => Some(file),
+            _ => None,
+        }
+    }
+}
+
 /// A representation of a file in HTTP `multipart/form-data`.
 ///
 /// Note that the file is not yet saved to the system; 
@@ -260,27 +300,22 @@ pub trait HttpRequest: Read {
 /// to the beginning of the file's contents in the HTTP stream. 
 /// You can read it to EOF, or use one of the `save_*()` methods here 
 /// to save it to disk.
-pub struct MultipartFile<'a, R> {
+#[derive(Debug)]
+pub struct MultipartFile<'a, R: 'a> {
     filename: Option<String>,
     content_type: Mime,
     reader: &'a mut BoundaryReader<R>,
 }
 
-impl<'a> MultipartFile<'a> {
-    fn from_octet(filename: Option<String>, reader: &'a mut Read, cont_type: &str) -> MultipartFile<'a> {
+impl<'a, R: Read> MultipartFile<'a, R> {
+    fn from_reader(
+        filename: Option<String>, reader: &'a mut BoundaryReader<R>, cont_type: &str
+    ) -> MultipartFile<'a, R> {
         MultipartFile {
             filename: filename,
+            content_type: cont_type.parse::<Mime>().ok().unwrap_or_else(::mime_guess::octet_stream),            
             reader: reader,
-            content_type: cont_type.parse::<Mime>().ok().unwrap_or_else(::mime_guess::octet_stream),
         }    
-    }
-
-    fn from_file(filename: Option<String>, reader: &'a mut File, mime: Mime) -> MultipartFile<'a> {
-        MultipartFile {
-            filename: filename,
-            reader: reader,
-            content_type: mime,
-        }
     }
 
     /// Save this file to `path`, discarding the filename.
@@ -288,7 +323,7 @@ impl<'a> MultipartFile<'a> {
     /// If successful, the file can be found at `path`.
     pub fn save_as(&mut self, path: &Path) -> io::Result<()> {
         let mut file = try!(File::create(path));
-        io::copy(self.reader, &mut file)
+        io::copy(self.reader, &mut file).and(Ok(()))
     }
 
     /// Save this file in the directory described by `dir`,
@@ -299,9 +334,10 @@ impl<'a> MultipartFile<'a> {
     /// ###Panics
     /// If `dir` does not represent a directory.
     pub fn save_in(&mut self, dir: &Path) -> io::Result<PathBuf> {
-        assert!(dir.is_dir(), "Given path is not a directory!");
+        let meta = try!(fs::metadata(dir));
+        assert!(meta.is_dir(), "Given path is not a directory!");
 
-        let path = dir.join(self.dest_filename());
+        let path = dir.join(::random_alphanumeric(8));
        
         try!(self.save_as(&path));
 
@@ -330,51 +366,12 @@ impl<'a> MultipartFile<'a> {
     }
 }
 
-impl<'a> Read for MultipartFile<'a> {
+impl<'a, R: Read> Read for MultipartFile<'a, R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
         self.reader.read(buf)
     }
 }
 
 
-impl<'a> fmt::Debug for MultipartFile<'a> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "Filename: {:?} Content-Type: {:?}", self.filename, self.content_type)    
-    } 
-}
-
-
-/// A field in a `multipart/form-data` request.
-///
-/// This enum does not include the names of the fields, as those are yielded separately
-/// by `server::Multipart::read_entry()`.
-#[derive(Debug)]
-pub enum MultipartField<'a> {
-    /// A text field.
-    Text(&'a str),
-    /// A file field, including the content type and optional filename
-    /// along with a `Read` implementation for getting the contents.
-    File(MultipartFile<'a>),
-    // MultiFiles(Vec<MultipartFile>), /* TODO: Multiple files */
-}
-
-impl<'a> MultipartField<'a> {
-    /// Borrow this field as a text field, if possible.
-    pub fn as_text(&self) -> Option<&str> {
-        match *self {
-            MultipartField::Text(ref s) => Some(s),
-            _ => None,
-        }
-    }
-
-    /// Borrow this field as a file field, if possible
-    /// Mutably borrows so the contents can be read.
-    pub fn as_file(&mut self) -> Option<&mut MultipartFile<'a>> {
-        match *self {
-            MultipartField::File(ref mut file) => Some(file),
-            _ => None,
-        }
-    }
-}
 
 
