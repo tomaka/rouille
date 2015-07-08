@@ -16,10 +16,10 @@ keywords = ["form-data", "hyper", "http", "post", "upload"]
 
 [dependencies]
 log = "*"
+env_logger = "*"
 mime = "*"
 mime_guess = "*"
 rand = "*"
-rustc-serialize = "*"
 
 [dependencies.hyper]
 version = "*"

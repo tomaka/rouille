@@ -39,11 +39,15 @@ impl<R> BoundaryReader<R> where R: Read {
             for (search_idx, maybe_boundary) in lookahead_iter {
                 if maybe_boundary[0] == self.boundary[0] {
                     self.boundary_read = self.boundary == maybe_boundary;
-                    self.search_idx += search_idx;
+                    self.search_idx = search_idx;
+
+                    if self.boundary_read {
+                        break;
+                    }
                 }
             }
         }
-
+        debug!("Buf len: {} Search idx: {}", buf.len(), self.search_idx);
         Ok(&buf[..self.search_idx]) 
     }
 
@@ -63,8 +67,7 @@ impl<R> BoundaryReader<R> where R: Read {
         self.buffer.consume(consume_amt);
         self.search_idx = 0;
         self.boundary_read = false;
-
-        Ok(())
+Ok(())
     }
 
     #[allow(unused)]
@@ -124,7 +127,7 @@ fn copy_bytes(src: &[u8], dst: &mut [u8]) {
 #[test]
 fn test_boundary() {
     use std::io::BufReader;
-
+    
     const BOUNDARY: &'static str = "--boundary\r\n";
     const TEST_VAL: &'static str = "\r
 --boundary\r
@@ -134,6 +137,8 @@ dashed-value-2\r
 --boundary\r
 ";
 
+    ::env_logger::init().unwrap();
+
     let src = &mut TEST_VAL.as_bytes();
     let mut reader = BoundaryReader::from_reader(src, BOUNDARY);
 
@@ -141,7 +146,7 @@ dashed-value-2\r
 
     debug!("Read 1");
     let _ = reader.read_to_string(buf).unwrap();
-    debug!("{}", buf);
+    debug!("Buf: {:?}", buf);
     assert!(buf.trim().is_empty());
 
     buf.clear();
