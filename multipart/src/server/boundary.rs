@@ -16,7 +16,6 @@ pub struct BoundaryReader<R> {
     boundary_read: bool,
 }
 
-
 impl<R> BoundaryReader<R> where R: Read {
     #[doc(hidden)]
     pub fn from_reader<B: Into<Vec<u8>>>(reader: R, boundary: B) -> BoundaryReader<R> {
@@ -32,8 +31,6 @@ impl<R> BoundaryReader<R> where R: Read {
         let buf = try!(self.buffer.fill_buf());
 
         if !self.boundary_read {
-            let boundary_0 = self.boundary[0];
-
             let lookahead_iter = buf[self.search_idx..].windows(self.boundary.len()).enumerate();
 
             for (search_idx, maybe_boundary) in lookahead_iter {
@@ -70,6 +67,7 @@ impl<R> BoundaryReader<R> where R: Read {
 Ok(())
     }
 
+    // Keeping this around to support nested boundaries later.
     #[allow(unused)]
     #[doc(hidden)]
     pub fn set_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) {
@@ -125,9 +123,7 @@ fn copy_bytes(src: &[u8], dst: &mut [u8]) {
 }
 
 #[test]
-fn test_boundary() {
-    use std::io::BufReader;
-    
+fn test_boundary() {    
     const BOUNDARY: &'static str = "--boundary\r\n";
     const TEST_VAL: &'static str = "\r
 --boundary\r

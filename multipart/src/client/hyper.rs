@@ -10,7 +10,7 @@ use super::{HttpRequest, HttpStream};
 use std::io;
 use std::io::prelude::*;
 
-impl super::HttpRequest for Request<Fresh> {
+impl HttpRequest for Request<Fresh> {
     type Stream = Request<Streaming>;
     type Response = Response;
     type Error = HyperError;
@@ -18,7 +18,6 @@ impl super::HttpRequest for Request<Fresh> {
     /// #Panics
     /// If the `Request<Fresh>` method is not `Method::Post`.
     fn apply_headers(&mut self, boundary: &str, content_len: Option<usize>) {
-
         assert!(self.method() == Method::Post, "Multipart request must use POST method!");        
 
         let headers = self.headers_mut();
@@ -40,6 +39,14 @@ impl super::HttpRequest for Request<Fresh> {
     }
 } 
 
-impl super::HttpStream for Request<Streaming> {
+impl HttpStream for Request<Streaming> {
     
 }
+
+fn multipart_mime(bound: &str) -> Mime {
+    Mime(
+        TopLevel::Multipart, SubLevel::Ext("form-data".into()),
+        vec![(Attr::Ext("boundary".into()), Value::Ext(bound.into()))]
+    )         
+}
+

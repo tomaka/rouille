@@ -18,10 +18,9 @@
 //! server doesn't support chunked requests or otherwise rejects them. 
 //!
 //! [chunked-example]: http://en.wikipedia.org/wiki/Chunked_transfer_encoding#Example 
-use mime::{Mime, TopLevel, SubLevel, Attr, Value};
+use mime::Mime;
 
 use std::borrow::{Borrow, BorrowMut};
-use std::cell::Cell;
 use std::convert::AsRef;
 
 use std::fs::File;
@@ -85,6 +84,9 @@ impl<S: HttpStream> Multipart<S> {
 
     /// Write a text field to this multipart request.
     /// `name` and `val` can be either owned `String` or `&str`.
+    ///
+    /// ##Errors
+    /// If something went wrong with the HTTP stream.
     pub fn write_text<N: Borrow<str>, V: Borrow<str>>(mut self, name: N, val: V) -> Self {
         if self.last_err.is_none() {
             self.last_err = chain_result! {
@@ -102,6 +104,10 @@ impl<S: HttpStream> Multipart<S> {
     ///
     /// If you want to set these values manually, or use another type that implements `Read`, 
     /// use `.write_stream()`.
+    ///
+    /// ##Errors
+    /// If there was a problem opening the file (was a directory or didn't exist),
+    /// or if something went wrong with the HTTP stream.
     // Remove `File::path()`, GG Rust-lang
     pub fn write_file<N: Borrow<str>, P: AsRef<Path>>(mut self, name: N, path: P) -> Self {
         if self.last_err.is_none() {     
@@ -133,6 +139,9 @@ impl<S: HttpStream> Multipart<S> {
     /// multipart data has to be written to an in-memory buffer so its size can be calculated.
     ///
     /// Use `Read::take` if you wish to send data from a `Read` that will never end otherwise.
+    ///
+    /// ##Errors
+    /// If the reader returned an error, or if something went wrong with the HTTP stream.
     // RFC: How to format this declaration?
     pub fn write_stream<N: Borrow<str>, St: Read, St_: BorrowMut<St>>(
         mut self, name: N, mut read: St_, filename: Option<&str>, content_type: Option<Mime>
@@ -170,7 +179,7 @@ impl<S: HttpStream> Multipart<S> {
         write!(self.stream, "{}\r\n", self.boundary)
     }
 
-    /// Finalize the request and return the response from the server.
+    /// Finalize the request and return the response from the server, or the last error if set.
     pub fn send(self) -> Result<S::Response, S::Error> {
         match self.last_err {
             None => self.stream.finish(),
@@ -185,14 +194,6 @@ where <R::Stream as HttpStream>::Error: From<R::Error> {
     pub fn from_request_sized(req: R) -> Result<Self, R::Error> {
         Multipart::<SizedRequest<R>>::from_request(SizedRequest::from_request(req))
     }
-}
-
-
-fn multipart_mime(bound: &str) -> Mime {
-    Mime(
-        TopLevel::Multipart, SubLevel::Ext("form-data".into()),
-        vec![(Attr::Ext("boundary".into()), Value::Ext(bound.into()))]
-    )         
 }
 
 pub trait HttpRequest {

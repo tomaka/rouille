@@ -5,14 +5,12 @@
 //!
 //! See the `Multipart` struct for more info.
 
-use mime::{Mime, TopLevel, SubLevel, Attr, Value};
+use mime::Mime;
 
 use std::borrow::Borrow;
-use std::cmp;
-use std::collections::HashMap;
 use std::ops::Deref;
 
-use std::fmt;
+use std::collections::HashMap;
 
 use std::fs::{self, File};
 use std::io;
