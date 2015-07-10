@@ -26,6 +26,36 @@ mod boundary;
 #[cfg(feature = "hyper")]
 pub mod hyper;
 
+macro_rules! try_opt (
+    ($expr:expr) => (
+        match $expr {
+            Some(val) => Some(val),
+            None => return None,
+        }
+    )
+);
+
+#[derive(Clone, Debug)]
+pub enum MultipartError {
+    EndOfStream,
+    Io(io::Error),
+}
+
+impl From<io::Error> for MultipartError {
+    fn from(err: io::Error) -> MultipartError {
+        MultipartError::Io(err)
+    }
+}
+
+impl MultipartError {
+    fn is_end_of_stream(&self) -> bool {
+        match *self {
+            MultipartError::EndOfStream => true,
+            _ => false,
+        }
+    }
+}
+
 /// The server-side implementation of `multipart/form-data` requests.
 ///
 /// Create this with `Multipart::from_request()` passing a `server::Request` object from Hyper,
@@ -38,12 +68,6 @@ pub struct Multipart<R> {
     source: BoundaryReader<R>,
     line_buf: String,
 }
-
-macro_rules! try_find(
-    ($needle:expr, $haystack:expr, $err:expr) => (
-        try!($haystack.find($needle).ok_or_else(|| line_error($err, $haystack)))
-    )
-);
 
 impl<R> Multipart<R> where R: HttpRequest {
     /// If the given `HttpRequest` is a POST request of `Content-Type: multipart/form-data`,
@@ -75,32 +99,13 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// ##Warning
     /// If the last returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry!
-    pub fn read_entry(&mut self) -> io::Result<(String, MultipartField<R>)> {
-        try!(self.source.consume_boundary());
-        let (disp_type, field_name, filename) = try!(self.read_content_disposition());
+    pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<R>>> {
+        
+    }
 
-        if disp_type != "form-data" {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("Content-Disposition value: {:?} expected: \"form-data\"", disp_type),
-            ));
-        }
-
-        if let Some(content_type) = try!(self.read_content_type()) {
-            let _ = try!(self.read_line()); // Consume empty line
-            Ok((field_name,
-                MultipartField::File(
-                    MultipartFile::from_reader(filename, &mut self.source, &content_type)
-                )
-            ))
-        } else {
-            // Empty line consumed by read_content_type()
-            let text = try!(self.read_to_string());
-            // The last two characters are "\r\n".
-            // We can't do a simple trim because the content might be terminated
-            // with line separators we want to preserve.
-            Ok((field_name, MultipartField::Text(text[..text.len() - 2].into())))
-        }
+    fn read_content_disposition(&mut self) -> io::Result<Option<ContentDisp>> {
+        let line = try!(self.read_line());
+        Ok(ContentDisp::read_from(line))
     }
 
     /// Call `f` for each entry in the multipart request.
@@ -108,68 +113,22 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// since `Iterator::next()` can't use bound lifetimes.
     ///
     /// See https://www.reddit.com/r/rust/comments/2lkk\4\isize/concrete_lifetime_vs_bound_lifetime/
-    pub fn foreach_entry<F>(&mut self, mut foreach: F) where F: FnMut(String, MultipartField<R>) {
+    ///
+    /// Returns `Ok(())` when all fields have been read, or the first error.
+    pub fn foreach_entry<F>(&mut self, mut foreach: F) -> io::Result<()> where F: FnMut(MultipartField<R>) {
         loop {
             match self.read_entry() {
-                Ok((name, field)) => foreach(name, field),
-                Err(err) => {
-                    error!("Error reading Multipart: {}", err);
-                    break;
-                },
+                Ok(Some(field)) => foreach(field),
+                Ok(None) => return Ok(()),
+                Err(err) => return Err(err),
             }
         }
     }
 
-    fn read_content_disposition(&mut self) -> io::Result<(String, String, Option<String>)> {
-        let line = try!(self.read_line());
-
-        // Find the end of CONT_DISP in the line
-        let disp_type = {
-            const CONT_DISP: &'static str = "Content-Disposition:";
-
-            let disp_idx = try_find!(CONT_DISP, &line, "Content-Disposition subheader not found!") 
-                + CONT_DISP.len();
-
-            let disp_type_end = try_find!(
-                ';', &line[disp_idx..], 
-                "Error parsing Content-Disposition value!"
-            );
-
-            line[disp_idx .. disp_idx + disp_type_end].trim().to_owned()
-        };
-
-        let field_name = {
-            const NAME: &'static str = "name=\"";
-
-            let name_idx = try_find!(NAME, &line, "Error parsing field name!") + NAME.len();
-            let name_end = try_find!('"', &line[name_idx ..], "Error parsing field name!");
-
-            line[name_idx .. name_idx + name_end].to_owned() // No trim here since it's in quotes.
-        };
-
-        let filename = {
-            const FILENAME: &'static str = "filename=\"";
-
-            let filename_idx = line.find(FILENAME).map(|idx| idx + FILENAME.len());
-            let filename_idxs = with(filename_idx, |&start| line[start ..].find('"'));
-
-            filename_idxs.map(|(start, end)| line[start .. start + end].to_owned())
-        };
-
-        Ok((disp_type, field_name, filename))
-    }
-
-    fn read_content_type(&mut self) -> io::Result<Option<String>> {
+    fn read_content_type<'a>(&'a mut self) -> io::Result<Option<ContentType<'a>> {
         debug!("Read content type!");
         let line = try!(self.read_line());
-
-        const CONTENT_TYPE: &'static str = "Content-Type:";
-
-        let type_idx = line.find(CONTENT_TYPE);
-
-        // FIXME Will not properly parse for multiple files!
-        // Does not expect boundary=<boundary>
-        Ok(type_idx.map(|start| line[(start + CONTENT_TYPE.len())..].trim().to_owned()))
+        Ok(ContentType::read_from(line))
     }
 
     /// Read the request fully, parsing all fields and saving all files 
@@ -199,6 +158,8 @@ impl<R> Multipart<R> where R: HttpRequest {
     }
 
     fn read_line(&mut self) -> io::Result<&str> {
+        self.line_buf.clear();
+
         match self.source.read_line(&mut self.line_buf) {
             Ok(read) => Ok(&self.line_buf[..read]),
             Err(err) => Err(err),
@@ -206,6 +167,8 @@ impl<R> Multipart<R> where R: HttpRequest {
     }
 
     fn read_to_string(&mut self) -> io::Result<&str> {
+        self.line_buf.clear();
+
         match self.source.read_to_string(&mut self.line_buf) {
             Ok(read) => Ok(&self.line_buf[..read]),
             Err(err) => Err(err),
@@ -235,22 +198,80 @@ fn line_error(msg: &str, line: &str) -> io::Error {
     )
 }
 
-/// A result of `Multipart::save_all()`.
-pub struct Entries {
-    pub fields: HashMap<String, String>,
-    pub files: HashMap<String, PathBuf>,
-    /// The directory the files were saved under.
-    pub dir: PathBuf,
+struct ContentType<'a> {
+    cont_type: &'a str,
+    boundary: Option<&'a str>,
 }
 
-impl Entries {
-    fn with_path<P: Into<PathBuf>>(path: P) -> Entries {
-        Entries {
-            fields: HashMap::new(),
-            files: HashMap::new(),
-            dir: path.into(),
+impl<'a> ContentType<'a> {
+    fn read_from(line: &'a str) -> Option<ContentType<'a>> {
+        const CONTENT_TYPE: &'static str = "Content-Type:";
+        const BOUNDARY: &'static str = "boundary=\"";
+
+        let cont_type = get_str_after(CONTENT_TYPE, ';', line);
+
+        if let Some((cont_type, after_cont_type)) = get_str_after(CONTENT_TYPE, ';', line) {
+            let boundary = get_str_after(BOUNDARY, '"', after_cont_type).map(|tup| tup.0);
+
+            Some(ContentType {
+                cont_type: cont_type,
+                boundary: boundary,
+            })
+        } else {
+            get_remainder_after(CONTENT_TYPE, line).map(|cont_type|
+                ContentType { cont_type: cont_type, boundary: None }
+            )
         }
     }
+}
+
+struct ContentDisp {
+    field_name: String,
+    filename: Option<String>,
+}
+
+impl ContentDisp {
+    fn read_from(line: &str) -> Option<ContentDisp>> {
+        debug!("Reading Content-Disposition from line: {:?}", line);
+
+        if line.is_empty() {
+            return None;
+        }
+
+        const CONT_DISP: &'static str = "Content-Disposition:";
+        const NAME: &'static str = "name=\"";
+        const FILENAME: &'static str = "filename=\"";
+
+        let after_disp_type = {
+            let (disp_type, after_disp_type) = get_str_after(CONT_DISP, ';', line);
+
+            if disp_type.trim() != "form-data" {
+                return None;
+            }
+
+            after_disp_type
+        };
+
+        let (field_name, after_field_name) = try_opt!(get_str_after(NAME, '"', after_disp_type));
+
+        let filename = get_str_after(FILENAME, '"', after_field_name)
+            .map(|(filename, _)| filename.to_owned());
+
+        Some(ContentDisp { field_name: field_name.to_owned(), filename: filename })
+    }
+}
+
+/// Get the string after `needle` in `haystack`, stopping before `end_val_delim`
+fn get_str_after<'a>(needle: &str, end_val_delim: char, haystack: &'a str) -> Option<(&'a str, &'a str)> {
+    let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
+    let val_end_idx = try_opt!(haystack[val_start_idx..].find(end_val_delim));
+    Some(&haystack[val_start_idx..val_end_idx], &haystack[val_end_idx..])
+}
+
+/// Get everything after `needle` in `haystack`
+fn get_remainder_after<'a>(needle: &str, haystack: &'a str) -> Option<(&'a str)> {
+    let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
+    Some(&haystack[val_start_idx..])
 }
 
 pub trait HttpRequest: Read {
@@ -258,12 +279,56 @@ pub trait HttpRequest: Read {
     fn get_boundary(&self) -> Option<&str>;
 }
 
-/// A field in a `multipart/form-data` request.
-///
-/// This enum does not include the names of the fields, as those are yielded separately
-/// by `server::Multipart::read_entry()`.
+pub struct MultipartField<'a, R: 'a> {
+    /// The field's name from the form
+    pub name: String,
+    /// The data of the field. Can be text or binary.
+    pub data: MultipartData<'a, R>,
+}
+
+impl<'a, R: HttpRequest + 'a> MultipartField<'a, R> {
+    fn read_from(multipart: &'a mut Multipart<R>) -> io::Result<Option<MultipartField<'a>>> {
+        try!(multipart.source.consume_boundary());
+
+        let cont_disp = match multipart.read_content_disposition() {
+            Ok(Some(cont_disp)) => cont_disp,
+            Ok(None) => return None,
+            Err(err) => return Err(err),
+        };        
+
+        let data = match try!(multipart.read_content_type()) {
+            Some(content_type) => {
+                let _ = try!(multipart.read_line()); // Consume empty line
+                MultipartData::File(
+                    MultipartFile::from_reader(
+                        cont_disp.filename, 
+                        &mut multipart.source, 
+                        &content_type,
+                    )
+                 )
+            },
+            None => {
+                // Empty line consumed by read_content_type()
+                let text = try!(multipart.read_to_string());
+                // The last two characters are "\r\n".
+                // We can't do a simple trim because the content might be terminated
+                // with line separators we want to preserve.
+                MultipartData::Text(&text[..text.len() - 2])
+            },
+        };
+
+        Ok(Some(
+            MultipartField {
+                name: cont_disp.name,
+                data: data,
+            }
+        ))
+    }
+} 
+
+/// The data of a field in a `multipart/form-data` request.
 #[derive(Debug)]
-pub enum MultipartField<'a, R: 'a> {
+pub enum MultipartData<'a, R: 'a> {
     /// A text field.
     Text(&'a str),
     /// A file field, including the content type and optional filename
@@ -272,11 +337,11 @@ pub enum MultipartField<'a, R: 'a> {
     // MultiFiles(Vec<MultipartFile>), /* TODO: Multiple files */
 }
 
-impl<'a, R> MultipartField<'a, R> {
+impl<'a, R> MultipartData<'a, R> {
     /// Borrow this field as a text field, if possible.
     pub fn as_text(&self) -> Option<&str> {
         match *self {
-            MultipartField::Text(ref s) => Some(s),
+            MultipartData::Text(ref s) => Some(s),
             _ => None,
         }
     }
@@ -285,7 +350,7 @@ impl<'a, R> MultipartField<'a, R> {
     /// Mutably borrows so the contents can be read.
     pub fn as_file(&mut self) -> Option<&mut MultipartFile<'a, R>> {
         match *self {
-            MultipartField::File(ref mut file) => Some(file),
+            MultipartData::File(ref mut file) => Some(file),
             _ => None,
         }
     }
@@ -300,8 +365,8 @@ impl<'a, R> MultipartField<'a, R> {
 /// to save it to disk.
 #[derive(Debug)]
 pub struct MultipartFile<'a, R: 'a> {
-    filename: Option<String>,
-    content_type: Mime,
+    pub filename: Option<String>,
+    pub content_type: Mime,
     reader: &'a mut BoundaryReader<R>,
 }
 
@@ -370,6 +435,21 @@ impl<'a, R: Read> Read for MultipartFile<'a, R> {
     }
 }
 
+/// A result of `Multipart::save_all()`.
+pub struct Entries {
+    pub fields: HashMap<String, String>,
+    pub files: HashMap<String, io::Result<PathBuf>>,
+    /// The directory the files were saved under.
+    pub dir: PathBuf,
+}
 
-
+impl Entries {
+    fn with_path<P: Into<PathBuf>>(path: P) -> Entries {
+        Entries {
+            fields: HashMap::new(),
+            files: HashMap::new(),
+            dir: path.into(),
+        }
+    }
+}
 
