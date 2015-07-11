@@ -10,6 +10,8 @@ extern crate hyper;
 
 use rand::Rng;
 
+use std::path::PathBuf;
+
 macro_rules! try_all {
     ($first_expr:expr, $($try_expr:expr),*) => (
         try!($first_expr $(.and_then(|_| $try_expr))*);
@@ -26,6 +28,11 @@ pub mod client;
 pub mod server;
 
 const BOUNDARY_LEN: usize = 16;
+const DIRNAME_LEN: usize = 12;
+
+fn temp_dir() -> PathBuf {
+    random_alphanumeric(DIRNAME_LEN).into()
+}
 
 fn random_alphanumeric(len: usize) -> String {
     rand::thread_rng().gen_ascii_chars().take(len).collect()

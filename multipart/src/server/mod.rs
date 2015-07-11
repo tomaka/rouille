@@ -29,32 +29,11 @@ pub mod hyper;
 macro_rules! try_opt (
     ($expr:expr) => (
         match $expr {
-            Some(val) => Some(val),
+            Some(val) => val,
             None => return None,
         }
     )
 );
-
-#[derive(Clone, Debug)]
-pub enum MultipartError {
-    EndOfStream,
-    Io(io::Error),
-}
-
-impl From<io::Error> for MultipartError {
-    fn from(err: io::Error) -> MultipartError {
-        MultipartError::Io(err)
-    }
-}
-
-impl MultipartError {
-    fn is_end_of_stream(&self) -> bool {
-        match *self {
-            MultipartError::EndOfStream => true,
-            _ => false,
-        }
-    }
-}
 
 /// The server-side implementation of `multipart/form-data` requests.
 ///
@@ -100,7 +79,7 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// If the last returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry!
     pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<R>>> {
-        
+        MultipartField::read_from(self) 
     }
 
     fn read_content_disposition(&mut self) -> io::Result<Option<ContentDisp>> {
@@ -125,36 +104,38 @@ impl<R> Multipart<R> where R: HttpRequest {
         }
     }
 
-    fn read_content_type<'a>(&'a mut self) -> io::Result<Option<ContentType<'a>> {
+    fn read_content_type(&mut self) -> io::Result<Option<ContentType>> {
         debug!("Read content type!");
         let line = try!(self.read_line());
         Ok(ContentType::read_from(line))
     }
 
     /// Read the request fully, parsing all fields and saving all files 
-    /// to the given directory (if given) and return the result.
+    /// to the given directory or a random directory under `std::os::temp_dir()` 
+    /// and return the result.
     ///
-    /// If `dir` is none, uses `std::os::tmpdir()`.
-    pub fn save_all(mut self, dir: Option<&Path>) -> io::Result<Entries> {
-        let dir = dir.map_or_else(::std::env::temp_dir, |path| path.to_owned());
-
+    /// If there is an error in reading the request, returns the result so far along with the
+    /// error.
+    pub fn save_all(&mut self, dir: Option<&Path>) -> (Entries, Option<io::Error>) {
+        let dir = dir.map_or_else(::temp_dir, |path| path.to_owned());
         let mut entries = Entries::with_path(dir);
 
         loop {
             match self.read_entry() {
-                Ok((name, MultipartField::Text(text))) => { entries.fields.insert(name, text.to_owned()); },
-                Ok((name, MultipartField::File(mut file))) => {
-                    let path = try!(file.save_in(&entries.dir));
-                    entries.files.insert(name, path);
+                Ok(Some(field)) => match field.data {
+                    MultipartData::File(mut file) => {
+                        entries.files.insert(field.name, file.save_in(&entries.dir));
+                    },
+                    MultipartData::Text(text) => {
+                        entries.fields.insert(field.name, text.into());
+                    },
                 },
-                Err(err) => {
-                    error!("Error reading Multipart: {}", err);
-                    break;
-                },
+                Ok(None) => break,
+                Err(err) => return (entries, Some(err)),
             }
         }
 
-        Ok(entries)
+        (entries, None)
     }
 
     fn read_line(&mut self) -> io::Result<&str> {
@@ -183,46 +164,39 @@ impl<R> Deref for Multipart<R> where R: HttpRequest {
     }
 }
 
-fn with<T, U, F: FnOnce(&T) -> Option<U>>(left: Option<T>, right: F) -> Option<(T, U)> {
-    let temp = left.as_ref().and_then(right);
-    match (left, temp) {
-        (Some(lval), Some(rval)) => Some((lval, rval)),
-        _ => None,
-    }
+struct ContentType {
+    cont_type: Mime,
+    #[allow(dead_code)]
+    boundary: Option<String>,
 }
 
-fn line_error(msg: &str, line: &str) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::Other,
-        format!("Error: {:?} on line of request: {:?}", msg, line)
-    )
-}
-
-struct ContentType<'a> {
-    cont_type: &'a str,
-    boundary: Option<&'a str>,
-}
-
-impl<'a> ContentType<'a> {
-    fn read_from(line: &'a str) -> Option<ContentType<'a>> {
+impl ContentType {
+    fn read_from(line: &str) -> Option<ContentType> {
         const CONTENT_TYPE: &'static str = "Content-Type:";
         const BOUNDARY: &'static str = "boundary=\"";
 
-        let cont_type = get_str_after(CONTENT_TYPE, ';', line);
+        debug!("Reading Content-Type header from line: {:?}", line);
 
         if let Some((cont_type, after_cont_type)) = get_str_after(CONTENT_TYPE, ';', line) {
-            let boundary = get_str_after(BOUNDARY, '"', after_cont_type).map(|tup| tup.0);
+            let cont_type = read_content_type(cont_type);
+
+            let boundary = get_str_after(BOUNDARY, '"', after_cont_type).map(|tup| tup.0.into());
 
             Some(ContentType {
                 cont_type: cont_type,
                 boundary: boundary,
             })
         } else {
-            get_remainder_after(CONTENT_TYPE, line).map(|cont_type|
+            get_remainder_after(CONTENT_TYPE, line).map(|cont_type| {
+                let cont_type = read_content_type(cont_type);
                 ContentType { cont_type: cont_type, boundary: None }
-            )
+            })
         }
     }
+}
+
+fn read_content_type(cont_type: &str) -> Mime {
+    cont_type.parse().ok().unwrap_or_else(::mime_guess::octet_stream)
 }
 
 struct ContentDisp {
@@ -231,7 +205,7 @@ struct ContentDisp {
 }
 
 impl ContentDisp {
-    fn read_from(line: &str) -> Option<ContentDisp>> {
+    fn read_from(line: &str) -> Option<ContentDisp> {
         debug!("Reading Content-Disposition from line: {:?}", line);
 
         if line.is_empty() {
@@ -243,9 +217,11 @@ impl ContentDisp {
         const FILENAME: &'static str = "filename=\"";
 
         let after_disp_type = {
-            let (disp_type, after_disp_type) = get_str_after(CONT_DISP, ';', line);
+            let (disp_type, after_disp_type) = try_opt!(get_str_after(CONT_DISP, ';', line));
+            let disp_type = disp_type.trim();
 
-            if disp_type.trim() != "form-data" {
+            if disp_type != "form-data" {
+                error!("Unexpected Content-Disposition value: {:?}", disp_type);
                 return None;
             }
 
@@ -265,7 +241,7 @@ impl ContentDisp {
 fn get_str_after<'a>(needle: &str, end_val_delim: char, haystack: &'a str) -> Option<(&'a str, &'a str)> {
     let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
     let val_end_idx = try_opt!(haystack[val_start_idx..].find(end_val_delim));
-    Some(&haystack[val_start_idx..val_end_idx], &haystack[val_end_idx..])
+    Some((&haystack[val_start_idx..val_end_idx], &haystack[val_end_idx..]))
 }
 
 /// Get everything after `needle` in `haystack`
@@ -287,12 +263,12 @@ pub struct MultipartField<'a, R: 'a> {
 }
 
 impl<'a, R: HttpRequest + 'a> MultipartField<'a, R> {
-    fn read_from(multipart: &'a mut Multipart<R>) -> io::Result<Option<MultipartField<'a>>> {
+    fn read_from(multipart: &'a mut Multipart<R>) -> io::Result<Option<MultipartField<'a, R>>> {
         try!(multipart.source.consume_boundary());
 
         let cont_disp = match multipart.read_content_disposition() {
             Ok(Some(cont_disp)) => cont_disp,
-            Ok(None) => return None,
+            Ok(None) => return Ok(None),
             Err(err) => return Err(err),
         };        
 
@@ -303,7 +279,7 @@ impl<'a, R: HttpRequest + 'a> MultipartField<'a, R> {
                     MultipartFile::from_reader(
                         cont_disp.filename, 
                         &mut multipart.source, 
-                        &content_type,
+                        content_type.cont_type,
                     )
                  )
             },
@@ -319,7 +295,7 @@ impl<'a, R: HttpRequest + 'a> MultipartField<'a, R> {
 
         Ok(Some(
             MultipartField {
-                name: cont_disp.name,
+                name: cont_disp.field_name,
                 data: data,
             }
         ))
@@ -372,11 +348,11 @@ pub struct MultipartFile<'a, R: 'a> {
 
 impl<'a, R: Read> MultipartFile<'a, R> {
     fn from_reader(
-        filename: Option<String>, reader: &'a mut BoundaryReader<R>, cont_type: &str
+        filename: Option<String>, reader: &'a mut BoundaryReader<R>, cont_type: Mime, 
     ) -> MultipartFile<'a, R> {
         MultipartFile {
             filename: filename,
-            content_type: cont_type.parse::<Mime>().ok().unwrap_or_else(::mime_guess::octet_stream),            
+            content_type: cont_type,            
             reader: reader,
         }    
     }
@@ -437,7 +413,9 @@ impl<'a, R: Read> Read for MultipartFile<'a, R> {
 
 /// A result of `Multipart::save_all()`.
 pub struct Entries {
+    /// The text files of the multipart request
     pub fields: HashMap<String, String>,
+    /// A list of file field names and their save results.
     pub files: HashMap<String, io::Result<PathBuf>>,
     /// The directory the files were saved under.
     pub dir: PathBuf,
