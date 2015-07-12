@@ -54,11 +54,11 @@ impl<R> Multipart<R> where R: HttpRequest {
     pub fn from_request(req: R) -> Result<Multipart<R>, R> {
         if !req.is_multipart() { return Err(req); }
 
-        if req.get_boundary().is_none() {
+        if req.boundary().is_none() {
             return Err(req);     
         }
 
-        let boundary = req.get_boundary().unwrap().to_owned();
+        let boundary = req.boundary().unwrap().to_owned();
 
         debug!("Boundary: {}", boundary);
 
@@ -252,9 +252,10 @@ fn get_remainder_after<'a>(needle: &str, haystack: &'a str) -> Option<(&'a str)>
 
 pub trait HttpRequest: Read {
     fn is_multipart(&self) -> bool;
-    fn get_boundary(&self) -> Option<&str>;
+    fn boundary(&self) -> Option<&str>;
 }
 
+#[derive(Debug)]
 pub struct MultipartField<'a, R: 'a> {
     /// The field's name from the form
     pub name: String,

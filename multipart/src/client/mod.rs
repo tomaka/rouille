@@ -49,9 +49,10 @@ pub struct Multipart<S: HttpStream> {
     stream: S,
     boundary: String,
     last_err: Option<S::Error>,
+    data_written: bool,
 }
 
-impl<S: HttpStream> Multipart<S> {
+impl Multipart<io::Sink> {
     /// Create a new `Multipart` to wrap a request.
     ///
     /// ## Returns Error
@@ -65,7 +66,8 @@ impl<S: HttpStream> Multipart<S> {
         Ok(Multipart {
             stream: stream,
             boundary: boundary,
-            last_err: None
+            last_err: None,
+            data_written: false,
         })
     }
 }
@@ -177,12 +179,19 @@ impl<S: HttpStream> Multipart<S> {
 
     fn write_boundary(&mut self) -> io::Result<()> {
         write!(self.stream, "{}\r\n", self.boundary)
+            .map(|res| { self.data_written = true; res })
     }
 
     /// Finalize the request and return the response from the server, or the last error if set.
-    pub fn send(self) -> Result<S::Response, S::Error> {
+    pub fn send(mut self) -> Result<S::Response, S::Error> {
         match self.last_err {
-            None => self.stream.finish(),
+            None => {
+                if self.data_written {
+                    try!(self.stream.write(b"--"));
+                }
+                
+                self.stream.finish()
+            },
             Some(err) => Err(err),
         }
     }    
@@ -192,7 +201,7 @@ impl<R: HttpRequest> Multipart<SizedRequest<R>>
 where <R::Stream as HttpStream>::Error: From<R::Error> {
     /// Create a new `Multipart` using the `SizedRequest` wrapper around `req`.
     pub fn from_request_sized(req: R) -> Result<Self, R::Error> {
-        Multipart::<SizedRequest<R>>::from_request(SizedRequest::from_request(req))
+        Multipart::from_request(SizedRequest::from_request(req))
     }
 }
 
@@ -218,3 +227,18 @@ pub trait HttpStream: Write {
     fn finish(self) -> Result<Self::Response, Self::Error>;
 }
 
+impl HttpRequest for () {
+    type Stream = io::Sink;
+    type Error = io::Error;
+
+    fn apply_headers(&mut self, _: &str, _: Option<usize>) { }
+    fn open_stream(self) -> Result<Self::Stream, Self::Error> { Ok(io::sink()) }
+}
+
+impl HttpStream for io::Sink {
+    type Request = ();
+    type Response = io::Empty;
+    type Error = io::Error;
+
+    fn finish(self) -> Result<Self::Response, Self::Error> { Ok(io::empty()) }
+}
