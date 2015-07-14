@@ -1,23 +1,6 @@
-//! The client side implementation of `multipart/form-data` requests.
+//! The client-side abstraction for multipart requests.
 //!
 //! Use this when sending POST requests with files to a server.
-//!
-//! `ChunkedMultipart` sends chunked requests (recommended), 
-//! while `SizedMultipart` sends sized requests.
-//!
-//! Both implement the `MultipartRequest` trait for their core API.
-//!
-//! Sized requests are more human-readable and use less bandwidth 
-//! (as chunking adds [significant visual noise and overhead][chunked-example]),
-//! but they must be able to load their entirety, including the contents of all files
-//! and streams, into memory so the request body can be measured and its size set
-//! in the `Content-Length` header.
-//!
-//! You should really only use sized requests if you intend to inspect the data manually on the
-//! server side, as it will produce a more human-readable request body. Also, of course, if the
-//! server doesn't support chunked requests or otherwise rejects them. 
-//!
-//! [chunked-example]: http://en.wikipedia.org/wiki/Chunked_transfer_encoding#Example 
 use mime::Mime;
 
 use std::borrow::{Borrow, BorrowMut};
@@ -30,10 +13,23 @@ use std::io::prelude::*;
 use std::path::Path;
 
 #[cfg(feature = "hyper")]
-mod hyper;
+pub mod hyper;
 
 mod sized;
 
+/// A wrapper around a request object that measures the request body and sets the `Content-Length`
+/// header to its size in bytes.
+///
+/// Sized requests are more human-readable and use less bandwidth 
+/// (as chunking adds [visual noise and overhead][chunked-example]),
+/// but they must be able to load their entirety, including the contents of all files
+/// and streams, into memory so the request body can be measured.
+///
+/// You should really only use sized requests if you intend to inspect the data manually on the
+/// server side, as it will produce a more human-readable request body. Also, of course, if the
+/// server doesn't support chunked requests or otherwise rejects them. 
+///
+/// [chunked-example]: http://en.wikipedia.org/wiki/Chunked_transfer_encoding#Example 
 pub use self::sized::SizedRequest;
 
 
@@ -110,7 +106,6 @@ impl<S: HttpStream> Multipart<S> {
     /// ##Errors
     /// If there was a problem opening the file (was a directory or didn't exist),
     /// or if something went wrong with the HTTP stream.
-    // Remove `File::path()`, GG Rust-lang
     pub fn write_file<N: Borrow<str>, P: AsRef<Path>>(mut self, name: N, path: P) -> Self {
         if self.last_err.is_none() {     
             let path = path.as_ref();
@@ -130,7 +125,7 @@ impl<S: HttpStream> Multipart<S> {
     }
 
     /// Write a byte stream to the multipart request as a file field, supplying `filename` if given,
-    /// and `content_type` if given or `application/octet-stream` if not.
+    /// and `content_type` if given or `"application/octet-stream"` if not.
     ///
     /// ##Warning
     /// The given `Read` **must** be able to read to EOF (end of file/no more data), meaning
@@ -140,7 +135,8 @@ impl<S: HttpStream> Multipart<S> {
     /// When using `sized::SizedRequest` this also can cause out-of-control memory usage as the
     /// multipart data has to be written to an in-memory buffer so its size can be calculated.
     ///
-    /// Use `Read::take` if you wish to send data from a `Read` that will never end otherwise.
+    /// Use `Read::take(usize)` if you wish to send data from a `Read` 
+    /// that will never return EOF otherwise.
     ///
     /// ##Errors
     /// If the reader returned an error, or if something went wrong with the HTTP stream.
@@ -187,6 +183,7 @@ impl<S: HttpStream> Multipart<S> {
         match self.last_err {
             None => {
                 if self.data_written {
+                    // Write two hyphens after the last boundary occurrence.
                     try!(self.stream.write(b"--"));
                 }
                 
@@ -205,25 +202,37 @@ where <R::Stream as HttpStream>::Error: From<R::Error> {
     }
 }
 
+/// A trait describing an HTTP request that can be used to send multipart data.
 pub trait HttpRequest {
-    type Stream: HttpStream; 
+    /// The HTTP stream type that can be opend by this request, to which the multipart data will be
+    /// written.
+    type Stream: HttpStream;
+    /// The error type for this request. 
+    /// Must be compatible with `io::Error` as well as `Self::HttpStream::Error`
     type Error: From<io::Error> + Into<<Self::Stream as HttpStream>::Error>;
 
-    /// Set the `ContentType` header to `multipart/form-data` and supply the `boundary` value.
+    /// Set the `Content-Type` header to `multipart/form-data` and supply the `boundary` value.
     /// If `content_len` is given, set the `Content-Length` header to its value.
-    fn apply_headers(&mut self, boundary: &str, content_len: Option<usize>);
+    /// 
+    /// Return `true` if any and all sanity checks passed and the stream is ready to be opened, 
+    /// or `false` otherwise.
+    fn apply_headers(&mut self, boundary: &str, content_len: Option<u64>) -> bool;
 
-    /// Open the request stream and return it, after which point the request body will be
-    /// written. `HttpStream::finish()` will be called after the body has finished being written.
+    /// Open the request stream and return it or any error otherwise. 
     fn open_stream(self) -> Result<Self::Stream, Self::Error>;
 }
 
+/// A trait describing an open HTTP stream that can be written to.
 pub trait HttpStream: Write {
+    /// The request type that opened this stream.
     type Request: HttpRequest;
-    type Response: Read;
+    /// The response type that will be returned after the request is completed.
+    type Response;
+    /// The error type for this stream.
+    /// Must be compatible with `io::Error` as well as `Self::Request::Error`.
     type Error: From<io::Error> + From<<Self::Request as HttpRequest>::Error>; 
 
-    /// Finalize and close the stream, returning the HTTP response object.
+    /// Finalize and close the stream and return the response object, or any error otherwise.
     fn finish(self) -> Result<Self::Response, Self::Error>;
 }
 
@@ -231,14 +240,14 @@ impl HttpRequest for () {
     type Stream = io::Sink;
     type Error = io::Error;
 
-    fn apply_headers(&mut self, _: &str, _: Option<usize>) { }
+    fn apply_headers(&mut self, _: &str, _: Option<u64>) -> bool { true }
     fn open_stream(self) -> Result<Self::Stream, Self::Error> { Ok(io::sink()) }
 }
 
 impl HttpStream for io::Sink {
     type Request = ();
-    type Response = io::Empty;
+    type Response = ();
     type Error = io::Error;
 
-    fn finish(self) -> Result<Self::Response, Self::Error> { Ok(io::empty()) }
+    fn finish(self) -> Result<Self::Response, Self::Error> { Ok(()) }
 }

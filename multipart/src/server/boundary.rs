@@ -7,7 +7,7 @@ use std::io::prelude::*;
 
 use std::ptr;
 
-/// A struct implementing `Read` that will yield bytes until it sees a given sequence.
+/// A struct implementing `Read` and `BufRead` that will yield bytes until it sees a given sequence.
 #[derive(Debug)]
 pub struct BoundaryReader<R> {
     buffer: BufReader<R>,

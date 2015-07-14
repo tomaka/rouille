@@ -47,16 +47,17 @@ fn test_server(buf: HttpBuffer) {
 #[derive(Default, Debug)]
 struct MockClientRequest {
     boundary: Option<String>,
-    content_len: Option<usize>,
+    content_len: Option<u64>,
 }
 
 impl ClientRequest for MockClientRequest {
     type Stream = HttpBuffer;
     type Error = io::Error;
     
-    fn apply_headers(&mut self, boundary: &str, content_len: Option<usize>) {
+    fn apply_headers(&mut self, boundary: &str, content_len: Option<u64>) -> bool {
         self.boundary = Some(boundary.into());
         self.content_len = content_len;
+        true
     }
 
     fn open_stream(self) -> Result<HttpBuffer, io::Error> {
@@ -71,7 +72,7 @@ impl ClientRequest for MockClientRequest {
 struct HttpBuffer {
     buf: Vec<u8>,
     boundary: String,
-    content_len: Option<usize>,
+    content_len: Option<u64>,
 }
 
 impl HttpBuffer {
@@ -112,7 +113,7 @@ impl ClientStream for HttpBuffer {
 struct ServerBuffer<'a> {
     data: &'a [u8],
     boundary: &'a str,
-    content_len: Option<usize>,
+    content_len: Option<u64>,
 }
 
 impl<'a> Read for ServerBuffer<'a> {

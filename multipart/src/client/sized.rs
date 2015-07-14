@@ -38,9 +38,10 @@ where <R::Stream as HttpStream>::Error: From<R::Error> {
     type Error = R::Error;
 
     /// `SizedRequest` ignores `_content_len` because it sets its own later.
-    fn apply_headers(&mut self, boundary: &str, _content_len: Option<usize>) {
+    fn apply_headers(&mut self, boundary: &str, _content_len: Option<u64>) -> bool {
         self.boundary.clear();
         self.boundary.push_str(boundary);
+        true
     }
 
     fn open_stream(mut self) -> Result<Self, Self::Error> {
@@ -55,9 +56,15 @@ where <R::Stream as HttpStream>::Error: From<R::Error> {
     type Response = <<R as HttpRequest>::Stream as HttpStream>::Response;
     type Error = <<R as HttpRequest>::Stream as HttpStream>::Error;
 
-    fn finish(mut self) -> Result<Self::Response, Self::Error>  {
-        let content_len = self.buffer.len();
-        self.inner.apply_headers(&self.boundary, Some(content_len));
+    fn finish(mut self) -> Result<Self::Response, Self::Error> {
+        let content_len = self.buffer.len() as u64;
+        
+        if !self.inner.apply_headers(&self.boundary, Some(content_len)) {
+            return Err(io::Error::new(
+                io::ErrorKind::Other, 
+                "SizedRequest failed to apply headers to wrapped request."
+            ).into());
+        }
 
         let mut req = try!(self.inner.open_stream());
         try!(io::copy(&mut &self.buffer[..], &mut req));

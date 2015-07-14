@@ -1,16 +1,19 @@
-//! Convenient wrappers for `hyper::server::Handler`
-
+//! Server-side integration with [Hyper](https://github.com/hyperium/hyper).
+//! Enabled with the `hyper` feature.
+use hyper::net::Fresh;
 use hyper::header::ContentType;
 use hyper::method::Method;
 use hyper::server::{Handler, Request, Response};
 
-use super::Multipart;
+use mime::{Mime, TopLevel, SubLevel, Attr, Value};
+
+use super::{Multipart, HttpRequest};
 
 /// A container that implements `hyper::server::Handler` which will switch
 /// the handler implementation depending on if the incoming request is multipart or not.
 ///
 /// Create an instance with `new()` and pass it to `hyper::server::Server::listen()` where
-/// you would normally pass a `Handler` instance, usually a static function.
+/// you would normally pass a `Handler` instance.
 ///
 /// A convenient wrapper for `Multipart::from_request()`.
 pub struct Switch<H, M> {
@@ -30,7 +33,7 @@ impl<H, M> Switch<H, M> where H: Handler, M: MultipartHandler {
 }
 
 impl<H, M> Handler for Switch<H, M> where H: Handler, M: MultipartHandler {
-    fn handle<'a>(&'a self, req: Request<'a>, res: Response<'a>) {
+    fn handle<'a, 'k>(&'a self, req: Request<'a, 'k>, res: Response<'a, Fresh>) {
         match Multipart::from_request(req) {
             Ok(multi) => self.multipart.handle_multipart(multi, res),
             Err(req) => self.normal.handle(req, res),
@@ -40,64 +43,56 @@ impl<H, M> Handler for Switch<H, M> where H: Handler, M: MultipartHandler {
 
 /// A trait defining a type that can handle an incoming multipart request.
 ///
-/// Extends to unboxed closures of the type `Fn(Multipart, Response)`,
+/// Extends to closures of the type `Fn(Multipart<Request>, Response<Fresh>)`,
 /// and subsequently static functions.
-///
-/// Since `Multipart` implements `Deref<Request>`, you can still access
-/// the fields on `Request`, such as `Request::uri` or `Request::headers`.
 pub trait MultipartHandler: Send + Sync {
     /// Generate a response from this multipart request.
-    fn handle_multipart<'a>(&self, multipart: Multipart<'a>, response: Response);
+    fn handle_multipart<'a, 'k>(&self, 
+                                multipart: Multipart<Request<'a, 'k>>, 
+                                response: Response<'a, Fresh>);
 }
 
-impl<F> MultipartHandler for F where F: for<'a> Fn(Multipart<'a>, Response) + Send + Sync {
-    fn handle_multipart<'a>(&self, multipart: Multipart<'a>, response: Response) {
+impl<F> MultipartHandler for F 
+where F: Fn(Multipart<Request>, Response<Fresh>), F: Send + Sync {
+    fn handle_multipart<'a, 'k>(&self, 
+                                multipart: Multipart<Request<'a, 'k>>, 
+                                response: Response<'a, Fresh>) {
         (*self)(multipart, response);
     }
 }
 
-/// A container for an unboxed closure that implements `hyper::server::Handler`.
-///
-/// This exists because as of this writing, `Handler` is not automatically implemented for
-/// compatible unboxed closures (though this will likely change).
-///
-/// No private fields, instantiate directly.
-pub struct UnboxedHandler<F> {
-    /// The closure to call
-    pub f: F,
-}
+impl<'a, 'b> HttpRequest for Request<'a, 'b> {
+    fn is_multipart(&self) -> bool {
+        self.method == Method::Post && 
+        self.headers.get::<ContentType>().map_or(false, |ct| {
+            let ContentType(ref mime) = *ct;
 
-impl<F> Handler for UnboxedHandler<F> where F: Fn(Request, Response) + Send + Sync {
-    fn handle(&self, req: Request, res: Response) {
-        (self.f)(req, res);
+            debug!("Content-Type: {}", mime);
+
+            match *mime {
+                Mime(TopLevel::Multipart, SubLevel::FormData, _) => true,
+                _ => false,
+            }
+        })
     }
-}
 
-fn is_multipart_formdata(req: &Request) -> bool {
-    req.method == Method::Post && req.headers.get::<ContentType>().map_or(false, |ct| {
-        let ContentType(ref mime) = *ct;
+    fn boundary(&self) -> Option<&str> {
+        self.headers.get::<ContentType>().and_then(|ct| {
+            let ContentType(ref mime) = *ct;
+            let Mime(_, _, ref params) = *mime;
 
-        debug!("Content-Type: {}", mime);
-
-        match *mime {
-            Mime(TopLevel::Multipart, SubLevel::FormData, _) => true,
-            _ => false,
-        }
-    })
-}
-
-fn get_boundary(ct: &ContentType) -> Option<String> {
-    let ContentType(ref mime) = *ct;
-    let Mime(_, _, ref params) = *mime;
-
-    params.iter().find(|&&(ref name, _)|
-        if let Attr::Ext(ref name) = *name {
-            "boundary" == &**name
-        } else { false }
-    ).and_then(|&(_, ref val)|
-        if let Value::Ext(ref val) = *val {
-            Some(val.clone())
-        } else { None }
-    )
+            params.iter().find(|&&(ref name, _)|
+                match *name {
+                    Attr::Ext(ref name) => "boundary" == name,
+                    _ => false,
+                }
+            ).and_then(|&(_, ref val)|
+                match *val {
+                    Value::Ext(ref val) => Some(&**val),
+                    _ => None,
+                }
+            )
+        })
+    }
 }
 
