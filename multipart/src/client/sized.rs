@@ -5,8 +5,19 @@ use client::{HttpRequest, HttpStream};
 use std::io;
 use std::io::prelude::*;
 
-/// A wrapper around `HttpRequest` that writes the multipart data to an in-memory buffer so its
-/// size can be calculated and set in the request as the `Content-Length` header.
+/// A wrapper around a request object that measures the request body and sets the `Content-Length`
+/// header to its size in bytes.
+///
+/// Sized requests are more human-readable and use less bandwidth 
+/// (as chunking adds [visual noise and overhead][chunked-example]),
+/// but they must be able to load their entirety, including the contents of all files
+/// and streams, into memory so the request body can be measured.
+///
+/// You should really only use sized requests if you intend to inspect the data manually on the
+/// server side, as it will produce a more human-readable request body. Also, of course, if the
+/// server doesn't support chunked requests or otherwise rejects them. 
+///
+/// [chunked-example]: http://en.wikipedia.org/wiki/Chunked_transfer_encoding#Example 
 pub struct SizedRequest<R> {
     inner: R,
     buffer: Vec<u8>,
@@ -52,7 +63,7 @@ where <R::Stream as HttpStream>::Error: From<R::Error> {
 
 impl<R: HttpRequest> HttpStream for SizedRequest<R> 
 where <R::Stream as HttpStream>::Error: From<R::Error> { 
-    type Request = R;
+    type Request = Self;
     type Response = <<R as HttpRequest>::Stream as HttpStream>::Response;
     type Error = <<R as HttpRequest>::Stream as HttpStream>::Error;
 

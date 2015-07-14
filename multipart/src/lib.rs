@@ -1,8 +1,9 @@
 //! Client- and server-side abstractions for HTTP `multipart/form-data` requests.
 //!
-//! Features:
-//! * `hyper`: Enable client- and server-side integration with
-//! [Hyper](https:://github.com/hyperium/hyper)
+//! Features: 
+//!
+//! * `hyper`: Enable client- and server-side integration with the
+//! [Hyper](https:://github.com/hyperium/hyper) HTTP library.
 #![warn(missing_docs)]
 #[macro_use] extern crate log;
 extern crate env_logger;

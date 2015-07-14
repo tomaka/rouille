@@ -1,4 +1,4 @@
-//! The server-side abstraction for multipart requests requests.
+//! The server-side abstraction for multipart requests.
 //!
 //! Use this when you are implementing an HTTP server and want to
 //! to accept, parse, and serve HTTP `multipart/form-data` requests (file uploads).

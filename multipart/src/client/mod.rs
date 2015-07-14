@@ -17,19 +17,6 @@ pub mod hyper;
 
 mod sized;
 
-/// A wrapper around a request object that measures the request body and sets the `Content-Length`
-/// header to its size in bytes.
-///
-/// Sized requests are more human-readable and use less bandwidth 
-/// (as chunking adds [visual noise and overhead][chunked-example]),
-/// but they must be able to load their entirety, including the contents of all files
-/// and streams, into memory so the request body can be measured.
-///
-/// You should really only use sized requests if you intend to inspect the data manually on the
-/// server side, as it will produce a more human-readable request body. Also, of course, if the
-/// server doesn't support chunked requests or otherwise rejects them. 
-///
-/// [chunked-example]: http://en.wikipedia.org/wiki/Chunked_transfer_encoding#Example 
 pub use self::sized::SizedRequest;
 
 
@@ -38,9 +25,6 @@ pub use self::sized::SizedRequest;
 /// Though they perform I/O, the `.write_*()` methods do not return `io::Result<_>` in order to
 /// facilitate method chaining. Upon the first error, all subsequent API calls will be no-ops until
 /// `.send()` is called, at which point the error will be reported.
-///
-/// If you don't want to consume data handles (`File`, etc.), `write_file()` and `write_stream()`
-/// also accept `&mut` versions.
 pub struct Multipart<S: HttpStream> {
     stream: S,
     boundary: String,
@@ -103,6 +87,8 @@ impl<S: HttpStream> Multipart<S> {
     /// If you want to set these values manually, or use another type that implements `Read`, 
     /// use `.write_stream()`.
     ///
+    /// `name` can be either `String` or `&str`, and `path` can be `PathBuf` or `&Path`.
+    ///
     /// ##Errors
     /// If there was a problem opening the file (was a directory or didn't exist),
     /// or if something went wrong with the HTTP stream.
@@ -127,15 +113,18 @@ impl<S: HttpStream> Multipart<S> {
     /// Write a byte stream to the multipart request as a file field, supplying `filename` if given,
     /// and `content_type` if given or `"application/octet-stream"` if not.
     ///
+    /// `name` can be either `String` or `&str`, and `read` can take the `Read` by-value or
+    /// with an `&mut` borrow.
+    ///
     /// ##Warning
     /// The given `Read` **must** be able to read to EOF (end of file/no more data), meaning
     /// `Read::read()` returns `Ok(0)`. If it never returns EOF it will be read to infinity 
     /// and the request will never be completed.
     ///
-    /// When using `sized::SizedRequest` this also can cause out-of-control memory usage as the
+    /// When using `SizedRequest` this also can cause out-of-control memory usage as the
     /// multipart data has to be written to an in-memory buffer so its size can be calculated.
     ///
-    /// Use `Read::take(usize)` if you wish to send data from a `Read` 
+    /// Use `Read::take()` if you wish to send data from a `Read` 
     /// that will never return EOF otherwise.
     ///
     /// ##Errors
