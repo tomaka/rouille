@@ -1,7 +1,7 @@
 [package]
 
 name = "multipart"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
 description = "An extension to the Hyper HTTP library that provides support for POST multipart/form-data requests on for both client and server."
@@ -14,5 +14,14 @@ license = "MIT"
 
 keywords = ["form-data", "hyper", "http", "post", "upload"]
 
+[dependencies]
+log = "*"
+env_logger = "*"
+mime = "*"
+mime_guess = "*"
+rand = "*"
+
 [dependencies.hyper]
-git = "https://github.com/hyperium/hyper"
+version = "*"
+optional = true
+

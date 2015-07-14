@@ -1,18 +1,17 @@
 language: rust
+rust:
+  - stable
+  - beta
+  - nightly
 os:
-- linux
-- osx
+  - linux
+  - osx
 env:
   global:
     - secure: eJpqXoY/xuCQRYmLBK9dLLzTGHvsBWe67wRN0fljesRgSnU+H09OsWI22DB9z/e6pMKjZpfDuyRkJaHVj8N7rwEfSeKdywv6uKqs5/Mi7dVINnzVA7jU3E4kLc+EuASF8w5d85kfccGNGs7qM0Uwz/i4da3Gw4B+cSc5cqjWsIY=
-before_script:
-- rustc -v
-- cargo -V
-script:
-- cargo build -v
-- cargo test -v
-- cargo doc -v --no-deps
 after_success:
-- cp -R target/doc doc
-- curl http://www.rust-ci.org/artifacts/put?t=$RUSTCI_TOKEN | sh
-- rm -r doc
+    - |
+        test ${TRAVIS_PULL_REQUEST} == "false" && \
+        test ${TRAVIS_BRANCH} == "master" && \
+        test "${TRAVIS_BUILD_NUMBER}.1" == "${TRAVIS_JOB_NUMBER}" && \
+        bash deploy-docs.sh

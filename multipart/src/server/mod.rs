@@ -1,477 +1,482 @@
-//! The server-side implementation of `multipart/form-data` requests.
+//! The server-side abstraction for multipart requests.
 //!
-//! Use this when you are implementing a server on top of Hyper and want to 
-//! to parse and serve POST `multipart/form-data` requests.
-//! 
+//! Use this when you are implementing an HTTP server and want to
+//! to accept, parse, and serve HTTP `multipart/form-data` requests (file uploads).
+//!
 //! See the `Multipart` struct for more info.
 
-use hyper::header::common::content_type::ContentType;
-use hyper::server::request::Request;
-use hyper::method::Method;
+use mime::Mime;
 
-use mime::{Mime, TopLevel, SubLevel, Attr, Value};
-
-use super::{MultipartField, MultipartFile};
-
-use std::cmp;
+use std::borrow::Borrow;
 
 use std::collections::HashMap;
 
-use std::io::{IoError, IoResult, EndOfFile, standard_error, OtherIoError};
+use std::fs::{self, File};
+use std::io;
+use std::io::prelude::*;
 
-pub mod handler;
+use std::path::{Path, PathBuf};
 
-fn is_multipart_formdata(req: &Request) -> bool {
-    req.method == Method::Post && req.headers.get::<ContentType>().map_or(false, |ct| {
-        let ContentType(ref mime) = *ct;
-        
-        debug!("Content-Type: {}", mime);
+#[doc(inline)]
+pub use self::boundary::BoundaryReader;
 
-        match *mime {
-            Mime(TopLevel::Multipart, SubLevel::FormData, _) => true,
-            _ => false,   
+mod boundary;
+
+#[cfg(feature = "hyper")]
+pub mod hyper;
+
+macro_rules! try_opt (
+    ($expr:expr) => (
+        match $expr {
+            Some(val) => val,
+            None => return None,
         }
-    })
-}
-
-fn get_boundary(ct: &ContentType) -> Option<String> {
-    let ContentType(ref mime) = *ct;
-    let Mime(_, _, ref params) = *mime;
-    
-    params.iter().find(|&&(ref name, _)| 
-        if let Attr::Ext(ref name) = *name { 
-            name[] == "boundary" 
-        } else { false }
-    ).and_then(|&(_, ref val)| 
-        if let Value::Ext(ref val) = *val { 
-            Some(val.clone()) 
-        } else { None }
-    )        
-}
+    )
+);
 
 /// The server-side implementation of `multipart/form-data` requests.
 ///
-/// Create this with `Multipart::from_request()` passing a `server::Request` object from Hyper,
-/// or give Hyper a `handler::Switch` instance instead,
-/// then read individual entries with `.read_entry()` or process them all at once with
-/// `.foreach_entry()`.
-///
-/// Implements `Deref<Request>` to allow access to read-only fields on `Request` without copying.
-pub struct Multipart<'a> {
-    source: BoundaryReader<Request<'a>>,
-    tmp_dir: String,
+/// Implements `Borrow<R>` to allow access to the request object.
+pub struct Multipart<R> {
+    source: BoundaryReader<R>,
+    line_buf: String,
+    /// The directory for saving files in this request.
+    /// By default, this is set to a subdirectory of `std::env::temp_dir()` with a 
+    /// random alphanumeric name.
+    pub save_dir: PathBuf,
 }
 
-macro_rules! try_find(
-    ($haystack:expr, $f:ident, $needle:expr, $err:expr, $line:expr) => (
-        try!($haystack.$f($needle).ok_or(line_error($err, $line.clone())))
-    )
-)
+impl<R> Multipart<R> where R: HttpRequest {
+    /// If the given `R: HttpRequest` is a POST request of `Content-Type: multipart/form-data`,
+    /// return the wrapped request as `Ok(Multipart<R>)`, otherwise `Err(R)`.
+    pub fn from_request(req: R) -> Result<Multipart<R>, R> {
+        if !req.is_multipart() { return Err(req); }
 
-impl<'a> Multipart<'a> {
+        if req.boundary().is_none() {
+            return Err(req);     
+        }
 
-    /// If the given `Request` is a POST request of `Content-Type: multipart/form-data`, 
-    /// return the wrapped request as `Ok(Multipart)`, otherwise `Err(Request)`.
-    ///
-    /// See the `handler` submodule for a convenient wrapper for this function,
-    /// `Switch`, that implements `hyper::server::Handler`.
-    pub fn from_request(req: Request<'a>) -> Result<Multipart<'a>, Request<'a>> {
-        if !is_multipart_formdata(&req) { return Err(req); }
-
-        let boundary = if let Some(boundary) = req.headers.get::<ContentType>()
-            .and_then(get_boundary) { boundary } else { return Err(req); };
+        let boundary = req.boundary().unwrap().to_owned();
 
         debug!("Boundary: {}", boundary);
 
-        Ok(Multipart { source: BoundaryReader::from_reader(req, format!("--{}\r\n", boundary)), tmp_dir: ::random_alphanumeric(10) })
+        Ok(
+            Multipart { 
+                source: BoundaryReader::from_reader(req, boundary),
+                line_buf: String::new(),
+                save_dir: ::temp_dir(),
+            }
+        )
     }
 
-    /// Read an entry from this multipart request, returning a pair with the field's name and
-    /// contents. This will return an End of File error if there are no more entries.
+    /// Read the next entry from this multipart request, returning a struct with the field's name and
+    /// data. See `MultipartField` for more info.
     ///
-    /// To get to the data, you will need to match on `MultipartField`.
-    ///
-    /// ##Warning
-    /// If the last returned entry had contents of type `MultipartField::File`,
-    /// calling this again will discard any unread contents of that entry! 
-    pub fn read_entry(&'a mut self) -> IoResult<(String, MultipartField<'a>)> { 
-        try!(self.source.consume_boundary());
-        let (disp_type, field_name, filename) = try!(self.read_content_disposition());
-
-        if &*disp_type != "form-data" {
-            return Err(IoError {
-                    kind: OtherIoError,
-                    desc: "Content-Disposition value was not \"form-data\"",
-                    detail: Some(format!("Content-Disposition: {}", disp_type)),
-                });
-        }
-      
-        if let Some(content_type) = try!(self.read_content_type()) {
-            let _ = try!(self.source.read_line()); // Consume empty line
-            Ok((field_name, 
-                MultipartField::File(
-                    MultipartFile::from_octet(filename, &mut self.source, content_type[], self.tmp_dir[])
-                )
-            ))
-        } else {
-            // Empty line consumed by read_content_type()
-            let text = try!(self.source.read_to_string());
-            // The last two characters are "\r\n".
-            // We can't do a simple trim because the content might be terminated
-            // with line separators we want to preserve.
-            Ok((field_name, MultipartField::Text(text[..text.len() - 2].into_string()))) 
-        }                
+    /// ##Warning: Risk of Data Loss
+    /// If the previously returned entry had contents of type `MultipartField::File`,
+    /// calling this again will discard any unread contents of that entry.
+    pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<R>>> {
+        MultipartField::read_from(self) 
     }
-   
+
+    fn read_content_disposition(&mut self) -> io::Result<Option<ContentDisp>> {
+        let line = try!(self.read_line());
+        Ok(ContentDisp::read_from(line))
+    }
+
     /// Call `f` for each entry in the multipart request.
-    /// This is a substitute for `Multipart` implementing `Iterator`,
-    /// since `Iterator::next()` can't use bound lifetimes.
+    /// 
+    /// This is a substitute for Rust not supporting streaming iterators (where the return value
+    /// from `next()` borrows the iterator for a bound lifetime).
     ///
-    /// See https://www.reddit.com/r/rust/comments/2lkk4i/concrete_lifetime_vs_bound_lifetime/
-    pub fn foreach_entry<F: for<'a> FnMut(String, MultipartField<'a>)>(&mut self, mut f: F) {
+    /// Returns `Ok(())` when all fields have been read, or the first error.
+    pub fn foreach_entry<F>(&mut self, mut foreach: F) -> io::Result<()> where F: FnMut(MultipartField<R>) {
         loop {
             match self.read_entry() {
-                Ok((name, field)) => f(name, field),
-                Err(err) => { 
-                    if err.kind != EndOfFile {
-                        error!("Error reading Multipart: {}", err);
-                    }
-
-                    break;
-                },            
-            }    
-        }    
-    } 
-    
-    fn read_content_disposition(&mut self) -> IoResult<(String, String, Option<String>)> {
-        let line = try!(self.source.read_line());       
-
-        // Find the end of CONT_DISP in the line
-        let disp_type = {
-            const CONT_DISP: &'static str = "Content-Disposition:";
-
-            let disp_idx = try_find!(line[], find_str, CONT_DISP, 
-                "Content-Disposition subheader not found!", line) + CONT_DISP.len();
-
-            let disp_type_end = try_find!(line[disp_idx..], find, ';', 
-                "Error parsing Content-Disposition value!", line);
-
-            line[disp_idx .. disp_idx + disp_type_end].trim().into_string()
-        };
-    
-        let field_name = {
-            const NAME: &'static str = "name=\"";
-
-            let name_idx = try_find!(line[], find_str, NAME, 
-                "Error parsing field name!", line) + NAME.len();
-
-            let name_end = try_find!(line[name_idx ..], find, '"',
-                "Error parsing field name!", line);
-
-            line[name_idx .. name_idx + name_end].into_string() // No trim here since it's in quotes.
-        };
-
-        let filename = {
-            const FILENAME: &'static str = "filename=\"";
-
-            let filename_idx = line[].find_str(FILENAME).map(|idx| idx + FILENAME.len());
-            let filename_idxs = with(filename_idx, |&start| line[start ..].find('"'));
-            
-            filename_idxs.map(|(start, end)| line[start .. start + end].into_string())
-        };
- 
-        Ok((disp_type, field_name, filename))
+                Ok(Some(field)) => foreach(field),
+                Ok(None) => return Ok(()),
+                Err(err) => return Err(err),
+            }
+        }
     }
 
-    fn read_content_type(&mut self) -> IoResult<Option<String>> {
+    fn read_content_type(&mut self) -> io::Result<Option<ContentType>> {
         debug!("Read content type!");
-        let line = try!(self.source.read_line());
-
-        const CONTENT_TYPE: &'static str = "Content-Type:";
-        
-        let type_idx = (&*line).find_str(CONTENT_TYPE);
-
-        // FIXME Will not properly parse for multiple files! 
-        // Does not expect boundary=<boundary>
-        Ok(type_idx.map(|start| line[start + CONTENT_TYPE.len()..].trim().into_string()))
+        let line = try!(self.read_line());
+        Ok(ContentType::read_from(line))
     }
 
-    /// Read the request fully, parsing all fields and saving all files to the given directory or a
-    /// temporary, and return the result.
+    /// Read the request fully, parsing all fields and saving all files in `self.save_dir`. 
     ///
-    /// If `dir` is none, chooses a random subdirectory under `std::os::tmpdir()`.
-    pub fn save_all(mut self, dir: Option<&Path>) -> IoResult<Entries> {
-        let dir = dir.map_or_else(|| ::std::os::tmpdir().join(self.tmp_dir[]), |path| path.clone());
-
-        let mut entries = Entries::with_path(dir);
+    /// If there is an error in reading the request, returns the partial result along with the
+    /// error.
+    pub fn save_all(&mut self) -> (Entries, Option<io::Error>) {
+        let mut entries = Entries::with_path(self.save_dir.clone());
 
         loop {
             match self.read_entry() {
-                Ok((name, MultipartField::Text(text))) => { entries.fields.insert(name, text); },
-                Ok((name, MultipartField::File(mut file))) => {
-                    let path = try!(file.save_in(&entries.dir));
-                    entries.files.insert(name, path);
-                },            
-                Err(err) => { 
-                    if err.kind != EndOfFile {
-                        error!("Error reading Multipart: {}", err);
-                    }
-
-                    break;
+                Ok(Some(field)) => match field.data {
+                    MultipartData::File(mut file) => {
+                        entries.files.insert(field.name, file.save());
+                    },
+                    MultipartData::Text(text) => {
+                        entries.fields.insert(field.name, text.into());
+                    },
                 },
+                Ok(None) => break,
+                Err(err) => return (entries, Some(err)),
             }
         }
 
-        Ok(entries)
+        (entries, None)
+    }
+
+    fn read_line(&mut self) -> io::Result<&str> {
+        self.line_buf.clear();
+
+        match self.source.read_line(&mut self.line_buf) {
+            Ok(read) => Ok(&self.line_buf[..read]),
+            Err(err) => Err(err),
+        }
+    }
+
+    fn read_to_string(&mut self) -> io::Result<&str> {
+        self.line_buf.clear();
+
+        match self.source.read_to_string(&mut self.line_buf) {
+            Ok(read) => Ok(&self.line_buf[..read]),
+            Err(err) => Err(err),
+        }
     }
 }
 
-impl<'a> Deref<Request<'a>> for Multipart<'a> {
-    fn deref(&self) -> &Request<'a> {
-        self.source.borrow_reader()  
-    }    
+impl<R> Borrow<R> for Multipart<R> where R: HttpRequest {
+    fn borrow(&self) -> &R {
+        self.source.borrow()
+    }
 }
 
-fn with<T, U>(left: Option<T>, right: |&T| -> Option<U>) -> Option<(T, U)> {
-    let temp = left.as_ref().and_then(right);
-    match (left, temp) {
-        (Some(lval), Some(rval)) => Some((lval, rval)),
-        _ => None,    
+struct ContentType {
+    val: Mime,
+    #[allow(dead_code)]
+    boundary: Option<String>,
+}
+
+impl ContentType {
+    fn read_from(line: &str) -> Option<ContentType> {
+        const CONTENT_TYPE: &'static str = "Content-Type:";
+        const BOUNDARY: &'static str = "boundary=\"";
+
+        debug!("Reading Content-Type header from line: {:?}", line);
+
+        if let Some((cont_type, after_cont_type)) = get_str_after(CONTENT_TYPE, ';', line) {
+            let content_type = read_content_type(cont_type);
+
+            let boundary = get_str_after(BOUNDARY, '"', after_cont_type).map(|tup| tup.0.into());
+
+            Some(ContentType {
+                val: content_type,
+                boundary: boundary,
+            })
+        } else {
+            get_remainder_after(CONTENT_TYPE, line).map(|cont_type| {
+                let content_type = read_content_type(cont_type);
+                ContentType { val: content_type, boundary: None }
+            })
+        }
+    }
+}
+
+fn read_content_type(cont_type: &str) -> Mime {
+    cont_type.parse().ok().unwrap_or_else(::mime_guess::octet_stream)
+}
+
+struct ContentDisp {
+    field_name: String,
+    filename: Option<String>,
+}
+
+impl ContentDisp {
+    fn read_from(line: &str) -> Option<ContentDisp> {
+        debug!("Reading Content-Disposition from line: {:?}", line);
+
+        if line.is_empty() {
+            return None;
+        }
+
+        const CONT_DISP: &'static str = "Content-Disposition:";
+        const NAME: &'static str = "name=\"";
+        const FILENAME: &'static str = "filename=\"";
+
+        let after_disp_type = {
+            let (disp_type, after_disp_type) = try_opt!(get_str_after(CONT_DISP, ';', line));
+            let disp_type = disp_type.trim();
+
+            if disp_type != "form-data" {
+                error!("Unexpected Content-Disposition value: {:?}", disp_type);
+                return None;
+            }
+
+            after_disp_type
+        };
+
+        let (field_name, after_field_name) = try_opt!(get_str_after(NAME, '"', after_disp_type));
+
+        let filename = get_str_after(FILENAME, '"', after_field_name)
+            .map(|(filename, _)| filename.to_owned());
+
+        Some(ContentDisp { field_name: field_name.to_owned(), filename: filename })
+    }
+}
+
+/// Get the string after `needle` in `haystack`, stopping before `end_val_delim`
+fn get_str_after<'a>(needle: &str, end_val_delim: char, haystack: &'a str) -> Option<(&'a str, &'a str)> {
+    let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
+    let val_end_idx = try_opt!(haystack[val_start_idx..].find(end_val_delim));
+    Some((&haystack[val_start_idx..val_end_idx], &haystack[val_end_idx..]))
+}
+
+/// Get everything after `needle` in `haystack`
+fn get_remainder_after<'a>(needle: &str, haystack: &'a str) -> Option<(&'a str)> {
+    let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
+    Some(&haystack[val_start_idx..])
+}
+
+/// A server-side HTTP request that may or may not be multipart.
+pub trait HttpRequest: Read {
+    /// Return `true` if this request is a `multipart/form-data` request, `false` otherwise.
+    fn is_multipart(&self) -> bool;
+    /// Get the boundary string of this request if it is `multipart/form-data`.
+    fn boundary(&self) -> Option<&str>;
+}
+
+/// A field in a multipart request. May be either text or a binary stream (file).
+#[derive(Debug)]
+pub struct MultipartField<'a, R: 'a> {
+    /// The field's name from the form
+    pub name: String,
+    /// The data of the field. Can be text or binary.
+    pub data: MultipartData<'a, R>,
+}
+
+impl<'a, R: HttpRequest + 'a> MultipartField<'a, R> {
+    fn read_from(multipart: &'a mut Multipart<R>) -> io::Result<Option<MultipartField<'a, R>>> {
+        try!(multipart.source.consume_boundary());
+
+        let cont_disp = match multipart.read_content_disposition() {
+            Ok(Some(cont_disp)) => cont_disp,
+            Ok(None) => return Ok(None),
+            Err(err) => return Err(err),
+        };        
+
+        let data = match try!(multipart.read_content_type()) {
+            Some(content_type) => {
+                let _ = try!(multipart.read_line()); // Consume empty line
+                MultipartData::File(
+                    MultipartFile::from_stream(
+                        cont_disp.filename, 
+                        content_type.val,
+                        &multipart.save_dir,
+                        &mut multipart.source,
+                    )
+                 )
+            },
+            None => {
+                // Empty line consumed by read_content_type()
+                let text = try!(multipart.read_to_string());
+                // The last two characters are "\r\n".
+                // We can't do a simple trim because the content might be terminated
+                // with line separators we want to preserve.
+                MultipartData::Text(&text[..text.len() - 2])
+            },
+        };
+
+        Ok(Some(
+            MultipartField {
+                name: cont_disp.field_name,
+                data: data,
+            }
+        ))
     }
 } 
 
-fn line_error(msg: &'static str, line: String) -> IoError {
-    IoError { 
-        kind: OtherIoError, 
-        desc: msg,
-        detail: Some(line),
+/// The data of a field in a `multipart/form-data` request.
+#[derive(Debug)]
+pub enum MultipartData<'a, R: 'a> {
+    /// The field's payload is a text string.
+    Text(&'a str),
+    /// The field's payload is a binary stream (file).
+    File(MultipartFile<'a, R>),
+    // TODO: Support multiple files per field (nested boundaries)
+    // MultiFiles(Vec<MultipartFile>),
+}
+
+impl<'a, R> MultipartData<'a, R> {
+    /// Borrow this payload as a text field, if possible.
+    pub fn as_text(&self) -> Option<&str> {
+        match *self {
+            MultipartData::Text(ref s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Borrow this payload as a file field, if possible.
+    /// Mutably borrows so the contents can be read.
+    pub fn as_file(&mut self) -> Option<&mut MultipartFile<'a, R>> {
+        match *self {
+            MultipartData::File(ref mut file) => Some(file),
+            _ => None,
+        }
+    }
+}
+
+/// A representation of a file in HTTP `multipart/form-data`.
+///
+/// Note that the file is not yet saved to the system; 
+/// instead, this struct exposes `Read` and `BufRead` impls which point
+/// to the beginning of the file's contents in the HTTP stream. 
+///
+/// You can read it to EOF, or use one of the `save_*()` methods here 
+/// to save it to disk.
+#[derive(Debug)]
+pub struct MultipartFile<'a, R: 'a> {
+    filename: Option<String>,
+    content_type: Mime,
+    save_dir: &'a Path,
+    stream: &'a mut BoundaryReader<R>,
+}
+
+impl<'a, R: Read> MultipartFile<'a, R> {
+    fn from_stream(filename: Option<String>, 
+                   content_type: Mime, 
+                   save_dir: &'a Path,
+                   stream: &'a mut BoundaryReader<R>) -> MultipartFile<'a, R> {
+        MultipartFile {
+            filename: filename,
+            content_type: content_type,
+            save_dir: save_dir,
+            stream: stream,
+        }    
+    }
+
+    /// Save this file to `path`.
+    ///
+    /// Returns the number of bytes written on success, or any errors otherwise.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save_as(&mut self, path: &Path) -> io::Result<u64> {
+        let mut file = try!(File::create(path));
+        retry_on_interrupt(|| io::copy(self.stream, &mut file))    
+    }
+
+    /// Save this file in the directory pointed at by `dir`,
+    /// using `self.filename()` if present, or a random alphanumeric string otherwise.
+    ///
+    /// Any missing directories in the `dir` path will be created.
+    ///
+    /// `self.filename()` is sanitized of all file separators before being appended to `dir`.
+    ///
+    /// Returns the created file's path on success, or any errors otherwise.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save_in(&mut self, dir: &Path) -> io::Result<PathBuf> {
+        try!(fs::create_dir_all(dir));
+        let path = self.gen_safe_file_path(dir);
+        self.save_as(&path).map(move |_| path)
+    }
+
+    /// Save this file in the directory pointed at by `self.save_dir`,
+    /// using `self.filename()` if present, or a random alphanumeric string otherwise.
+    ///
+    /// Any missing directories in the `self.save_dir` path will be created.
+    ///
+    /// `self.filename()` is sanitized of all file separators before being appended to `self.save_dir`.
+    ///
+    /// Returns the created file's path on success, or any errors otherwise.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save(&mut self) -> io::Result<PathBuf> {
+        try!(fs::create_dir_all(self.save_dir));
+        let path = self.gen_safe_file_path(self.save_dir);
+        self.save_as(&path).map(move |_| path)
+    }
+
+    /// Get the filename of this entry, if supplied.
+    ///
+    /// ##Warning
+    /// You should treat this value as untrustworthy because it is an arbitrary string provided by
+    /// the client. You should *not* blindly append it to a directory path and save the file there, 
+    /// as such behavior could easily be exploited by a malicious client.
+    pub fn filename(&self) -> Option<&str> {
+        self.filename.as_ref().map(String::as_ref)    
+    }
+
+    /// Get the MIME type (`Content-Type` value) of this file, if supplied by the client, 
+    /// or `"applicaton/octet-stream"` otherwise.
+    pub fn content_type(&self) -> Mime {
+        self.content_type.clone()    
+    }
+
+    /// The save directory assigned to this file field by the `Multipart` instance it was read
+    /// from.
+    pub fn save_dir(&self) -> &Path {
+        self.save_dir
+    }
+
+    fn gen_safe_file_path(&self, dir: &Path) -> PathBuf { 
+        self.filename().map(Path::new)
+            .and_then(Path::file_name) //Make sure there's no path separators in the filename
+            .map_or_else(
+                || dir.join(::random_alphanumeric(8)), 
+                |filename| dir.join(filename),
+            )
+    }
+}
+
+impl<'a, R: Read> Read for MultipartFile<'a, R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
+        self.stream.read(buf)
+    }
+}
+
+impl<'a, R: Read> BufRead for MultipartFile<'a, R> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.stream.fill_buf()
+    }
+
+    fn consume(&mut self, amt: usize) {
+        self.stream.consume(amt)
     }
 }
 
 /// A result of `Multipart::save_all()`.
 pub struct Entries {
+    /// The text fields of the multipart request.
     pub fields: HashMap<String, String>,
-    pub files: HashMap<String, Path>,
+    /// A map of file field names to their save results.
+    pub files: HashMap<String, io::Result<PathBuf>>,
     /// The directory the files were saved under.
-    pub dir: Path,
+    pub dir: PathBuf,
 }
 
 impl Entries {
-    fn with_path(path: Path) -> Entries {
+    fn with_path<P: Into<PathBuf>>(path: P) -> Entries {
         Entries {
             fields: HashMap::new(),
             files: HashMap::new(),
-            dir: path,
-        }
-    }    
-}
-
-/* FIXME: Can't have an iterator return a borrowed reference
-impl<'a> Iterator<(String, MultipartField<'a>)> for Multipart<'a> {
-    fn next(&mut self) -> Option<(String, MultipartField<'a>)> {
-        match self.read_entry() {
-            Ok(ok) => Some(ok), 
-            Err(err) => { 
-                if err.kind != EndOfFile {
-                    error!("Error reading Multipart: {}", err);
-                }
-
-                None
-             },
-        }
-    }    
-}
-*/
-
-/// A `Reader` that will yield bytes until it sees a given sequence.
-pub struct BoundaryReader<S> {
-    reader: S,
-    boundary: Vec<u8>,
-    last_search_idx: uint,
-    boundary_read: bool,
-    buf: Vec<u8>,
-    buf_len: uint,
-}
-
-fn eof<T>() -> IoResult<T> {
-    Err(standard_error(EndOfFile))    
-}
-
-const BUF_SIZE: uint = 1024 * 64; // 64k buffer
-
-impl<S> BoundaryReader<S> where S: Reader {
-    fn from_reader(reader: S, boundary: String) -> BoundaryReader<S> {
-        let mut buf = Vec::with_capacity(BUF_SIZE);
-        unsafe { buf.set_len(BUF_SIZE); }
-
-        BoundaryReader {
-            reader: reader,
-            boundary: boundary.into_bytes(),
-            last_search_idx: 0,
-            boundary_read: false,
-            buf: buf,
-            buf_len: 0,  
+            dir: path.into(),
         }
     }
+}
 
-    fn read_to_boundary(&mut self) -> IoResult<()> {
-         if !self.boundary_read {
-            try!(self.true_fill_buf());
-
-            if self.buf_len == 0 { return eof(); }
-            
-            let lookahead = self.buf[self.last_search_idx .. self.buf_len];
- 
-            let search_idx = lookahead.position_elem(&self.boundary[0])
-                .unwrap_or(lookahead.len() - 1);
-
-            debug!("Search idx: {}", search_idx);
-
-            self.boundary_read = lookahead[search_idx..]
-                .starts_with(self.boundary[]);
-
-            self.last_search_idx += search_idx;
-
-            if !self.boundary_read {
-                self.last_search_idx += 1;    
-            }
-
-        } else if self.last_search_idx == 0 {
-            return Err(standard_error(EndOfFile))                
+fn retry_on_interrupt<F, T>(mut do_fn: F) -> io::Result<T> where F: FnMut() -> io::Result<T> {
+    loop {
+        match do_fn() {
+            Ok(val) => return Ok(val),
+            Err(err) => if err.kind() != io::ErrorKind::Interrupted { 
+                return Err(err);
+            },
         }
-        
-        Ok(()) 
     }
-
-    /// Read bytes until the reader is full
-    fn true_fill_buf(&mut self) -> IoResult<()> {
-        let mut bytes_read = 1u;
-        
-        while bytes_read != 0 {
-            bytes_read = match self.reader.read(self.buf[mut self.buf_len..]) {
-                Ok(read) => read,
-                Err(err) => if err.kind == EndOfFile { break; } else { return Err(err); },
-            };
-
-            self.buf_len += bytes_read;
-        }
-
-        Ok(())
-    }
-
-    fn _consume(&mut self, amt: uint) {
-        use std::ptr::copy_memory;
- 
-        assert!(amt <= self.buf_len);
-
-        let src = self.buf[amt..].as_ptr();
-        let dest = self.buf[mut].as_mut_ptr();
-
-        unsafe { copy_memory(dest, src, self.buf_len - amt); }
-        
-        self.buf_len -= amt;
-        self.last_search_idx -= amt; 
-    }
-
-    fn consume_boundary(&mut self) -> IoResult<()> {
-        while !self.boundary_read {
-            match self.read_to_boundary() {
-                Ok(_) => (),
-                Err(e) => if e.kind == EndOfFile { 
-                    break; 
-                } else { 
-                    return Err(e);
-                }
-            }
-        }
-       
-        let consume_amt = cmp::min(self.buf_len, self.last_search_idx + self.boundary.len());
-
-        debug!("Consume amt: {} Buf len: {}", consume_amt, self.buf_len);
-
-        self._consume(consume_amt);
-        self.last_search_idx = 0;
-        self.boundary_read = false;  
-        
-        Ok(())  
-    }
-
-    #[allow(unused)]
-    fn set_boundary(&mut self, boundary: String) {
-        self.boundary = boundary.into_bytes();    
-    }
-
-    pub fn borrow_reader<'a>(&'a self) -> &'a S {
-        &self.reader
-    }
-}
-
-impl<S> Reader for BoundaryReader<S> where S: Reader {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
-        use std::cmp;        
-        use std::slice::bytes::copy_memory;
-
-        try!(self.read_to_boundary()); 
-
-        let trunc_len = cmp::min(buf.len(), self.last_search_idx);
-        copy_memory(buf, self.buf[..trunc_len]); 
-
-        self._consume(trunc_len);
-
-        Ok(trunc_len)        
-    } 
-}
-
-impl<S> Buffer for BoundaryReader<S> where S: Reader {
-    fn fill_buf<'a>(&'a mut self) -> IoResult<&'a [u8]> {
-        try!(self.read_to_boundary());
-       
-        let buf = self.buf[..self.last_search_idx];
-
-        Ok(buf)    
-    }
-
-    fn consume(&mut self, amt: uint) {
-        assert!(amt <= self.last_search_idx);
-        self._consume(amt);
-    }
-}
-
-#[test]
-fn test_boundary() {
-    use std::io::BufReader;
-
-    const BOUNDARY: &'static str = "--boundary\r\n";
-    const TEST_VAL: &'static str = "\r
---boundary\r
-dashed-value-1\r
---boundary\r
-dashed-value-2\r
---boundary\r
-";
-
-    let test_reader = BufReader::new(TEST_VAL.as_bytes());
-    let mut reader = BoundaryReader::from_reader(test_reader, BOUNDARY.into_string());
-
-    debug!("Read 1");
-    let string = reader.read_to_string().unwrap();
-    debug!("{}", string);
-    assert!(string[].trim().is_empty());
-
-    debug!("Consume 1");
-    reader.consume_boundary().unwrap();
-
-    debug!("Read 2");
-    assert_eq!(reader.read_to_string().unwrap()[].trim(), "dashed-value-1");
-
-    debug!("Consume 2");
-    reader.consume_boundary().unwrap();
-
-    debug!("Read 3");
-    assert_eq!(reader.read_to_string().unwrap()[].trim(), "dashed-value-2");
-
-    debug!("Consume 3");
-    reader.consume_boundary().unwrap();
-   
-}
+} 
 
