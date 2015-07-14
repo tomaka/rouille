@@ -1,19 +1,82 @@
 Multipart + Hyper [![Build Status](https://travis-ci.org/cybergeek94/multipart.svg?branch=master)](https://travis-ci.org/cybergeek94/multipart)
 =========
 
-An extension to [Hyper][1] that adds support for HTTP multipart (`Content-Type: multipart/form-data`) requests.
+Client- and server-side abstractions for HTTP file uploads (POST requests with  `Content-Type: multipart/form-data`).
 
-See `src/bin/multipart_server.rs` for server-side example (used in testing).
+Provides integration with [Hyper](https://github.com/hyperium/hyper) via the `hyper` feature. More to come!
+
+Usage
+-----
+
+In your `Cargo.toml`:
+```toml
+# Currently only useful with `hyper` and `url` crates:
+[dependencies]
+hyper = "*"
+url = "*"
+
+[dependencies.multipart]
+version = "0.2"
+# The `hyper` feature enables trait impls for Hyper's request objects.
+# RFC: should this be set by default?
+features = ["hyper"]
+```
+
+Client-side example (using Hyper):
+```rust
+extern crate hyper;
+extern crate multipart;
+extern crate url;
+
+use hyper::client::request::Request;
+use hyper::method::Method;
+
+use multipart::client::Multipart;
+
+use url::Url;
+
+fn main() {
+    let url = Url::parse("127.0.0.1").unwrap();
+    let request = Request::new(Method::Post, url).unwrap();
+    
+    let mut response = Multipart::from_request(request).unwrap()
+        .write_text("hello", "world")
+        .write_file("my_file", "my_text_data.txt")
+        .send().unwrap();
+        
+    // Read response...
+}
+```
+
+Server-side example (using Hyper):
+```rust
+use hyper::net::Fresh;
+use hyper::server::{Server, Request, Response};
+
+use multipart::server::Multipart;
+use multipart::server::hyper::Switch;
+
+fn handle_regular<'a, 'k>(req: Request<'a, 'k>, res: Response<'a, Fresh>) {
+    // handle things here
+}
+
+fn handle_multipart<'a, 'k>(mut multi: Multipart<Request<'a, 'k>>, res: Response<'a, Fresh>) {
+    multi.foreach_entry(|entry| println!("Multipart entry: {:?}", entry)).unwrap();
+}
+
+fn main() {
+    Server::http("0.0.0.0:0").unwrap()
+      .handle(Switch::new(handle_regular, handle_multipart))
+      .unwrap();
+}
+```
 
 ####[Documentation][2]
 
-#####TODO:  
-- [x] Remove excess debug statements
+#####TODO:
 - [ ] Fill out README and provide examples
-- [ ] Improve documentation
 - [ ] Add support for multiple files per field (nested boundaries)
-- [ ] Expand test coverage
-- [ ] Integrate with future HTTP compression extension(s)
+
 
 [1]: https://github.com/hyperium/hyper
 [2]: http://rust-ci.org/cybergeek94/multipart/doc/multipart/
