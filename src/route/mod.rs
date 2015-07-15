@@ -12,6 +12,17 @@ pub struct Route {
     pub handler: Handler,
 }
 
+impl Route {
+    /// Returns true if this route can handle the given request.
+    pub fn matches(&self, request: &HyperRequest) -> bool {
+        if !self.method.matches(&request.method) {
+            return false;
+        }
+
+        true        // FIXME: 
+    }
+}
+
 /// Describes which methods must be used by the request for a route to be used.
 pub struct MethodsMask {
     /// True if the `GET` method matches this mask.

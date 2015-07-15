@@ -41,7 +41,10 @@ impl hyper::server::Handler for RequestHandler {
         let (method, uri) = (request.method.clone(), request.uri.clone());
 
         for route in self.router.routes.iter() {
-            // TODO: 
+            if !route.matches(&request) {
+                continue;
+            }
+
             match route.handler {    
                 route::Handler::Static(_) => unimplemented!(),
                 route::Handler::Dynamic(ref handler) => {
