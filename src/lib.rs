@@ -1,6 +1,7 @@
 #![warn(missing_docs)]
 
 extern crate hyper;
+extern crate rustc_serialize;
 extern crate term;
 extern crate time;
 

@@ -1,5 +1,6 @@
 use hyper::server::response::Response as HyperResponse;
 
+pub mod json;
 pub mod plain_text;
 
 /// Objects that can serve as a response to the request.
