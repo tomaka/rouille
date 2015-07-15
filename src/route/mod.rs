@@ -25,6 +25,17 @@ pub struct MethodsMask {
 }
 
 impl MethodsMask {
+    /// Parses from a string of the `route!` macro.
+    pub fn parse(_: &str) -> MethodsMask {
+        // FIXME:
+        MethodsMask {
+            get: true,
+            post: false,
+            put: false,
+            delete: false,
+        }
+    }
+
     /// Returns true if the mask contains the specified method.
     pub fn matches(&self, method: &HyperMethod) -> bool {
         match method {
@@ -34,7 +45,7 @@ impl MethodsMask {
             &HyperMethod::Delete => self.delete,
             _ => false
         }
-    } 
+    }
 }
 
 /// Describes how to handle a route.
@@ -60,4 +71,22 @@ impl<I, O> DynamicHandler for fn(I) -> O where I: Input, O: Output {
         let output = (*self)(input);
         output.send(response);
     }
+}
+
+#[macro_export]
+macro_rules! router {
+    ($($method:ident $uri:expr => $handler:expr)*) => (
+        $crate::route::Router {
+            routes: vec![
+                $(
+                    $crate::route::Route {
+                        url: $uri.to_string(),
+                        method: $crate::route::MethodsMask::parse(stringify!($method)),
+                        handler: $crate::route::Handler::Dynamic(Box::new($handler)
+                                             as Box<$crate::route::DynamicHandler + Send + Sync>),
+                    }
+                ),*
+            ]
+        }
+    );
 }
