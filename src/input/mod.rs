@@ -11,9 +11,9 @@ mod ignore;
 
 /// Objects that implement this trait describe the user's input.
 pub trait Input {
-    /// True if this input method matches the user content type.
-    fn matches(content_type_header: &str) -> bool;
+    /// Returns true if this input method matches the user content type.
+    fn matches_content_type(content_type_header: &str) -> bool;
 
-    /// Should only be called if `matches` returned true.
+    /// Should only be called if `matches_content_type` returned true.
     fn process<R>(R) -> Self where R: Read;
 }

@@ -5,7 +5,7 @@ use std::io::Read;
 pub struct Ignore;
 
 impl Input for Ignore {
-    fn matches(_: &str) -> bool {
+    fn matches_content_type(_: &str) -> bool {
         true
     }
 
