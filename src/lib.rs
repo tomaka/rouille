@@ -1,30 +1,42 @@
 #![warn(missing_docs)]
 
 extern crate hyper;
+extern crate term;
 
 use std::net::ToSocketAddrs;
 
 use hyper::server::Listening;
 use hyper::server::Server as HyperServer;
 
+use log::LogProvider;
+
 pub mod input;
+pub mod log;
 pub mod output;
 pub mod route;
 
 /// Starts a server with the given router.
 pub fn start<T>(addr: T, router: route::Router) where T: ToSocketAddrs {
+    let handler = RequestHandler {
+        router: router,
+        logs: Box::new(log::term::TermLog::new()),
+    };
+
     let server = HyperServer::http(addr).unwrap();
-    let _ = server.handle(RequestHandler { router: router }).unwrap();
+    let _ = server.handle(handler).unwrap();
 }
 
 struct RequestHandler {
     router: route::Router,
+    logs: Box<log::LogProvider + Send + Sync>,
 }
 
 impl hyper::server::Handler for RequestHandler {
     fn handle<'a, 'k>(&'a self, request: hyper::server::request::Request<'a, 'k>,
                       response: hyper::server::response::Response<'a, hyper::net::Fresh>)
     {
+        self.logs.log_request(&request);
+
         for route in self.router.routes.iter() {
             // TODO: 
             match route.handler {    
