@@ -2,6 +2,7 @@
 
 extern crate hyper;
 extern crate term;
+extern crate time;
 
 use std::net::ToSocketAddrs;
 
@@ -35,7 +36,8 @@ impl hyper::server::Handler for RequestHandler {
     fn handle<'a, 'k>(&'a self, request: hyper::server::request::Request<'a, 'k>,
                       response: hyper::server::response::Response<'a, hyper::net::Fresh>)
     {
-        self.logs.log_request(&request);
+        let time_before = time::precise_time_ns();
+        let (method, uri) = (request.method.clone(), request.uri.clone());
 
         for route in self.router.routes.iter() {
             // TODO: 
@@ -47,5 +49,8 @@ impl hyper::server::Handler for RequestHandler {
                 },
             }
         }
+
+        let time_after = time::precise_time_ns();
+        self.logs.log_request(&method, &uri, time_after - time_before);
     }
 }

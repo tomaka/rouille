@@ -6,3 +6,4 @@ authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>"]
 [dependencies]
 hyper = "0.6"
 term = "0.2"
+time = "0.1.31"
