@@ -15,6 +15,6 @@ fn main() {
     rouille::start("0.0.0.0:8000", router);
 }
 
-fn handler(_: rouille::input::Ignore) -> rouille::output::json::JsonOutput<Data> {
-    rouille::output::json::JsonOutput::new(Data { val1: 3 })
+fn handler(_: rouille::input::Ignore) -> rouille::output::JsonOutput<Data> {
+    rouille::output::JsonOutput::new(Data { val1: 3 })
 }
