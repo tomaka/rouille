@@ -14,6 +14,10 @@ use std::fs::File;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 
+use hyper::mime::Mime as HyperMime;
+use hyper::mime::TopLevel as HyperMimeTopLevel;
+use hyper::mime::Attr as HyperMimeAttr;
+use hyper::mime::Value as HyperMimeValue;
 use hyper::header::ContentType as HyperContentType;
 use hyper::uri::RequestUri as HyperRequestUri;
 use hyper::server::Server as HyperServer;
@@ -95,7 +99,14 @@ impl hyper::server::Handler for RequestHandler {
             if fs::metadata(&possible_file).map(|d| d.is_file()).ok().unwrap_or(false) {
                 if let Ok(mut file) = File::open(&possible_file) {
                     let mut response = response;
-                    let mime = mime_guess::guess_mime_type(&possible_file);
+
+                    let mut mime = mime_guess::guess_mime_type(&possible_file);
+
+                    // adding `charset=utf8` if starting with `text/`
+                    if let HyperMime(HyperMimeTopLevel::Text, _, _) = mime {
+                        let HyperMime(_, _, ref mut params) = mime;
+                        if params.is_empty() { *params = vec![(HyperMimeAttr::Charset, HyperMimeValue::Utf8)]; }
+                    }
                     response.headers_mut().set(HyperContentType(mime));
 
                     if let Ok(mut response) = response.start() {
