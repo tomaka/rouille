@@ -18,10 +18,9 @@ use hyper::header::ContentType as HyperContentType;
 use hyper::uri::RequestUri as HyperRequestUri;
 use hyper::server::Server as HyperServer;
 
-use log::LogProvider;
+use service::log::LogProvider;
 
 pub mod input;
-pub mod log;
 pub mod output;
 pub mod route;
 pub mod service;
@@ -65,7 +64,6 @@ pub fn start<T, P>(addr: T, router: route::Router, static_files: P,
 {
     let handler = RequestHandler {
         router: router,
-        logs: Box::new(log::term::TermLog::new()),
         static_files: static_files.into(),
         static_services: services,
     };
@@ -76,7 +74,6 @@ pub fn start<T, P>(addr: T, router: route::Router, static_files: P,
 
 struct RequestHandler {
     router: route::Router,
-    logs: Box<log::LogProvider + Send + Sync>,
     static_files: PathBuf,
     static_services: service::StaticServices,
 }
@@ -106,7 +103,7 @@ impl hyper::server::Handler for RequestHandler {
                     }
 
                     let time_after = time::precise_time_ns();
-                    self.logs.log_request(&method, &uri, time_after - time_before);
+                    self.static_services.logs.log_request(&method, &uri, time_after - time_before);
                     return;
                 }
             }
@@ -127,6 +124,6 @@ impl hyper::server::Handler for RequestHandler {
         }
 
         let time_after = time::precise_time_ns();
-        self.logs.log_request(&method, &uri, time_after - time_before);
+        self.static_services.logs.log_request(&method, &uri, time_after - time_before);
     }
 }
