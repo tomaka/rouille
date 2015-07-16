@@ -83,7 +83,7 @@ impl<'a, 'b> HttpRequest for Request<'a, 'b> {
 
             params.iter().find(|&&(ref name, _)|
                 match *name {
-                    Attr::Ext(ref name) => "boundary" == name,
+                    Attr::Boundary => true,
                     _ => false,
                 }
             ).and_then(|&(_, ref val)|
