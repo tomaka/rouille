@@ -111,6 +111,7 @@ impl hyper::server::Handler for RequestHandler {
 
                     if let Ok(mut response) = response.start() {
                         let _ = io::copy(&mut file, &mut response);
+                        let _ = response.end();
                     }
 
                     let time_after = time::precise_time_ns();
