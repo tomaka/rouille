@@ -17,7 +17,7 @@ fn main() {
         .. Default::default()
     };
 
-    rouille::start("0.0.0.0:8000", router, services);
+    rouille::start("0.0.0.0:8000", router, "examples", services);
 }
 
 #[derive(RustcEncodable)]

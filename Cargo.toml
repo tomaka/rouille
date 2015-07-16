@@ -5,6 +5,8 @@ authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>"]
 
 [dependencies]
 hyper = { version = "0.6", default-features = false }
+mime = "=0.0.12"        # using a fix version to avoid things breaking *grumble*
+mime_guess = "=1.1.1"   # using a fix version to avoid things breaking *grumble*
 mustache = "0.6"
 #postgres = "0.9"
 rustc-serialize = "0.3"

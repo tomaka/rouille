@@ -1,14 +1,21 @@
 #![warn(missing_docs)]
 
 extern crate hyper;
+extern crate mime;
+extern crate mime_guess;
 extern crate mustache;
 extern crate rustc_serialize;
 extern crate term;
 extern crate time;
 
+use std::io;
+use std::fs;
+use std::fs::File;
 use std::net::ToSocketAddrs;
+use std::path::PathBuf;
 
-use hyper::server::Listening;
+use hyper::header::ContentType as HyperContentType;
+use hyper::uri::RequestUri as HyperRequestUri;
 use hyper::server::Server as HyperServer;
 
 use log::LogProvider;
@@ -20,12 +27,14 @@ pub mod route;
 pub mod service;
 
 /// Starts a server with the given router.
-pub fn start<T>(addr: T, router: route::Router, services: service::StaticServices)
-                where T: ToSocketAddrs
+pub fn start<T, P>(addr: T, router: route::Router, static_files: P,
+                   services: service::StaticServices)
+                   where T: ToSocketAddrs, P: Into<PathBuf>
 {
     let handler = RequestHandler {
         router: router,
         logs: Box::new(log::term::TermLog::new()),
+        static_files: static_files.into(),
         static_services: services,
     };
 
@@ -36,6 +45,7 @@ pub fn start<T>(addr: T, router: route::Router, services: service::StaticService
 struct RequestHandler {
     router: route::Router,
     logs: Box<log::LogProvider + Send + Sync>,
+    static_files: PathBuf,
     static_services: service::StaticServices,
 }
 
@@ -45,6 +55,30 @@ impl hyper::server::Handler for RequestHandler {
     {
         let time_before = time::precise_time_ns();
         let (method, uri) = (request.method.clone(), request.uri.clone());
+
+        // handling static files
+        if let HyperRequestUri::AbsolutePath(ref url) = request.uri {
+            let possible_file = self.static_files.join(&url[1..]);      // TODO: this is a dirty hack to remove the leading `/`
+
+            // FIXME (SECURITY): check with `relative_from` that we're still in `self.static_files`
+            //                   once the function is stable
+
+            if fs::metadata(&possible_file).map(|d| d.is_file()).ok().unwrap_or(false) {
+                if let Ok(mut file) = File::open(&possible_file) {
+                    let mut response = response;
+                    let mime = mime_guess::guess_mime_type(&possible_file);
+                    response.headers_mut().set(HyperContentType(mime));
+
+                    if let Ok(mut response) = response.start() {
+                        let _ = io::copy(&mut file, &mut response);
+                    }
+
+                    let time_after = time::precise_time_ns();
+                    self.logs.log_request(&method, &uri, time_after - time_before);
+                    return;
+                }
+            }
+        }
 
         for route in self.router.routes.iter() {
             if !route.matches(&request) {
