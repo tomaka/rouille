@@ -5,11 +5,13 @@ use std::io::Read;
 pub struct Ignore;
 
 impl Input for Ignore {
+    type Err = ();
+
     fn matches_content_type(_: &str) -> bool {
         true
     }
 
-    fn process<R>(_: R) -> Self where R: Read {
-        Ignore
+    fn process<R>(_: R) -> Result<Self, ()> where R: Read {
+        Ok(Ignore)
     }
 }

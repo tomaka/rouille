@@ -78,7 +78,11 @@ pub trait DynamicHandler {
 
 impl<I, O> DynamicHandler for fn(I) -> O where I: Input, O: Output {
     fn call(&self, request: HyperRequest, response: HyperResponse) {
-        let input = I::process(request);
+        let input = match I::process(request) {
+            Ok(i) => i,
+            Err(_) => return        // TODO: handle properly
+        };
+
         let output = (*self)(input);
         output.send(response);
     }
