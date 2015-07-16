@@ -1,4 +1,5 @@
 use hyper::server::response::Response as HyperResponse;
+use service::StaticServices;
 use super::Output;
 
 /// A response that redirects the user to another URL.
@@ -25,7 +26,7 @@ impl RedirectOutput {
 }
 
 impl Output for RedirectOutput {
-    fn send(self, mut response: HyperResponse) {
+    fn send(self, mut response: HyperResponse, _: &StaticServices) {
         use hyper::header::Location;
         use hyper::status::StatusCode;
 

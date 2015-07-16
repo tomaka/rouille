@@ -5,6 +5,8 @@ authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>"]
 
 [dependencies]
 hyper = { version = "0.6", default-features = false }
+mustache = "0.6"
+#postgres = "0.9"
 rustc-serialize = "0.3"
 term = "0.2"
 time = "0.1.31"

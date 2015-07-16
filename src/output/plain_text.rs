@@ -1,4 +1,5 @@
 use hyper::server::response::Response as HyperResponse;
+use service::StaticServices;
 use super::Output;
 
 /// A plain-text output.
@@ -22,7 +23,7 @@ impl PlainTextOutput {
 }
 
 impl Output for PlainTextOutput {
-    fn send(self, mut response: HyperResponse) {
+    fn send(self, mut response: HyperResponse, _: &StaticServices) {
         use hyper::header::ContentType;
         use hyper::mime::{Mime, TopLevel, SubLevel, Attr, Value};
 

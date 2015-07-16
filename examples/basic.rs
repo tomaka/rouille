@@ -12,9 +12,17 @@ fn main() {
         GET "/" => handler as fn(_) -> _
     };
 
-    rouille::start("0.0.0.0:8000", router);
+    let services = rouille::service::StaticServices {
+        templates: rouille::service::TemplatesCache::new("."),
+        .. Default::default()
+    };
+
+    rouille::start("0.0.0.0:8000", router, services);
 }
 
-fn handler(_: rouille::input::Ignore) -> rouille::output::JsonOutput<Data> {
-    rouille::output::JsonOutput::new(Data { val1: 3 })
+#[derive(RustcEncodable)]
+struct TemplateVars;
+
+fn handler(_: rouille::input::Ignore) -> rouille::output::TemplateOutput<TemplateVars> {
+    rouille::output::TemplateOutput::new("test", TemplateVars)
 }

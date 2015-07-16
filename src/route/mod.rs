@@ -1,6 +1,9 @@
 use std::path::PathBuf;
+
 use input::Input;
 use output::Output;
+use service::ServiceAccess;
+use service::StaticServices;
 
 use hyper::server::request::Request as HyperRequest;
 use hyper::server::response::Response as HyperResponse;
@@ -73,18 +76,34 @@ pub struct Router {
 /// Describes types that can process a route.
 pub trait DynamicHandler {
     /// Handles a request.
-    fn call(&self, HyperRequest, HyperResponse);
+    fn call(&self, HyperRequest, HyperResponse, &StaticServices);
 }
 
 impl<I, O> DynamicHandler for fn(I) -> O where I: Input, O: Output {
-    fn call(&self, request: HyperRequest, response: HyperResponse) {
+    fn call(&self, request: HyperRequest, response: HyperResponse, services: &StaticServices) {
         let input = match I::process(request) {
             Ok(i) => i,
             Err(_) => return        // TODO: handle properly
         };
 
         let output = (*self)(input);
-        output.send(response);
+        output.send(response, services);
+    }
+}
+
+impl<I, O, S1> DynamicHandler for fn(I, S1) -> O
+                                  where I: Input, O: Output, S1: for<'s> ServiceAccess<'s>
+{
+    fn call(&self, request: HyperRequest, response: HyperResponse, services: &StaticServices) {
+        let input = match I::process(request) {
+            Ok(i) => i,
+            Err(_) => return        // TODO: handle properly
+        };
+
+        let s1 = S1::load(services);
+
+        let output = (*self)(input, s1);
+        output.send(response, services);
     }
 }
 

@@ -1,6 +1,7 @@
 #![warn(missing_docs)]
 
 extern crate hyper;
+extern crate mustache;
 extern crate rustc_serialize;
 extern crate term;
 extern crate time;
@@ -16,12 +17,16 @@ pub mod input;
 pub mod log;
 pub mod output;
 pub mod route;
+pub mod service;
 
 /// Starts a server with the given router.
-pub fn start<T>(addr: T, router: route::Router) where T: ToSocketAddrs {
+pub fn start<T>(addr: T, router: route::Router, services: service::StaticServices)
+                where T: ToSocketAddrs
+{
     let handler = RequestHandler {
         router: router,
         logs: Box::new(log::term::TermLog::new()),
+        static_services: services,
     };
 
     let server = HyperServer::http(addr).unwrap();
@@ -31,6 +36,7 @@ pub fn start<T>(addr: T, router: route::Router) where T: ToSocketAddrs {
 struct RequestHandler {
     router: route::Router,
     logs: Box<log::LogProvider + Send + Sync>,
+    static_services: service::StaticServices,
 }
 
 impl hyper::server::Handler for RequestHandler {
@@ -48,7 +54,7 @@ impl hyper::server::Handler for RequestHandler {
             match route.handler {    
                 route::Handler::Static(_) => unimplemented!(),
                 route::Handler::Dynamic(ref handler) => {
-                    handler.call(request, response);
+                    handler.call(request, response, &self.static_services);
                     break;
                 },
             }

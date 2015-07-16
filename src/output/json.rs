@@ -2,6 +2,7 @@ use hyper::server::response::Response as HyperResponse;
 use rustc_serialize::Encodable;
 use rustc_serialize::json;
 use super::Output;
+use service::StaticServices;
 
 /// A JSON output.
 pub struct JsonOutput<D> {
@@ -19,7 +20,7 @@ impl<D> JsonOutput<D> {
 }
 
 impl<D> Output for JsonOutput<D> where D: Encodable {
-    fn send(self, mut response: HyperResponse) {
+    fn send(self, mut response: HyperResponse, _: &StaticServices) {
         use hyper::header::ContentType;
         use hyper::mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
