@@ -27,6 +27,38 @@ pub mod route;
 pub mod service;
 
 /// Starts a server with the given router.
+///
+/// # Parameters
+///
+/// - `router`: The list of routes that are handled dynamically. You are encouraged to use the
+///             `router!` macro to build a router.
+///
+/// - `static_files`: A path to the directory containing the static files to serve.
+///
+/// - `services`: Configuration for the various services accessible in the dynamic routes.
+///
+/// # Example
+///
+/// ```no_run
+/// # #[macro_use] extern crate rouille;
+/// # fn main() {
+/// # fn handler(_: rouille::input::Ignore) -> rouille::output::PlainTextOutput { panic!() }
+/// use rouille::service::StaticServices;
+/// use rouille::service::TemplatesCache;
+///
+/// let router = router! {
+///     GET "/" => handler as fn(_) -> _
+/// };
+///
+/// let services = StaticServices {
+///     templates: TemplatesCache::new("./templates"),
+///     .. Default::default()
+/// };
+///
+/// rouille::start("0.0.0.0:8000", router, "static", services);
+/// # }
+/// ```
+///
 pub fn start<T, P>(addr: T, router: route::Router, static_files: P,
                    services: service::StaticServices)
                    where T: ToSocketAddrs, P: Into<PathBuf>
