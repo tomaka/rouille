@@ -232,7 +232,7 @@ impl ContentDisp {
 /// Get the string after `needle` in `haystack`, stopping before `end_val_delim`
 fn get_str_after<'a>(needle: &str, end_val_delim: char, haystack: &'a str) -> Option<(&'a str, &'a str)> {
     let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
-    let val_end_idx = try_opt!(haystack[val_start_idx..].find(end_val_delim));
+    let val_end_idx = try_opt!(haystack[val_start_idx..].find(end_val_delim)) + val_start_idx;
     Some((&haystack[val_start_idx..val_end_idx], &haystack[val_end_idx..]))
 }
 
