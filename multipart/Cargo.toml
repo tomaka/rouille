@@ -14,6 +14,11 @@ license = "MIT"
 
 keywords = ["form-data", "hyper", "http", "post", "upload"]
 
+[features]
+server = []
+client = []
+default = ["hyper", "server", "client"]
+
 [dependencies]
 log = "*"
 env_logger = "*"

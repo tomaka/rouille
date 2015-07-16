@@ -31,7 +31,9 @@ macro_rules! chain_result {
     )
 }
 
+#[cfg(feature = "client")]
 pub mod client;
+#[cfg(feature = "server")]
 pub mod server;
 
 const BOUNDARY_LEN: usize = 16;
