@@ -185,7 +185,7 @@ impl ContentType {
         debug!("Reading Content-Type header from line: {:?}", line);
 
         if let Some((cont_type, after_cont_type)) = get_str_after(CONTENT_TYPE, ';', line) {
-            let content_type = read_content_type(cont_type);
+            let content_type = read_content_type(cont_type.trim());
 
             let boundary = get_str_after(BOUNDARY, '"', after_cont_type).map(|tup| tup.0.into());
 
@@ -195,7 +195,7 @@ impl ContentType {
             })
         } else {
             get_remainder_after(CONTENT_TYPE, line).map(|cont_type| {
-                let content_type = read_content_type(cont_type);
+                let content_type = read_content_type(cont_type.trim());
                 ContentType { val: content_type, boundary: None }
             })
         }
