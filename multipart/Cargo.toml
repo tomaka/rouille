@@ -1,7 +1,7 @@
 [package]
 
 name = "multipart"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
 description = "An extension to the Hyper HTTP library that provides support for POST multipart/form-data requests on for both client and server."

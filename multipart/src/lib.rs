@@ -25,16 +25,10 @@ use rand::Rng;
 
 use std::path::PathBuf;
 
-macro_rules! try_all {
-    ($first_expr:expr, $($try_expr:expr),*) => (
-        try!($first_expr $(.and_then(|_| $try_expr))*);
-    )
-}
-
 macro_rules! chain_result {
     ($first_expr:expr, $($try_expr:expr),*) => (
         $first_expr $(.and_then(|_| $try_expr))*
-    )
+    );
 }
 
 #[cfg(feature = "client")]
@@ -42,7 +36,6 @@ pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
-const BOUNDARY_LEN: usize = 16;
 const DIRNAME_LEN: usize = 12;
 
 fn temp_dir() -> PathBuf {
@@ -53,8 +46,3 @@ fn random_alphanumeric(len: usize) -> String {
     rand::thread_rng().gen_ascii_chars().take(len).collect()
 }
 
-fn gen_boundary() -> String {
-    let mut boundary = "--".to_owned();
-    boundary.extend(rand::thread_rng().gen_ascii_chars().take(BOUNDARY_LEN));
-    boundary
-}

@@ -24,9 +24,17 @@ struct TestFields {
 
 #[test]
 fn local_test() {
+    env_logger::init().unwrap(); 
+
     let test_fields = gen_test_fields();
 
     let buf = test_client(&test_fields);
+
+    info!(
+        "\n--Test Buffer Begin--\n{}\n--Test Buffer End--", 
+        String::from_utf8_lossy(&buf.buf)
+    );
+
     test_server(buf, test_fields);
 }
 
@@ -58,8 +66,8 @@ fn gen_string() -> String {
 }
 
 fn gen_bytes() -> Vec<u8> {
-    const MIN_LEN: usize = 64;
-    const MAX_LEN: usize = 1024;
+    const MIN_LEN: usize = 8;
+    const MAX_LEN: usize = 32;
 
     let mut rng = rand::weak_rng();
     let bytes_len = gen_range(MIN_LEN, MAX_LEN);
@@ -78,7 +86,8 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
     let mut test_files = test_fields.files.iter();
 
     let mut multipart = Multipart::from_request(request).unwrap();
-    
+   
+    // Intersperse file fields amongst text fields
     for (name, text) in &test_fields.texts {
         if let Some((file_name, file)) = test_files.next() {
             multipart = multipart.write_stream(file_name, &mut &**file, None, None);
@@ -86,6 +95,12 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
 
         multipart = multipart.write_text(name, text);    
     }
+
+    // Write remaining files
+    for (file_name, file) in test_files {
+       multipart = multipart.write_stream(file_name, &mut &**file, None, None);
+    }
+
 
     multipart.send().unwrap()
 }
@@ -103,7 +118,7 @@ fn test_server(buf: HttpBuffer, mut fields: TestFields) {
                 assert!(
                     text == test_text, 
                     "Expected {:?} for {:?} got {:?}", 
-                    text, field.name, test_text
+                    test_text, field.name, text
                 );
 
             },
@@ -119,7 +134,7 @@ fn test_server(buf: HttpBuffer, mut fields: TestFields) {
     }
 
     assert!(fields.texts.is_empty(), "Text fields were not exhausted! Text fields: {:?}", fields.texts);
-    assert!(fields.files.is_empty(), "File fields were not exhausted!");
+    assert!(fields.files.is_empty(), "File fields were not exhausted! File fields: {:?}", fields.files);
 }
 
 #[derive(Default, Debug)]
