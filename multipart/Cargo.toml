@@ -30,3 +30,7 @@ rand = "*"
 version = "*"
 optional = true
 
+[dev-dependencies.hyper]
+version = "*"
+# Disable SSL for testing purposes
+default-features = false
