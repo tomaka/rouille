@@ -40,6 +40,10 @@ impl<R> BoundaryReader<R> where R: Read {
                     self.search_idx = last_search_idx + search_idx;
 
                     if self.boundary_read {
+                        // if boundary is preceded by CRLF, include it
+                        if self.search_idx >= 2 && &buf[self.search_idx-2..self.search_idx] == b"\r\n" {
+                            self.search_idx = self.search_idx - 2;
+                        }
                         break;
                     }
                 }

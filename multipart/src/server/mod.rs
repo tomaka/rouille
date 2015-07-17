@@ -58,7 +58,7 @@ impl<R> Multipart<R> where R: HttpRequest {
             return Err(req);     
         }
 
-        let boundary = format!("\r\n--{}", req.boundary().unwrap());
+        let boundary = format!("--{}", req.boundary().unwrap());
 
         debug!("Boundary: {}", boundary);
 
@@ -81,11 +81,11 @@ impl<R> Multipart<R> where R: HttpRequest {
     pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<R>>> {
         if self.at_end { return Ok(None); }
 
-        let mut byte2 = [0u8; 2];
         try!(self.source.consume_boundary());
-        try!(self.source.read(&mut byte2));
 
-        self.at_end = &byte2 == b"--";
+        self.at_end = {
+            try!(self.read_line()) == "--\r\n"
+        };
         
         if !self.at_end {
             MultipartField::read_from(self)
