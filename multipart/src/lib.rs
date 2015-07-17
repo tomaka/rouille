@@ -1,9 +1,15 @@
 //! Client- and server-side abstractions for HTTP `multipart/form-data` requests.
 //!
 //! Features: 
+//! 
+//! * `client` (default): Enable the client-side abstractions for multipart requests. If the
+//! `hyper` feature is also set, enables integration with the Hyper HTTP client API.
 //!
-//! * `hyper`: Enable client- and server-side integration with the
-//! [Hyper](https:://github.com/hyperium/hyper) HTTP library.
+//! * `server` (default): Enable the server-side abstractions for multipart requests. If the
+//! `hyper` feature is also set, enables integration with the Hyper HTTP server API.
+//!
+//! * `hyper` (default): Enable integration with the [Hyper](https:://github.com/hyperium/hyper) HTTP library 
+//! for client and/or server depending on which other feature flags are set.
 #![warn(missing_docs)]
 #[macro_use] extern crate log;
 extern crate env_logger;
@@ -31,7 +37,9 @@ macro_rules! chain_result {
     )
 }
 
+#[cfg(feature = "client")]
 pub mod client;
+#[cfg(feature = "server")]
 pub mod server;
 
 const BOUNDARY_LEN: usize = 16;

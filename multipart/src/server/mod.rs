@@ -1,4 +1,5 @@
-//! The server-side abstraction for multipart requests.
+//! The server-side abstraction for multipart requests. Enabled with the `server` feature (on by
+//! default).
 //!
 //! Use this when you are implementing an HTTP server and want to
 //! to accept, parse, and serve HTTP `multipart/form-data` requests (file uploads).

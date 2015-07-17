@@ -16,13 +16,13 @@ hyper = "*"
 url = "*"
 
 [dependencies.multipart]
-version = "0.2"
-# The `hyper` feature enables trait impls for Hyper's request objects.
-# RFC: should this be set by default?
-features = ["hyper"]
+version = "0.2.1"
+# You can also select which features to compile:
+# default-features = false
+# features = ["hyper", "server", "client"]
 ```
 
-Client-side example (using Hyper):
+Client-side example using Hyper (`--features hyper,client` or default):
 ```rust
 extern crate hyper;
 extern crate multipart;
@@ -48,7 +48,7 @@ fn main() {
 }
 ```
 
-Server-side example (using Hyper):
+Server-side example using Hyper (`--features hyper,server` or default`):
 ```rust
 use hyper::net::Fresh;
 use hyper::server::{Server, Request, Response};
@@ -74,8 +74,8 @@ fn main() {
 ####[Documentation][2]
 
 #####TODO:
-- [ ] Fill out README and provide examples
 - [ ] Add support for multiple files per field (nested boundaries)
+- [ ] Expand integration tests to cover more cases
 
 
 [1]: https://github.com/hyperium/hyper

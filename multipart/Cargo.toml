@@ -1,7 +1,7 @@
 [package]
 
 name = "multipart"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
 description = "An extension to the Hyper HTTP library that provides support for POST multipart/form-data requests on for both client and server."
@@ -13,6 +13,11 @@ documentation = "http://rust-ci.org/cybergeek94/multipart/doc/multipart/"
 license = "MIT"
 
 keywords = ["form-data", "hyper", "http", "post", "upload"]
+
+[features]
+server = []
+client = []
+default = ["hyper", "server", "client"]
 
 [dependencies]
 log = "*"
