@@ -4,9 +4,6 @@
 //! Use this when sending POST requests with files to a server.
 use mime::Mime;
 
-use std::borrow::{Borrow, BorrowMut};
-use std::convert::AsRef;
-
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
@@ -70,11 +67,11 @@ impl<S: HttpStream> Multipart<S> {
     ///
     /// ##Errors
     /// If something went wrong with the HTTP stream.
-    pub fn write_text<N: Borrow<str>, V: Borrow<str>>(mut self, name: N, val: V) -> Self {
+    pub fn write_text<N: AsRef<str>, V: AsRef<str>>(mut self, name: N, val: V) -> Self {
         if self.last_err.is_none() {
             self.last_err = chain_result! {
-                self.write_field_headers(name.borrow(), None, None),
-                self.write_line(val.borrow()),
+                self.write_field_headers(name.as_ref(), None, None),
+                self.write_line(val.as_ref()),
                 self.write_boundary()
             }.err().map(|err| err.into())
         }
@@ -93,7 +90,7 @@ impl<S: HttpStream> Multipart<S> {
     /// ##Errors
     /// If there was a problem opening the file (was a directory or didn't exist),
     /// or if something went wrong with the HTTP stream.
-    pub fn write_file<N: Borrow<str>, P: AsRef<Path>>(mut self, name: N, path: P) -> Self {
+    pub fn write_file<N: AsRef<str>, P: AsRef<Path>>(mut self, name: N, path: P) -> Self {
         if self.last_err.is_none() {     
             let path = path.as_ref();
 
@@ -101,7 +98,7 @@ impl<S: HttpStream> Multipart<S> {
                 { // New borrow scope so we can reborrow `file` after
                     let content_type = ::mime_guess::guess_mime_type(path);
                     let filename = path.file_name().and_then(|filename| filename.to_str());
-                    self.write_field_headers(name.borrow(), filename, Some(content_type))
+                    self.write_field_headers(name.as_ref(), filename, Some(content_type))
                 },
                 File::open(path).and_then(|ref mut file| io::copy(file, &mut self.stream)),
                 self.write_boundary()
@@ -131,15 +128,15 @@ impl<S: HttpStream> Multipart<S> {
     /// ##Errors
     /// If the reader returned an error, or if something went wrong with the HTTP stream.
     // RFC: How to format this declaration?
-    pub fn write_stream<N: Borrow<str>, St: Read, St_: BorrowMut<St>>(
-        mut self, name: N, mut read: St_, filename: Option<&str>, content_type: Option<Mime>
+    pub fn write_stream<N: AsRef<str>, St: Read>(
+        mut self, name: N, read: &mut St, filename: Option<&str>, content_type: Option<Mime>
     ) -> Self {
         if self.last_err.is_none() {
             let content_type = content_type.unwrap_or_else(::mime_guess::octet_stream);
 
             self.last_err = chain_result! {
-                self.write_field_headers(name.borrow(), filename, Some(content_type)),
-                io::copy(read.borrow_mut(), &mut self.stream),
+                self.write_field_headers(name.as_ref(), filename, Some(content_type)),
+                io::copy(read, &mut self.stream),
                 self.write_boundary()
             }.err().map(|err| err.into());
         }
