@@ -1,9 +1,11 @@
-Multipart + Hyper [![Build Status](https://travis-ci.org/cybergeek94/multipart.svg?branch=master)](https://travis-ci.org/cybergeek94/multipart)
+Multipart + Hyper [![Build Status](https://travis-ci.org/cybergeek94/multipart.svg?branch=master)](https://travis-ci.org/cybergeek94/multipart) [![On Crates.io](https://img.shields.io/crates/v/multipart.svg)](https://crates.io/crates/multipart)
 =========
 
 Client- and server-side abstractions for HTTP file uploads (POST requests with  `Content-Type: multipart/form-data`).
 
 Provides integration with [Hyper](https://github.com/hyperium/hyper) via the `hyper` feature. More to come!
+
+####[Documentation](http://rust-ci.org/cybergeek94/multipart/doc/multipart/)
 
 Usage
 -----
@@ -16,13 +18,13 @@ hyper = "*"
 url = "*"
 
 [dependencies.multipart]
-version = "0.2.1"
+version = "*" # Or use the version in the Crates.io badge above.
 # You can also select which features to compile:
 # default-features = false
 # features = ["hyper", "server", "client"]
 ```
 
-Client-side example using Hyper (`--features hyper,client` or default):
+Client-side example using Hyper (`features = ["hyper", "client"]` or default):
 ```rust
 extern crate hyper;
 extern crate multipart;
@@ -48,7 +50,7 @@ fn main() {
 }
 ```
 
-Server-side example using Hyper (`--features hyper,server` or default`):
+Server-side example using Hyper (`features = ["hyper", "server"]` or default):
 ```rust
 use hyper::net::Fresh;
 use hyper::server::{Server, Request, Response};
@@ -71,7 +73,6 @@ fn main() {
 }
 ```
 
-####[Documentation][2]
-
-[1]: https://github.com/hyperium/hyper
-[2]: http://rust-ci.org/cybergeek94/multipart/doc/multipart/
+License
+-------
+MIT
