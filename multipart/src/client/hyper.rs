@@ -1,5 +1,5 @@
 //! Client-side integration with [Hyper](https://github.com/hyperium/hyper). 
-//! Enabled with the `hyper` feature.
+//! Enabled with the `hyper` feature (on by default).
 //!
 //! Contains `impl HttpRequest for Request<Fresh>` and `impl HttpStream for Request<Streaming>`.
 use hyper::client::request::Request;
