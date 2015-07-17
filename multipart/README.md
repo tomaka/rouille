@@ -73,10 +73,5 @@ fn main() {
 
 ####[Documentation][2]
 
-#####TODO:
-- [ ] Add support for multiple files per field (nested boundaries)
-- [ ] Expand integration tests to cover more cases
-
-
 [1]: https://github.com/hyperium/hyper
 [2]: http://rust-ci.org/cybergeek94/multipart/doc/multipart/
