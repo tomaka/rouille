@@ -76,7 +76,7 @@ impl<S: HttpStream> Multipart<S> {
         if self.last_err.is_none() {
             self.last_err = chain_result! {
                 self.write_field_headers(name.as_ref(), None, None),
-                self.write_line(val.as_ref())
+                self.stream.write_all(val.as_ref().as_bytes())
             }.err().map(|err| err.into())
         }
 
@@ -139,7 +139,7 @@ impl<S: HttpStream> Multipart<S> {
 
             self.last_err = chain_result! {
                 self.write_field_headers(name.as_ref(), filename, Some(content_type)),
-                io::copy(read, &mut self.stream),
+                io::copy(read, &mut self.stream)
             }.err().map(|err| err.into());
         }
 
@@ -148,24 +148,18 @@ impl<S: HttpStream> Multipart<S> {
 
     fn write_field_headers(&mut self, name: &str, filename: Option<&str>, content_type: Option<Mime>) 
     -> io::Result<()> {
+        self.data_written = true;
+
         chain_result! {
-            // Write the end boundary to the previous field first
-            if self.data_written { self.write_boundary() } else { self.data_written = true; Ok(()) },
+            // Write the first boundary, or the boundary for the previous field.
+            write!(self.stream, "\r\n--{}\r\n", self.boundary),
             write!(self.stream, "Content-Disposition: form-data; name=\"{}\"", name),
             filename.map(|filename| write!(self.stream, "; filename=\"{}\"", filename))
                 .unwrap_or(Ok(())),
             content_type.map(|content_type| write!(self.stream, "\r\nContent-Type: {}", content_type))
                 .unwrap_or(Ok(())),
-            self.write_line("\r\n")
+            self.stream.write_all(b"\r\n\r\n")
         }
-    }
-
-    fn write_line(&mut self, line: &str) -> io::Result<()> {
-        write!(self.stream, "{}\r\n", line)
-    }
-
-    fn write_boundary(&mut self) -> io::Result<()> {
-        write!(self.stream, "--{}\r\n", self.boundary)
     }
 
     /// Finalize the request and return the response from the server, or the last error if set.
@@ -174,7 +168,7 @@ impl<S: HttpStream> Multipart<S> {
             None => {
                 if self.data_written {
                     // Write two hyphens after the last boundary occurrence.
-                    try!(write!(self.stream, "--{}--", self.boundary));
+                    try!(write!(self.stream, "\r\n--{}--", self.boundary));
                 }
                 
                 self.stream.finish()

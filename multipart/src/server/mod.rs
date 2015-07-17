@@ -58,7 +58,7 @@ impl<R> Multipart<R> where R: HttpRequest {
             return Err(req);     
         }
 
-        let boundary = req.boundary().unwrap().to_owned();
+        let boundary = format!("\r\n--{}", req.boundary().unwrap());
 
         debug!("Boundary: {}", boundary);
 
@@ -300,7 +300,7 @@ impl<'a, R: HttpRequest + 'a> MultipartField<'a, R> {
                 // The last two characters are "\r\n".
                 // We can't do a simple trim because the content might be terminated
                 // with line separators we want to preserve.
-                MultipartData::Text(&text[..text.len() - 2])
+                MultipartData::Text(&text[..text.len()])
             },
         };
 

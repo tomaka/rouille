@@ -29,9 +29,6 @@ macro_rules! chain_result {
     ($first_expr:expr, $($try_expr:expr),*) => (
         $first_expr $(.and_then(|_| $try_expr))*
     );
-    ($first_expr:expr, $($try_expr:expr),*,) => (
-        chain_result! { $first_expr, $($try_expr),* }
-    );
 }
 
 #[cfg(feature = "client")]
