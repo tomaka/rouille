@@ -31,12 +31,13 @@ impl<R> BoundaryReader<R> where R: Read {
         let buf = try!(self.buffer.fill_buf());
 
         if !self.boundary_read {
+            let last_search_idx = self.search_idx;
             let lookahead_iter = buf[self.search_idx..].windows(self.boundary.len()).enumerate();
 
             for (search_idx, maybe_boundary) in lookahead_iter {
                 if maybe_boundary[0] == self.boundary[0] {
                     self.boundary_read = self.boundary == maybe_boundary;
-                    self.search_idx = search_idx;
+                    self.search_idx = last_search_idx + search_idx;
 
                     if self.boundary_read {
                         break;
@@ -64,7 +65,8 @@ impl<R> BoundaryReader<R> where R: Read {
         self.buffer.consume(consume_amt);
         self.search_idx = 0;
         self.boundary_read = false;
-Ok(())
+ 
+        Ok(())
     }
 
     // Keeping this around to support nested boundaries later.

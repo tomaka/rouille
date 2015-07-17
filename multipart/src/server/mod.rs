@@ -41,6 +41,7 @@ macro_rules! try_opt (
 pub struct Multipart<R> {
     source: BoundaryReader<R>,
     line_buf: String,
+    at_end: bool,    
     /// The directory for saving files in this request.
     /// By default, this is set to a subdirectory of `std::env::temp_dir()` with a 
     /// random alphanumeric name.
@@ -65,6 +66,7 @@ impl<R> Multipart<R> where R: HttpRequest {
             Multipart { 
                 source: BoundaryReader::from_reader(req, boundary),
                 line_buf: String::new(),
+                at_end: false,                
                 save_dir: ::temp_dir(),
             }
         )
@@ -77,7 +79,19 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// If the previously returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry.
     pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<R>>> {
-        MultipartField::read_from(self) 
+        if self.at_end { return Ok(None); }
+
+        let mut byte2 = [0u8; 2];
+        try!(self.source.consume_boundary());
+        try!(self.source.read(&mut byte2));
+
+        self.at_end = &byte2 == b"--";
+        
+        if !self.at_end {
+            MultipartField::read_from(self)
+        } else {
+            Ok(None)
+        }
     }
 
     fn read_content_disposition(&mut self) -> io::Result<Option<ContentDisp>> {
@@ -262,8 +276,6 @@ pub struct MultipartField<'a, R: 'a> {
 
 impl<'a, R: HttpRequest + 'a> MultipartField<'a, R> {
     fn read_from(multipart: &'a mut Multipart<R>) -> io::Result<Option<MultipartField<'a, R>>> {
-        try!(multipart.source.consume_boundary());
-
         let cont_disp = match multipart.read_content_disposition() {
             Ok(Some(cont_disp)) => cont_disp,
             Ok(None) => return Ok(None),

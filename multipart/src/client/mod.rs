@@ -17,6 +17,8 @@ mod sized;
 
 pub use self::sized::SizedRequest;
 
+const BOUNDARY_LEN: usize = 16;
+
 
 /// The entry point of the client-side multipart API.
 ///
@@ -36,7 +38,7 @@ impl Multipart<io::Sink> {
     /// ## Returns Error
     /// If `req.open_stream()` returns an error.
     pub fn from_request<R: HttpRequest>(mut req: R) -> Result<Multipart<R::Stream>, R::Error> {
-        let boundary = ::gen_boundary();
+        let boundary = ::random_alphanumeric(BOUNDARY_LEN);
         req.apply_headers(&boundary, None);
 
         let stream = try!(req.open_stream());
@@ -58,6 +60,9 @@ impl<S: HttpStream> Multipart<S> {
 
     /// Remove and return the last error to occur, allowing subsequent API calls to proceed
     /// normally.
+    ///
+    /// ##Warning
+    /// If an error occurred during a write, the request body may be corrupt.
     pub fn take_err(&mut self) -> Option<S::Error> {
         self.last_err.take()
     }
@@ -71,8 +76,7 @@ impl<S: HttpStream> Multipart<S> {
         if self.last_err.is_none() {
             self.last_err = chain_result! {
                 self.write_field_headers(name.as_ref(), None, None),
-                self.write_line(val.as_ref()),
-                self.write_boundary()
+                self.write_line(val.as_ref())
             }.err().map(|err| err.into())
         }
 
@@ -100,8 +104,7 @@ impl<S: HttpStream> Multipart<S> {
                     let filename = path.file_name().and_then(|filename| filename.to_str());
                     self.write_field_headers(name.as_ref(), filename, Some(content_type))
                 },
-                File::open(path).and_then(|ref mut file| io::copy(file, &mut self.stream)),
-                self.write_boundary()
+                File::open(path).and_then(|ref mut file| io::copy(file, &mut self.stream))
             }.err().map(|err| err.into());
         }
 
@@ -137,7 +140,6 @@ impl<S: HttpStream> Multipart<S> {
             self.last_err = chain_result! {
                 self.write_field_headers(name.as_ref(), filename, Some(content_type)),
                 io::copy(read, &mut self.stream),
-                self.write_boundary()
             }.err().map(|err| err.into());
         }
 
@@ -147,6 +149,8 @@ impl<S: HttpStream> Multipart<S> {
     fn write_field_headers(&mut self, name: &str, filename: Option<&str>, content_type: Option<Mime>) 
     -> io::Result<()> {
         chain_result! {
+            // Write the end boundary to the previous field first
+            if self.data_written { self.write_boundary() } else { self.data_written = true; Ok(()) },
             write!(self.stream, "Content-Disposition: form-data; name=\"{}\"", name),
             filename.map(|filename| write!(self.stream, "; filename=\"{}\"", filename))
                 .unwrap_or(Ok(())),
@@ -161,8 +165,7 @@ impl<S: HttpStream> Multipart<S> {
     }
 
     fn write_boundary(&mut self) -> io::Result<()> {
-        write!(self.stream, "{}\r\n", self.boundary)
-            .map(|res| { self.data_written = true; res })
+        write!(self.stream, "--{}\r\n", self.boundary)
     }
 
     /// Finalize the request and return the response from the server, or the last error if set.
@@ -171,7 +174,7 @@ impl<S: HttpStream> Multipart<S> {
             None => {
                 if self.data_written {
                     // Write two hyphens after the last boundary occurrence.
-                    try!(self.stream.write(b"--"));
+                    try!(write!(self.stream, "--{}--", self.boundary));
                 }
                 
                 self.stream.finish()
