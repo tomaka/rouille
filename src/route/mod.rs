@@ -93,41 +93,47 @@ pub trait Handler {
     fn call(&self, HyperRequest, HyperResponse, &StaticServices, route_params: &Box<Any>);
 }
 
-impl<I, O> Handler for fn(I) -> O where I: Input, O: Output {
-    fn call(&self, request: HyperRequest, response: HyperResponse, services: &StaticServices,
-            _: &Box<Any>)
-    {
-        let input = match I::process(request) {
-            Ok(i) => i,
-            Err(_) => return        // TODO: handle properly
-        };
+macro_rules! impl_handler {
+    ($($p:ident),*) => (
+        impl<'a, I, O $(, $p)*> Handler for fn(I $(, $p)*) -> O
+                                            where I: Input, O: Output $(, $p: ServiceAccess<'a>)*
+        {
+            fn call(&self, request: HyperRequest, response: HyperResponse,
+                    services: &StaticServices, route_params: &Box<Any>)
+            {
+                let input = match I::process(request) {
+                    Ok(i) => i,
+                    Err(_) => return        // TODO: handle properly
+                };
 
-        let output = (*self)(input);
-        output.send(response, services);
-    }
+                // TODO: Properly handling lifetimes here would require HKTs which are not
+                //       supported by Rust. Considering that services are never destroyed, it's
+                //       ok to cast their lifetime to whatever we want ; however there is a danger
+                //       with route parameters and this should be fixed.
+                $(
+                    let $p = $p::load(unsafe { ::std::mem::transmute(services) },
+                                      unsafe { ::std::mem::transmute(route_params) });
+                )*
+
+                let output = (*self)(input $(, $p)*);
+                output.send(response, services);
+            }
+        }
+    );
 }
 
-impl<'a, I, O, S1> Handler for fn(I, S1) -> O
-                               where I: Input, O: Output, S1: ServiceAccess<'a>
-{
-    fn call(&self, request: HyperRequest, response: HyperResponse, services: &StaticServices,
-            route_params: &Box<Any>)
-    {
-        let input = match I::process(request) {
-            Ok(i) => i,
-            Err(_) => return        // TODO: handle properly
-        };
-
-        // TODO: Properly handling lifetimes here would require HKTs which are not supported
-        //       by Rust. Considering that services are never destroyed, it's ok to cast their
-        //       lifetime to whatever we want ; however there is a danger with route parameters.
-        let s1 = S1::load(unsafe { ::std::mem::transmute(services) },
-                          unsafe { ::std::mem::transmute(route_params) });
-
-        let output = (*self)(input, s1);
-        output.send(response, services);
-    }
-}
+impl_handler!();
+impl_handler!(S1);
+impl_handler!(S1, S2);
+impl_handler!(S1, S2, S3);
+impl_handler!(S1, S2, S3, S4);
+impl_handler!(S1, S2, S3, S4, S5);
+impl_handler!(S1, S2, S3, S4, S5, S6);
+impl_handler!(S1, S2, S3, S4, S5, S6, S7);
+impl_handler!(S1, S2, S3, S4, S5, S6, S7, S8);
+impl_handler!(S1, S2, S3, S4, S5, S6, S7, S8, S9);
+impl_handler!(S1, S2, S3, S4, S5, S6, S7, S8, S9, S10);
+impl_handler!(S1, S2, S3, S4, S5, S6, S7, S8, S9, S10, S11);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Params<'a, T: 'a>(&'a T);
