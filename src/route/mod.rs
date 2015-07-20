@@ -181,24 +181,36 @@ impl<'a, T> Deref for Params<'a, T> {
 
 // TODO: fix the trailing '/' problem
 
+
 #[macro_export]
 macro_rules! router {
+    ($($t:tt)+) => (
+        {
+            let mut routes = Vec::new();
+            router_impl!(__parse_route routes [] $($t)+);
+            $crate::route::Router { routes: routes }
+        }
+    );
+}
+
+#[macro_export]
+macro_rules! router_impl {
     (__parse_route $routes:ident [$($ex:tt)*] / $($t:tt)+) => (
         {
-            let method = router!(__parse_method $($ex)*);
-            router!(__parse_route2 $routes method [/] $($t)+)
+            let method = router_impl!(__parse_method $($ex)*);
+            router_impl!(__parse_route2 $routes method [/] $($t)+)
         }
     );
 
     (__parse_route $routes:ident [$($ex:tt)*] $f:tt $($t:tt)*) => (
-        router!(__parse_route $routes [$($ex)* $f] $($t)*)
+        router_impl!(__parse_route $routes [$($ex)* $f] $($t)*)
     );
 
     (__parse_route $routes:ident []) => ();
 
     (__parse_route2 $routes:ident $method:ident [$($ex:tt)*] => $handler:expr, $($t:tt)*) => (
         {
-            let pattern = router!(__parse_pattern $($ex)*);
+            let pattern = router_impl!(__parse_pattern $($ex)*);
             let handler = Box::new($handler) as Box<$crate::route::Handler + Send + Sync>;
             $routes.push($crate::route::Route {
                 url: pattern,
@@ -206,21 +218,21 @@ macro_rules! router {
                 handler: handler,
             });
 
-            router!(__parse_route $routes [] $($t)*);
+            router_impl!(__parse_route $routes [] $($t)*);
         }
     );
 
     (__parse_route2 $routes:ident $method:ident [$($ex:tt)*] => $handler:expr) => (
-        router!(__parse_route2 $routes $method [$($ex)*] => $handler,)
+        router_impl!(__parse_route2 $routes $method [$($ex)*] => $handler,)
     );
 
     (__parse_route2 $routes:ident $method:ident [$($ex:tt)*] $f:tt $($t:tt)*) => (
-        router!(__parse_route2 $routes $method [$($ex)* $f] $($t)*)
+        router_impl!(__parse_route2 $routes $method [$($ex)* $f] $($t)*)
     );
 
     (__parse_pattern $($t:tt)*) => (
         $crate::route::Pattern(Box::new(move |input| {
-            router!(__parse_pattern_inner (input.trim_right_matches('/')) () $($t)*)
+            router_impl!(__parse_pattern_inner (input.trim_right_matches('/')) () $($t)*)
         }))
     );
 
@@ -262,11 +274,11 @@ macro_rules! router {
     );
 
     (__parse_pattern_inner ($input:expr) ($($t:tt)*) / [ $s:ident ]) => (
-        router!(__parse_pattern_inner ($input) ($($t)*) [$s])
+        router_impl!(__parse_pattern_inner ($input) ($($t)*) [$s])
     );
 
     (__parse_pattern_inner ($input:expr) ($($t:tt)*) /) => (
-        router!(__parse_pattern_inner ($($t)*) ($input))
+        router_impl!(__parse_pattern_inner ($($t)*) ($input))
     );
 
     (__parse_pattern_inner ($input:expr) ($($e:tt)*) / { $val:ident } $($t:tt)*) => (
@@ -278,7 +290,7 @@ macro_rules! router {
             let end = $input[1 ..].find('/').map(|p| p + 1).unwrap_or($input.len());
             let matched = &$input[1 .. end];
 
-            router!(__parse_pattern_inner (&$input[end ..]) ($($e)* , $val: matched) $($t)*)
+            router_impl!(__parse_pattern_inner (&$input[end ..]) ($($e)* , $val: matched) $($t)*)
         }
     );
 
@@ -289,21 +301,12 @@ macro_rules! router {
                 return Err(());
             }
 
-            router!(__parse_pattern_inner (&$input[s.len() ..]) ($($e)*) $($t)*)
+            router_impl!(__parse_pattern_inner (&$input[s.len() ..]) ($($e)*) $($t)*)
         }
     );
 
     (__parse_method $($t:tt)*) => (
         // TODO: 
         $crate::route::MethodsMask { get: true, post: false, put: false, delete: false }
-    );
-
-    // main route
-    ($($t:tt)+) => (
-        {
-            let mut routes = Vec::new();
-            router!(__parse_route routes [] $($t)+);
-            $crate::route::Router { routes: routes }
-        }
     );
 }
