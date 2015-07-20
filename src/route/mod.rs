@@ -19,22 +19,28 @@ pub struct Route {
 }
 
 impl Route {
-    /// Returns true if this route can handle the given request.
-    pub fn matches(&self, request: &HyperRequest) -> bool {
+    /// Returns the route parameters, or `Err` if this route can't handle the given request.
+    pub fn matches(&self, request: &HyperRequest) -> Result<Box<Any>, ()> {
         if !self.method.matches(&request.method) {
-            return false;
+            return Err(());
         }
 
         match request.uri {
-            HyperRequestUri::AbsolutePath(ref p) => self.url.parse(p).is_ok(),
-            _ => false
+            HyperRequestUri::AbsolutePath(ref p) => self.url.parse(p),
+            _ => Err(())
         }
     }
 }
 
+/// Represents a URL pattern.
+///
+/// Contains a function that will return the route parameters, or `Err` if it doesn't match the
+/// request's URL.
 pub struct Pattern(pub Box<Fn(&str) -> Result<Box<Any>, ()> + Send + Sync>);
 
 impl Pattern {
+    /// Return `Err` if this pattern doesn't match the given URL, otherwise returns the
+    /// route parameters.
     pub fn parse(&self, url: &str) -> Result<Box<Any>, ()> {
         (self.0)(url)
     }
@@ -90,11 +96,13 @@ pub struct Router {
 /// Describes types that can process a route.
 pub trait DynamicHandler {
     /// Handles a request.
-    fn call(&self, HyperRequest, HyperResponse, &StaticServices);
+    fn call(&self, HyperRequest, HyperResponse, &StaticServices, route_params: &Box<Any>);
 }
 
 impl<I, O> DynamicHandler for fn(I) -> O where I: Input, O: Output {
-    fn call(&self, request: HyperRequest, response: HyperResponse, services: &StaticServices) {
+    fn call(&self, request: HyperRequest, response: HyperResponse, services: &StaticServices,
+            _: &Box<Any>)
+    {
         let input = match I::process(request) {
             Ok(i) => i,
             Err(_) => return        // TODO: handle properly
@@ -108,13 +116,15 @@ impl<I, O> DynamicHandler for fn(I) -> O where I: Input, O: Output {
 impl<I, O, S1> DynamicHandler for fn(I, S1) -> O
                                   where I: Input, O: Output, S1: for<'s> ServiceAccess<'s>
 {
-    fn call(&self, request: HyperRequest, response: HyperResponse, services: &StaticServices) {
+    fn call(&self, request: HyperRequest, response: HyperResponse, services: &StaticServices,
+            route_params: &Box<Any>)
+    {
         let input = match I::process(request) {
             Ok(i) => i,
             Err(_) => return        // TODO: handle properly
         };
 
-        let s1 = S1::load(services, unsafe { ::std::mem::uninitialized() });
+        let s1 = S1::load(services, route_params);
 
         let output = (*self)(input, s1);
         output.send(response, services);
@@ -124,7 +134,7 @@ impl<I, O, S1> DynamicHandler for fn(I, S1) -> O
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Params<'a, T: 'a>(&'a T);
 
-impl<'a, T> ServiceAccess<'a> for Params<'a, T> where T: Any {
+impl<'a, T: 'a> ServiceAccess<'a> for Params<'a, T> where T: Any {
     fn load(_: &'a StaticServices, params: &'a Box<Any>) -> Params<'a, T> {
         Params(params.downcast_ref().unwrap())      // TODO: don't panic
     }
@@ -201,7 +211,10 @@ macro_rules! router {
 
             Ok(Box::new($s {
                 $(
-                    $mem: $val.parse().unwrap(),        // TODO: remove unwrap()
+                    $mem: match $val.parse() {
+                        Ok(r) => r,
+                        Err(_) => return Err(())
+                    },
                 )*
             }))
         }

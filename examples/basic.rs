@@ -4,14 +4,8 @@
 extern crate rouille;
 extern crate rustc_serialize;
 
-#[derive(RustcEncodable)]
-struct Data {
-    val1: u32,
-}
-
 fn main() {
     let router = router! {
-        GET /hello/world => handler as fn(_) -> _,
         GET /{id} [RouteParams] => handler as fn(_) -> _,
     };
 

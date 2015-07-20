@@ -121,11 +121,18 @@ impl hyper::server::Handler for RequestHandler {
             }
         }
 
-        if let Some(route) = self.router.routes.iter().find(|r| r.matches(&request)) {
+        if let Some((route, params)) = self.router.routes.iter()
+                                                         .filter_map(|r| {
+                                                             r.matches(&request).ok().map(|res| {
+                                                                 (r, res)
+                                                             })
+                                                         })
+                                                         .next()
+        {
             match route.handler {    
                 route::Handler::Static(_) => unimplemented!(),
                 route::Handler::Dynamic(ref handler) => {
-                    handler.call(request, response, &self.static_services);
+                    handler.call(request, response, &self.static_services, &params);
                 },
             }
         } else {
