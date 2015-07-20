@@ -98,6 +98,33 @@ macro_rules! impl_handler {
         impl<'a, I, O $(, $p)*> Handler for fn(I $(, $p)*) -> O
                                             where I: Input, O: Output $(, $p: ServiceAccess<'a>)*
         {
+            #[allow(non_snake_case)]
+            fn call(&self, request: HyperRequest, response: HyperResponse,
+                    services: &StaticServices, route_params: &Box<Any>)
+            {
+                let input = match I::process(request) {
+                    Ok(i) => i,
+                    Err(_) => return        // TODO: handle properly
+                };
+
+                // TODO: Properly handling lifetimes here would require HKTs which are not
+                //       supported by Rust. Considering that services are never destroyed, it's
+                //       ok to cast their lifetime to whatever we want ; however there is a danger
+                //       with route parameters and this should be fixed.
+                $(
+                    let $p = $p::load(unsafe { ::std::mem::transmute(services) },
+                                      unsafe { ::std::mem::transmute(route_params) });
+                )*
+
+                let output = (*self)(input $(, $p)*);
+                output.send(response, services);
+            }
+        }
+
+        impl<'a, I, O $(, $p)*> Handler for Box<Fn(I $(, $p)*) -> O>
+                                            where I: Input, O: Output $(, $p: ServiceAccess<'a>)*
+        {
+            #[allow(non_snake_case)]
             fn call(&self, request: HyperRequest, response: HyperResponse,
                     services: &StaticServices, route_params: &Box<Any>)
             {
