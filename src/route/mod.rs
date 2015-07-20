@@ -109,18 +109,57 @@ impl<I, O, S1> DynamicHandler for fn(I, S1) -> O
 
 #[macro_export]
 macro_rules! router {
-    ($($method:ident $uri:expr => $handler:expr)*) => (
-        $crate::route::Router {
-            routes: vec![
-                $(
-                    $crate::route::Route {
-                        url: $uri.to_string(),
-                        method: $crate::route::MethodsMask::parse(stringify!($method)),
-                        handler: $crate::route::Handler::Dynamic(Box::new($handler)
-                                             as Box<$crate::route::DynamicHandler + Send + Sync>),
-                    }
-                ),*
-            ]
+    (__parse_route $routes:ident [$($ex:tt)*] / $($t:tt)+) => (
+        {
+            let method = router!(__parse_method $($ex)*);
+            router!(__parse_route2 $routes method [/] $($t)+)
+        }
+    );
+
+    (__parse_route $routes:ident [$($ex:tt)*] $f:tt $($t:tt)*) => (
+        router!(__parse_route $routes [$($ex)* $f] $($t)*)
+    );
+
+    (__parse_route $routes:ident []) => ();
+
+    (__parse_route2 $routes:ident $method:ident [$($ex:tt)*] => $handler:expr, $($t:tt)*) => (
+        {
+            let pattern = router!(__parse_pattern $($ex)*);
+            let handler = Box::new($handler) as Box<$crate::route::DynamicHandler + Send + Sync>;
+            $routes.push($crate::route::Route {
+                url: pattern,
+                method: $method,
+                handler: $crate::route::Handler::Dynamic(handler),
+            });
+
+            router!(__parse_route $routes [] $($t)*);
+        }
+    );
+
+    (__parse_route2 $routes:ident $method:ident [$($ex:tt)*] => $handler:expr) => (
+        router!(__parse_route2 $routes $method [$($ex)*] => $handler,)
+    );
+
+    (__parse_route2 $routes:ident $method:ident [$($ex:tt)*] $f:tt $($t:tt)*) => (
+        router!(__parse_route2 $routes $method [$($ex)* $f] $($t)*)
+    );
+
+    (__parse_pattern $($t:tt)*) => (
+        // TODO: 
+        "".to_string()
+    );
+
+    (__parse_method $($t:tt)*) => (
+        // TODO: 
+        $crate::route::MethodsMask { get: true, post: false, put: false, delete: false }
+    );
+
+    // main route
+    ($($t:tt)+) => (
+        {
+            let mut routes = Vec::new();
+            router!(__parse_route routes [] $($t)+);
+            $crate::route::Router { routes: routes }
         }
     );
 }
