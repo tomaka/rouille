@@ -6,7 +6,7 @@ extern crate rustc_serialize;
 
 fn main() {
     let router = router! {
-        GET /{id} [RouteParams] => handler as fn(_) -> _,
+        GET /{id} [RouteParams] => handler as fn(_, _) -> _,
     };
 
     let services = rouille::service::StaticServices {
@@ -27,9 +27,9 @@ struct RouteParams {
     id: u32,
 }
 
-fn handler(_: rouille::input::Ignore)
+fn handler(_: rouille::input::Ignore, params: rouille::route::Params<RouteParams>)
            -> rouille::output::TemplateOutput<TemplateVars>
 {
-    //println!("{:?}", params);
-    rouille::output::TemplateOutput::new("test", TemplateVars { id: 3 })
+    println!("{:?}", params);
+    rouille::output::TemplateOutput::new("test", TemplateVars { id: params.id })
 }

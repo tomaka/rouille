@@ -107,8 +107,8 @@ impl<I, O> Handler for fn(I) -> O where I: Input, O: Output {
     }
 }
 
-impl<I, O, S1> Handler for fn(I, S1) -> O
-                                  where I: Input, O: Output, S1: for<'s> ServiceAccess<'s>
+impl<'a, I, O, S1> Handler for fn(I, S1) -> O
+                               where I: Input, O: Output, S1: ServiceAccess<'a>
 {
     fn call(&self, request: HyperRequest, response: HyperResponse, services: &StaticServices,
             route_params: &Box<Any>)
@@ -118,7 +118,11 @@ impl<I, O, S1> Handler for fn(I, S1) -> O
             Err(_) => return        // TODO: handle properly
         };
 
-        let s1 = S1::load(services, route_params);
+        // TODO: Properly handling lifetimes here would require HKTs which are not supported
+        //       by Rust. Considering that services are never destroyed, it's ok to cast their
+        //       lifetime to whatever we want ; however there is a danger with route parameters.
+        let s1 = S1::load(unsafe { ::std::mem::transmute(services) },
+                          unsafe { ::std::mem::transmute(route_params) });
 
         let output = (*self)(input, s1);
         output.send(response, services);
