@@ -1,3 +1,5 @@
+#![recursion_limit = "500"]
+
 #[macro_use]
 extern crate rouille;
 extern crate rustc_serialize;
@@ -9,7 +11,7 @@ struct Data {
 
 fn main() {
     let router = router! {
-        GET "/" => handler as fn(_) -> _
+        GET /{id} [RouteParams] => handler as fn(_) -> _,
     };
 
     let services = rouille::service::StaticServices {
@@ -23,6 +25,12 @@ fn main() {
 #[derive(RustcEncodable)]
 struct TemplateVars;
 
-fn handler(_: rouille::input::Ignore) -> rouille::output::TemplateOutput<TemplateVars> {
+struct RouteParams {
+    id: u32,
+}
+
+fn handler(_: rouille::input::Ignore)
+           -> rouille::output::TemplateOutput<TemplateVars>
+{
     rouille::output::TemplateOutput::new("test", TemplateVars)
 }

@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::path::PathBuf;
 
 use input::Input;
@@ -7,10 +8,11 @@ use service::StaticServices;
 
 use hyper::server::request::Request as HyperRequest;
 use hyper::server::response::Response as HyperResponse;
+use hyper::uri::RequestUri as HyperRequestUri;
 use hyper::method::Method as HyperMethod;
 
 pub struct Route {
-    pub url: String,
+    pub url: Pattern,
     pub method: MethodsMask,
     pub handler: Handler,
 }
@@ -22,7 +24,18 @@ impl Route {
             return false;
         }
 
-        true        // FIXME: 
+        match request.uri {
+            HyperRequestUri::AbsolutePath(ref p) => self.url.parse(p).is_ok(),
+            _ => false
+        }
+    }
+}
+
+pub struct Pattern(pub Box<Fn(&str) -> Result<Box<Any>, ()> + Send + Sync>);
+
+impl Pattern {
+    pub fn parse(&self, url: &str) -> Result<Box<Any>, ()> {
+        (self.0)(url)
     }
 }
 
@@ -145,8 +158,75 @@ macro_rules! router {
     );
 
     (__parse_pattern $($t:tt)*) => (
-        // TODO: 
-        "".to_string()
+        $crate::route::Pattern(Box::new(move |input| {
+            router!(__parse_pattern_inner (input.trim_right_matches('/')) () $($t)*)
+        }))
+    );
+
+    (__parse_pattern_inner ($input:expr) () [ $s:ident ]) => (
+        {
+            if $input.len() != 0 {
+                return Err(());
+            }
+
+            Ok(Box::new($s))
+        }
+    );
+
+    (__parse_pattern_inner ($input:expr) ($(, $mem:ident:$val:expr)+) [ $s:ident ]) => (
+        {
+            if $input.len() != 0 {
+                return Err(());
+            }
+
+            Ok(Box::new($s {
+                $(
+                    $mem: $val.parse().unwrap(),        // TODO: remove unwrap()
+                )*
+            }))
+        }
+    );
+
+    (__parse_pattern_inner ($input:expr) ()) => (
+        {
+            if $input.len() != 0 {
+                return Err(());
+            }
+
+            Ok(Box::new(()))
+        }
+    );
+
+    (__parse_pattern_inner ($input:expr) ($($t:tt)*) / [ $s:ident ]) => (
+        router!(__parse_pattern_inner ($input) ($($t)*) [$s])
+    );
+
+    (__parse_pattern_inner ($input:expr) ($($t:tt)*) /) => (
+        router!(__parse_pattern_inner ($($t)*) ($input))
+    );
+
+    (__parse_pattern_inner ($input:expr) ($($e:tt)*) / { $val:ident } $($t:tt)*) => (
+        {
+            if !$input.starts_with('/') {
+                return Err(());
+            }
+
+            let end = $input[1 ..].find('/').map(|p| p + 1).unwrap_or($input.len());
+            let matched = &$input[1 .. end];
+
+            router!(__parse_pattern_inner (&$input[end ..]) ($($e)* , $val: matched) $($t)*)
+        }
+    );
+
+    (__parse_pattern_inner ($input:expr) ($($e:tt)*) / $val:ident $($t:tt)*) => (
+        {
+            let s = concat!("/", stringify!($val));
+            if !$input.starts_with(s) {
+                return Err(());
+            }
+
+            router!(__parse_pattern_inner (&$input[s.len() ..]) ($($e)*) $($t)*)
+        }
     );
 
     (__parse_method $($t:tt)*) => (

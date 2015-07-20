@@ -121,18 +121,15 @@ impl hyper::server::Handler for RequestHandler {
             }
         }
 
-        for route in self.router.routes.iter() {
-            if !route.matches(&request) {
-                continue;
-            }
-
+        if let Some(route) = self.router.routes.iter().find(|r| r.matches(&request)) {
             match route.handler {    
                 route::Handler::Static(_) => unimplemented!(),
                 route::Handler::Dynamic(ref handler) => {
                     handler.call(request, response, &self.static_services);
-                    break;
                 },
             }
+        } else {
+            println!("No route found!");        // TODO: 
         }
 
         let time_after = time::precise_time_ns();
