@@ -129,12 +129,7 @@ impl hyper::server::Handler for RequestHandler {
                                                          })
                                                          .next()
         {
-            match route.handler {    
-                route::Handler::Static(_) => unimplemented!(),
-                route::Handler::Dynamic(ref handler) => {
-                    handler.call(request, response, &self.static_services, &params);
-                },
-            }
+            route.handler.call(request, response, &self.static_services, &params);
         } else {
             println!("No route found!");        // TODO: 
         }

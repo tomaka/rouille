@@ -15,7 +15,7 @@ use hyper::method::Method as HyperMethod;
 pub struct Route {
     pub url: Pattern,
     pub method: MethodsMask,
-    pub handler: Handler,
+    pub handler: Box<Handler + Send + Sync>,
 }
 
 impl Route {
@@ -82,24 +82,18 @@ impl MethodsMask {
     }
 }
 
-/// Describes how to handle a route.
-pub enum Handler {
-    Static(PathBuf),
-    Dynamic(Box<DynamicHandler + Send + Sync>),
-}
-
 pub struct Router {
     /// List of the routes to try to match. They will be tried in this order.
     pub routes: Vec<Route>,
 }
 
 /// Describes types that can process a route.
-pub trait DynamicHandler {
+pub trait Handler {
     /// Handles a request.
     fn call(&self, HyperRequest, HyperResponse, &StaticServices, route_params: &Box<Any>);
 }
 
-impl<I, O> DynamicHandler for fn(I) -> O where I: Input, O: Output {
+impl<I, O> Handler for fn(I) -> O where I: Input, O: Output {
     fn call(&self, request: HyperRequest, response: HyperResponse, services: &StaticServices,
             _: &Box<Any>)
     {
@@ -113,7 +107,7 @@ impl<I, O> DynamicHandler for fn(I) -> O where I: Input, O: Output {
     }
 }
 
-impl<I, O, S1> DynamicHandler for fn(I, S1) -> O
+impl<I, O, S1> Handler for fn(I, S1) -> O
                                   where I: Input, O: Output, S1: for<'s> ServiceAccess<'s>
 {
     fn call(&self, request: HyperRequest, response: HyperResponse, services: &StaticServices,
@@ -168,11 +162,11 @@ macro_rules! router {
     (__parse_route2 $routes:ident $method:ident [$($ex:tt)*] => $handler:expr, $($t:tt)*) => (
         {
             let pattern = router!(__parse_pattern $($ex)*);
-            let handler = Box::new($handler) as Box<$crate::route::DynamicHandler + Send + Sync>;
+            let handler = Box::new($handler) as Box<$crate::route::Handler + Send + Sync>;
             $routes.push($crate::route::Route {
                 url: pattern,
                 method: $method,
-                handler: $crate::route::Handler::Dynamic(handler),
+                handler: handler,
             });
 
             router!(__parse_route $routes [] $($t)*);
