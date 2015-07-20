@@ -1,3 +1,5 @@
+use std::any::Any;
+
 pub use self::log::LogProvider;
 pub use self::templates::TemplatesCache;
 
@@ -23,5 +25,5 @@ impl Default for StaticServices {
 }
 
 pub trait ServiceAccess<'a> {
-    fn load(&'a StaticServices) -> Self;
+    fn load(&'a StaticServices, route_params: &'a Box<Any>) -> Self;
 }

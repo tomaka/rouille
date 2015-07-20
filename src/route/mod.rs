@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::ops::Deref;
 use std::path::PathBuf;
 
 use input::Input;
@@ -113,12 +114,31 @@ impl<I, O, S1> DynamicHandler for fn(I, S1) -> O
             Err(_) => return        // TODO: handle properly
         };
 
-        let s1 = S1::load(services);
+        let s1 = S1::load(services, unsafe { ::std::mem::uninitialized() });
 
         let output = (*self)(input, s1);
         output.send(response, services);
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Params<'a, T: 'a>(&'a T);
+
+impl<'a, T> ServiceAccess<'a> for Params<'a, T> where T: Any {
+    fn load(_: &'a StaticServices, params: &'a Box<Any>) -> Params<'a, T> {
+        Params(params.downcast_ref().unwrap())      // TODO: don't panic
+    }
+}
+
+impl<'a, T> Deref for Params<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.0
+    }
+}
+
+// TODO: fix the trailing '/' problem
 
 #[macro_export]
 macro_rules! router {

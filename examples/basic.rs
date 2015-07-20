@@ -11,11 +11,12 @@ struct Data {
 
 fn main() {
     let router = router! {
+        GET /hello/world => handler as fn(_) -> _,
         GET /{id} [RouteParams] => handler as fn(_) -> _,
     };
 
     let services = rouille::service::StaticServices {
-        templates: rouille::service::TemplatesCache::new("."),
+        templates: rouille::service::TemplatesCache::new("examples"),
         .. Default::default()
     };
 
@@ -23,8 +24,11 @@ fn main() {
 }
 
 #[derive(RustcEncodable)]
-struct TemplateVars;
+struct TemplateVars {
+    id: u32,
+}
 
+#[derive(Debug)]
 struct RouteParams {
     id: u32,
 }
@@ -32,5 +36,6 @@ struct RouteParams {
 fn handler(_: rouille::input::Ignore)
            -> rouille::output::TemplateOutput<TemplateVars>
 {
-    rouille::output::TemplateOutput::new("test", TemplateVars)
+    //println!("{:?}", params);
+    rouille::output::TemplateOutput::new("test", TemplateVars { id: 3 })
 }

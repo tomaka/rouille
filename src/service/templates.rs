@@ -37,10 +37,15 @@ impl TemplatesCache {
     pub fn render<W, E>(&self, name: &str, mut output: W, data: &E) -> Result<(), ()>
                         where W: Write, E: Encodable
     {
+        if self.path.is_none() {
+            return Err(());
+        }
+
         let entry = {
             let mut cache = self.cache.lock().unwrap();
             cache.entry(name.to_string()).or_insert_with(|| {
-                let template = mustache::compile_str("hello world");        // FIXME: 
+                let path = self.path.as_ref().unwrap().join(name);
+                let template = mustache::compile_path(path).unwrap();       // TOOD: proper error
                 Arc::new(template)
             }).clone()
         };
