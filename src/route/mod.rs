@@ -195,64 +195,65 @@ macro_rules! router {
 
 #[macro_export]
 macro_rules! router_impl {
-    (__parse_route $routes:ident [$($ex:tt)*] / $($t:tt)+) => (
+    (__parse_route $routes:ident [$($method:tt)*] / $($pattern:tt)+) => (
         {
-            let method = router_impl!(__parse_method $($ex)*);
-            router_impl!(__parse_route2 $routes method [/] $($t)+)
+            let method = router_impl!(__parse_method $($method)*);
+            router_impl!(__parse_route2 $routes method [/] $($pattern)+)
         }
     );
 
-    (__parse_route $routes:ident [$($ex:tt)*] $f:tt $($t:tt)*) => (
-        router_impl!(__parse_route $routes [$($ex)* $f] $($t)*)
+    (__parse_route $routes:ident [$($method:tt)*] $method_next:tt $($rest:tt)*) => (
+        router_impl!(__parse_route $routes [$($method)* $method_next] $($rest)*)
     );
 
     (__parse_route $routes:ident []) => ();
 
-    (__parse_route2 $routes:ident $method:ident [$($ex:tt)*] => $handler:expr, $($t:tt)*) => (
+    (__parse_route2 $routes:ident $method:ident [$($pattern:tt)*] => $handler:expr, $($other_routes:tt)*) => (
         {
-            let pattern = router_impl!(__parse_pattern $($ex)*);
+            router_impl!(__parse_route2 $routes $method [$($pattern)*] => $handler);
+            router_impl!(__parse_route $routes [] $($other_routes)*);
+        }
+    );
+
+    (__parse_route2 $routes:ident $method:ident [$($pattern:tt)*] => $handler:expr) => (
+        {
+            let pattern = router_impl!(__parse_pattern $($pattern)*);
             let handler = Box::new($handler) as Box<$crate::route::Handler + Send + Sync>;
             $routes.push($crate::route::Route {
                 url: pattern,
                 method: $method,
                 handler: handler,
             });
-
-            router_impl!(__parse_route $routes [] $($t)*);
         }
     );
 
-    (__parse_route2 $routes:ident $method:ident [$($ex:tt)*] => $handler:expr) => (
-        router_impl!(__parse_route2 $routes $method [$($ex)*] => $handler,)
+    (__parse_route2 $routes:ident $method:ident [$($pattern:tt)*] $pattern_next:tt $($rest:tt)*) => (
+        router_impl!(__parse_route2 $routes $method [$($pattern)* $pattern_next] $($rest)*)
     );
 
-    (__parse_route2 $routes:ident $method:ident [$($ex:tt)*] $f:tt $($t:tt)*) => (
-        router_impl!(__parse_route2 $routes $method [$($ex)* $f] $($t)*)
-    );
-
-    (__parse_pattern $($t:tt)*) => (
+    (__parse_pattern $($pat:tt)*) => (
         $crate::route::Pattern(Box::new(move |input| {
-            router_impl!(__parse_pattern_inner (input.trim_right_matches('/')) () $($t)*)
+            router_impl!(__parse_pattern_inner (input.trim_right_matches('/')) () $($pat)*)
         }))
     );
 
-    (__parse_pattern_inner ($input:expr) () [ $s:ident ]) => (
+    (__parse_pattern_inner ($input:expr) () [ $($s:ident)::+ ]) => (
         {
             if $input.len() != 0 {
                 return Err(());
             }
 
-            Ok(Box::new($s))
+            Ok(Box::new($($s)::+))
         }
     );
 
-    (__parse_pattern_inner ($input:expr) ($(, $mem:ident:$val:expr)+) [ $s:ident ]) => (
+    (__parse_pattern_inner ($input:expr) ($(, $mem:ident:$val:expr)+) [ $($s:ident)::+ ]) => (
         {
             if $input.len() != 0 {
                 return Err(());
             }
 
-            Ok(Box::new($s {
+            Ok(Box::new($($s)::+ {
                 $(
                     $mem: match $val.parse() {
                         Ok(r) => r,
@@ -273,15 +274,22 @@ macro_rules! router_impl {
         }
     );
 
-    (__parse_pattern_inner ($input:expr) ($($t:tt)*) / [ $s:ident ]) => (
+    (__parse_pattern_inner ($input:expr) ($(, $mem:ident:$val:expr)+)) => (
+        {
+            use found_pattern_without_struct_to_match_see_documentation;
+            Err(())
+        }
+    );
+
+    (__parse_pattern_inner ($input:expr) ($($t:tt)*) / [ $s:ty ]) => (
         router_impl!(__parse_pattern_inner ($input) ($($t)*) [$s])
     );
 
     (__parse_pattern_inner ($input:expr) ($($t:tt)*) /) => (
-        router_impl!(__parse_pattern_inner ($($t)*) ($input))
+        router_impl!(__parse_pattern_inner ($input) ($($t)*))
     );
 
-    (__parse_pattern_inner ($input:expr) ($($e:tt)*) / { $val:ident } $($t:tt)*) => (
+    (__parse_pattern_inner ($input:expr) ($($e:tt)*) / { $val:ident } $($rest:tt)*) => (
         {
             if !$input.starts_with('/') {
                 return Err(());
@@ -290,7 +298,7 @@ macro_rules! router_impl {
             let end = $input[1 ..].find('/').map(|p| p + 1).unwrap_or($input.len());
             let matched = &$input[1 .. end];
 
-            router_impl!(__parse_pattern_inner (&$input[end ..]) ($($e)* , $val: matched) $($t)*)
+            router_impl!(__parse_pattern_inner (&$input[end ..]) ($($e)*, $val:matched) $($rest)*)
         }
     );
 
