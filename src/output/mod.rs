@@ -12,8 +12,22 @@ pub mod plain_text;
 pub mod redirect;
 pub mod template;
 
+pub enum NoOutput {
+    IgnoreRoute,
+}
+
 /// Objects that can serve as a response to the request.
 pub trait Output {
     /// Sends the response.
     fn send(self, HyperResponse, &StaticServices);
+}
+
+impl<O> Output for Result<O, NoOutput> where O: Output {
+    fn send(self, response: HyperResponse, services: &StaticServices) {
+        if let Ok(output) = self {
+            output.send(response, services)
+        } else {
+            unimplemented!();
+        }
+    }
 }

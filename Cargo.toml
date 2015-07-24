@@ -8,7 +8,8 @@ hyper = { version = "0.6", default-features = false }
 mime = "=0.0.12"        # using a fix version to avoid things breaking *grumble*
 mime_guess = "=1.1.1"   # using a fix version to avoid things breaking *grumble*
 mustache = "0.6"
-#postgres = "0.9"
+openssl = "*"
+postgres = { version = "0.9", features = ["openssl"] }
 rustc-serialize = "0.3"
 term = "0.2"
 time = "0.1.31"

@@ -4,6 +4,8 @@ extern crate hyper;
 extern crate mime;
 extern crate mime_guess;
 extern crate mustache;
+extern crate openssl;
+extern crate postgres;
 extern crate rustc_serialize;
 extern crate term;
 extern crate time;
