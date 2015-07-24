@@ -1,14 +1,7 @@
-#[macro_use]
-extern crate log;
-extern crate env_logger;
-extern crate rand;
+use client::HttpRequest as ClientRequest;
+use client::HttpStream as ClientStream;
 
-extern crate multipart;
-
-use multipart::client::HttpRequest as ClientRequest;
-use multipart::client::HttpStream as ClientStream;
-
-use multipart::server::HttpRequest as ServerRequest;
+use server::HttpRequest as ServerRequest;
 
 use rand::Rng;
 use rand::distributions::{Range, Sample};
@@ -24,7 +17,7 @@ struct TestFields {
 
 #[test]
 fn local_test() {
-    env_logger::init().unwrap(); 
+    let _ = ::env_logger::init(); 
 
     let test_fields = gen_test_fields();
 
@@ -52,14 +45,14 @@ fn gen_test_fields() -> TestFields {
 }
 
 fn gen_range(min: usize, max: usize) -> usize {
-    Range::new(min, max).sample(&mut rand::weak_rng())
+    Range::new(min, max).sample(&mut ::rand::weak_rng())
 }
 
 fn gen_string() -> String {
     const MIN_LEN: usize = 3;
     const MAX_LEN: usize = 12;
 
-    let mut rng = rand::weak_rng();
+    let mut rng = ::rand::weak_rng();
     let str_len = gen_range(MIN_LEN, MAX_LEN);
 
     rng.gen_ascii_chars().take(str_len).collect()
@@ -69,7 +62,7 @@ fn gen_bytes() -> Vec<u8> {
     const MIN_LEN: usize = 8;
     const MAX_LEN: usize = 32;
 
-    let mut rng = rand::weak_rng();
+    let mut rng = ::rand::weak_rng();
     let bytes_len = gen_range(MIN_LEN, MAX_LEN);
 
     let mut vec = vec![0u8; bytes_len];
@@ -79,7 +72,7 @@ fn gen_bytes() -> Vec<u8> {
 
 
 fn test_client(test_fields: &TestFields) -> HttpBuffer {
-    use multipart::client::Multipart;
+    use client::Multipart;
 
     let request = MockClientRequest::default();
 
@@ -106,7 +99,7 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
 }
 
 fn test_server(buf: HttpBuffer, mut fields: TestFields) {
-    use multipart::server::{Multipart, MultipartData};
+    use server::{Multipart, MultipartData};
 
     let mut multipart = Multipart::from_request(buf.for_server())
         .unwrap_or_else(|_| panic!("Buffer should be multipart!"));
@@ -141,12 +134,6 @@ fn test_server(buf: HttpBuffer, mut fields: TestFields) {
 pub struct MockClientRequest {
     boundary: Option<String>,
     content_len: Option<u64>,
-}
-
-impl MockClientRequest {
-    pub fn new() -> MockClientRequest {
-        Self::default()
-    }
 }
 
 impl ClientRequest for MockClientRequest {

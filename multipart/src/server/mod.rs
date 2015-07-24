@@ -5,7 +5,6 @@
 //! to accept, parse, and serve HTTP `multipart/form-data` requests (file uploads).
 //!
 //! See the `Multipart` struct for more info.
-
 use mime::Mime;
 
 use std::borrow::Borrow;
@@ -18,9 +17,9 @@ use std::io::prelude::*;
 
 use std::path::{Path, PathBuf};
 
-#[doc(inline)]
 pub use self::boundary::BoundaryReader;
 
+mod buf_read;
 mod boundary;
 
 #[cfg(feature = "hyper")]
@@ -41,7 +40,6 @@ macro_rules! try_opt (
 pub struct Multipart<R> {
     source: BoundaryReader<R>,
     line_buf: String,
-    at_end: bool,    
     /// The directory for saving files in this request.
     /// By default, this is set to a subdirectory of `std::env::temp_dir()` with a 
     /// random alphanumeric name.
@@ -66,7 +64,6 @@ impl<R> Multipart<R> where R: HttpRequest {
             Multipart { 
                 source: BoundaryReader::from_reader(req, boundary),
                 line_buf: String::new(),
-                at_end: false,                
                 save_dir: ::temp_dir(),
             }
         )
@@ -79,19 +76,8 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// If the previously returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry.
     pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<R>>> {
-        if self.at_end { return Ok(None); }
-
         try!(self.source.consume_boundary());
-
-        self.at_end = {
-            try!(self.read_line()) == "--\r\n"
-        };
-        
-        if !self.at_end {
-            MultipartField::read_from(self)
-        } else {
-            Ok(None)
-        }
+        MultipartField::read_from(self)
     }
 
     fn read_content_disposition(&mut self) -> io::Result<Option<ContentDisp>> {
