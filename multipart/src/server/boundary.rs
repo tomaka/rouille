@@ -68,6 +68,10 @@ impl<R> BoundaryReader<R> where R: Read {
 
     #[doc(hidden)]
     pub fn consume_boundary(&mut self) -> io::Result<()> {
+        if self.at_end {
+            return Ok(());
+        }
+
         while !self.boundary_read {
             let buf_len = try!(self.read_to_boundary()).len();
 
@@ -297,6 +301,9 @@ dashed-value-2\r
 
         debug!("Read 4");
         let _ = reader.read_to_string(buf).unwrap();
-        assert!(buf.is_empty(), "Buffer not empty: {:?}", buf);        
+        assert!(buf.is_empty(), "Buffer not empty: {:?}", buf);
+
+        debug!("Extra Consume");
+        reader.consume_boundary().unwrap();
     }
 }
