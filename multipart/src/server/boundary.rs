@@ -1,8 +1,9 @@
+use server::buf_read::CustomBufReader;
+
 use std::cmp;
 use std::borrow::Borrow;
 
 use std::io;
-use std::io::BufReader;
 use std::io::prelude::*;
 
 use std::ptr;
@@ -10,7 +11,7 @@ use std::ptr;
 /// A struct implementing `Read` and `BufRead` that will yield bytes until it sees a given sequence.
 #[derive(Debug)]
 pub struct BoundaryReader<R> {
-    buffer: BufReader<R>,
+    buffer: CustomBufReader<R>,
     boundary: Vec<u8>,
     search_idx: usize,
     boundary_read: bool,
@@ -21,7 +22,7 @@ impl<R> BoundaryReader<R> where R: Read {
     #[doc(hidden)]
     pub fn from_reader<B: Into<Vec<u8>>>(reader: R, boundary: B) -> BoundaryReader<R> {
         BoundaryReader {
-            buffer: BufReader::new(reader),
+            buffer: CustomBufReader::new(reader),
             boundary: boundary.into(),
             search_idx: 0,
             boundary_read: false,
@@ -32,7 +33,7 @@ impl<R> BoundaryReader<R> where R: Read {
     fn read_to_boundary(&mut self) -> io::Result<&[u8]> {
         use log::LogLevel;
 
-        let buf = try!(self.buffer.fill_buf());
+        let buf = try!(self.buffer.fill_buf_min(self.boundary.len()));
 
         while !(self.boundary_read || self.at_end) && self.search_idx < buf.len() {
             let lookahead = &buf[self.search_idx..];
@@ -45,13 +46,12 @@ impl<R> BoundaryReader<R> where R: Read {
             }
 
             self.search_idx += 1;
-        }         
-
-        if self.search_idx >= 2 {
-            self.search_idx -= 2;
         }
 
-        debug!("Buf len: {} Search idx: {}", buf.len(), self.search_idx);
+        debug!(
+            "Buf len: {} Search idx: {} Boundary read: {:?}", 
+            buf.len(), self.search_idx, self.boundary_read
+        );
         
         if log_enabled!(LogLevel::Info) {
             let _ = ::std::str::from_utf8(buf).map(|buf|
@@ -59,7 +59,11 @@ impl<R> BoundaryReader<R> where R: Read {
             );
         }
 
-        Ok(&buf[..self.search_idx])
+        if self.search_idx >= 2 {
+            Ok(&buf[..self.search_idx - 2])
+        } else {
+            Ok(&buf[..self.search_idx])
+        }
     }
 
     #[doc(hidden)]
@@ -73,17 +77,51 @@ impl<R> BoundaryReader<R> where R: Read {
 
             self.consume(buf_len);
         }
+        
 
-        let consume_amt = self.search_idx + self.boundary.len();
+        let consume_amt = {
+            let mut buf = try!(self.buffer.fill_buf_min(self.boundary.len() + 4));
+            let mut consume_amt = self.boundary.len() + 2;
+
+            if self.search_idx != 0 {
+                let (before, new_buf) = buf.split_at(2);
+                if before != b"\r\n" {
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("Expected {:?}, got {:?}", b"\r\n", &before)
+                    ));
+                }
+
+                buf = new_buf;
+                consume_amt += 2;
+            }
+
+            let (boundary, after) = buf.split_at(self.boundary.len());
+            if &*self.boundary != boundary {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Expected {:?}, got {:?}", self.boundary, boundary)
+                ));
+            }
+
+            if &after[..2] != b"\r\n" {
+                self.at_end = after == b"--";
+
+                if !self.at_end {
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!(
+                            "Expected {:?} or {:?}, got {:?}", 
+                                b"\r\n", b"--", after
+                        )
+                    ));
+                }
+            }
+
+            consume_amt
+        };
 
         self.buffer.consume(consume_amt);
-
-        let mut after_buf = [0u8; 2];
-        // Substitute for Result::expect() being unstable.
-        self.buffer.read(&mut after_buf).unwrap_or_else(|err|
-            panic!("Failed to read 2 bytes after boundary. Reason: {:?}", err)
-        );
-        self.at_end = &after_buf == b"--";
 
         self.search_idx = 0;
         self.boundary_read = false;
@@ -126,7 +164,13 @@ impl<R> BufRead for BoundaryReader<R> where R: Read {
     }
 
     fn consume(&mut self, amt: usize) {
-        let true_amt = cmp::min(amt, self.search_idx);
+        let mut search_idx = self.search_idx;
+
+        if search_idx >= 2 {
+            search_idx -= 2;
+        }
+
+        let true_amt = cmp::min(amt, search_idx);
         self.buffer.consume(true_amt);
         self.search_idx -= true_amt;
     }
