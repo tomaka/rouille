@@ -50,13 +50,11 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// If the given `R: HttpRequest` is a POST request of `Content-Type: multipart/form-data`,
     /// return the wrapped request as `Ok(Multipart<R>)`, otherwise `Err(R)`.
     pub fn from_request(req: R) -> Result<Multipart<R>, R> {
-        if !req.is_multipart() { return Err(req); }
-
-        if req.boundary().is_none() {
+        if req.multipart_boundary().is_none() {
             return Err(req);     
         }
 
-        let boundary = format!("--{}", req.boundary().unwrap());
+        let boundary = format!("--{}", req.multipart_boundary().unwrap());
 
         debug!("Boundary: {}", boundary);
 
@@ -245,10 +243,12 @@ fn get_remainder_after<'a>(needle: &str, haystack: &'a str) -> Option<(&'a str)>
 
 /// A server-side HTTP request that may or may not be multipart.
 pub trait HttpRequest: Read {
-    /// Return `true` if this request is a `multipart/form-data` request, `false` otherwise.
-    fn is_multipart(&self) -> bool;
-    /// Get the boundary string of this request if it is `multipart/form-data`.
-    fn boundary(&self) -> Option<&str>;
+    /// Get the boundary string of this request if it is a POST request
+    /// with the `Content-Type` header set to `multipart/form-data`.
+    ///
+    /// The boundary string should be supplied as an extra value of the `Content-Type` header, e.g.
+    /// `Content-Type: multipart/form-data; boundary=myboundary`.
+    fn multipart_boundary(&self) -> Option<&str>;
 }
 
 /// A field in a multipart request. May be either text or a binary stream (file).

@@ -62,24 +62,17 @@ where F: Fn(Multipart<Request>, Response<Fresh>), F: Send + Sync {
 }
 
 impl<'a, 'b> HttpRequest for Request<'a, 'b> {
-    fn is_multipart(&self) -> bool {
-        self.method == Method::Post && 
-        self.headers.get::<ContentType>().map_or(false, |ct| {
-            let ContentType(ref mime) = *ct;
+    fn multipart_boundary(&self) -> Option<&str> {
+        if self.method != Method::Post {
+            return None;
+        }
 
-            debug!("Content-Type: {}", mime);
-
-            match *mime {
-                Mime(TopLevel::Multipart, SubLevel::FormData, _) => true,
-                _ => false,
-            }
-        })
-    }
-
-    fn boundary(&self) -> Option<&str> {
         self.headers.get::<ContentType>().and_then(|ct| {
             let ContentType(ref mime) = *ct;
-            let Mime(_, _, ref params) = *mime;
+            let params = match *mime {
+                Mime(TopLevel::Multipart, SubLevel::FormData, ref params) => params,
+                _ => return None,
+            };
 
             params.iter().find(|&&(ref name, _)|
                 match *name {

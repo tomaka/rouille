@@ -83,15 +83,15 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
     // Intersperse file fields amongst text fields
     for (name, text) in &test_fields.texts {
         if let Some((file_name, file)) = test_files.next() {
-            multipart = multipart.write_stream(file_name, &mut &**file, None, None);
+            multipart.write_stream(file_name, &mut &**file, None, None);
         }
 
-        multipart = multipart.write_text(name, text);    
+        multipart.write_text(name, text);    
     }
 
     // Write remaining files
     for (file_name, file) in test_files {
-       multipart = multipart.write_stream(file_name, &mut &**file, None, None);
+       multipart.write_stream(file_name, &mut &**file, None, None);
     }
 
 
@@ -209,7 +209,6 @@ impl<'a> Read for ServerBuffer<'a> {
 }
 
 impl<'a> ServerRequest for ServerBuffer<'a> {
-    fn is_multipart(&self) -> bool { true }
-    fn boundary(&self) -> Option<&str> { Some(&self.boundary) }
+    fn multipart_boundary(&self) -> Option<&str> { Some(&self.boundary) }
 }
 

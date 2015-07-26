@@ -72,7 +72,7 @@ impl<S: HttpStream> Multipart<S> {
     ///
     /// ##Errors
     /// If something went wrong with the HTTP stream.
-    pub fn write_text<N: AsRef<str>, V: AsRef<str>>(mut self, name: N, val: V) -> Self {
+    pub fn write_text<N: AsRef<str>, V: AsRef<str>>(&mut self, name: N, val: V) -> &mut Self {
         if self.last_err.is_none() {
             self.last_err = chain_result! {
                 self.write_field_headers(name.as_ref(), None, None),
@@ -94,7 +94,7 @@ impl<S: HttpStream> Multipart<S> {
     /// ##Errors
     /// If there was a problem opening the file (was a directory or didn't exist),
     /// or if something went wrong with the HTTP stream.
-    pub fn write_file<N: AsRef<str>, P: AsRef<Path>>(mut self, name: N, path: P) -> Self {
+    pub fn write_file<N: AsRef<str>, P: AsRef<Path>>(&mut self, name: N, path: P) -> &mut Self {
         if self.last_err.is_none() {     
             let path = path.as_ref();
 
@@ -132,8 +132,8 @@ impl<S: HttpStream> Multipart<S> {
     /// If the reader returned an error, or if something went wrong with the HTTP stream.
     // RFC: How to format this declaration?
     pub fn write_stream<N: AsRef<str>, St: Read>(
-        mut self, name: N, read: &mut St, filename: Option<&str>, content_type: Option<Mime>
-    ) -> Self {
+        &mut self, name: N, read: &mut St, filename: Option<&str>, content_type: Option<Mime>
+    ) -> &mut Self {
         if self.last_err.is_none() {
             let content_type = content_type.unwrap_or_else(::mime_guess::octet_stream);
 
