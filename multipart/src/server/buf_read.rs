@@ -81,9 +81,16 @@ impl<R: Read> BufRead for CustomBufReader<R> {
 
 impl<R> fmt::Debug for CustomBufReader<R> where R: fmt::Debug {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_struct("BufReader")
+        fmt.write_fmt(format_args!(
+            "CustomBufReader {{ reader: {:?}, buffer: {}/{}}}", 
+            &self.inner, self.cap - self.pos, self.buf.len()
+        ))
+
+        /* FIXME (07/26/15): Switch to this impl after the next Stable release.
+        fmt.debug_struct("CustomBufReader")
             .field("reader", &self.inner)
-            .field("buffer", &format_args!("{}/{}", self.cap - self.pos, self.buf.len()))
+            .field("buffer", &format_args!("{}/{}", ))
             .finish()
+        */
     }
 }
