@@ -36,6 +36,9 @@ pub mod client;
 #[cfg(feature = "server")]
 pub mod server;
 
+#[cfg(all(test, feature = "client", feature = "server"))]
+mod local_test;
+
 const DIRNAME_LEN: usize = 12;
 
 fn temp_dir() -> PathBuf {
