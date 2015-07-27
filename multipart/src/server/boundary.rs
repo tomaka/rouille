@@ -109,7 +109,7 @@ impl<R> BoundaryReader<R> where R: Read {
             }
 
             if &after[..2] != b"\r\n" {
-                self.at_end = after == b"--";
+                self.at_end = &after[..2] == b"--";
 
                 if !self.at_end {
                     return Err(io::Error::new(
