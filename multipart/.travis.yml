@@ -8,7 +8,7 @@ os:
   - osx
 env:
   global:
-    - secure: eJpqXoY/xuCQRYmLBK9dLLzTGHvsBWe67wRN0fljesRgSnU+H09OsWI22DB9z/e6pMKjZpfDuyRkJaHVj8N7rwEfSeKdywv6uKqs5/Mi7dVINnzVA7jU3E4kLc+EuASF8w5d85kfccGNGs7qM0Uwz/i4da3Gw4B+cSc5cqjWsIY=
+    - secure: UrIkXI/5PqRVn9GeCAtadkvIcnGY9+uMKfz50099M+ncf7/ZAwL5T6AjMmV9FqgvRShpW7px8Aj7uEGwbNgUGIuiYENWeoAi7LAh5OatUHBMVNFLnCLxHtnmj8G3RgNAql5wiEvvnaWvb+joi8zNJ4lJ5m6kkrAPxwx1Uj6uYmw=
 after_success:
     - |
         test ${TRAVIS_PULL_REQUEST} == "false" && \
