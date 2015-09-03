@@ -9,18 +9,25 @@ use std::num;
 use std::str::ParseBoolError;
 use url::form_urlencoded;
 
+/// Error that can happen when decoding POST data.
 #[derive(Clone, Debug)]
 pub enum PostError {
+    /// The `Content-Type` header of the request indicates that it doesn't contain POST data.
     WrongContentType,
 
+    /// A field is missing from the received data.
     MissingField(String),
 
+    /// Failed to parse a `bool` field.
     WrongDataTypeBool(ParseBoolError),
 
+    /// Failed to parse an integer field.
     WrongDataTypeInt(num::ParseIntError),
 
+    /// Failed to parse a floating-point field.
     WrongDataTypeFloat(num::ParseFloatError),
 
+    /// Failed to parse a string field.
     NotUtf8(String),
 }
 
@@ -52,6 +59,30 @@ impl From<num::ParseFloatError> for PostError {
     }
 }
 
+/// Attempts to decode the `POST` data received by the request into a struct.
+///
+/// The struct must implement the `Decodable` trait from `rustc_serialize`.
+///
+/// An error is returned if a field is missing, if the content type is not POST data, or if a field
+/// cannot be parsed.
+///
+/// # Example
+///
+/// ```no_run
+/// # extern crate rustc_serialize;
+/// # extern crate rouille;
+/// # fn main() {
+/// # let request: rouille::Request = unsafe { std::mem::uninitialized() };
+/// #[derive(RustcDecodable)]
+/// struct FormData {
+///     field1: u32,
+///     field2: String,
+/// }
+///
+/// let data: FormData = rouille::input::get_post_input(&request).unwrap();
+/// # }
+/// ```
+///
 pub fn get_post_input<T>(request: &Request) -> Result<T, PostError> where T: Decodable {
     // TODO: slow
     if request.header("Content-Type") != Some("application/x-www-form-urlencoded".to_owned()) {
