@@ -7,6 +7,8 @@
 macro_rules! router {
     ($request:expr, $(GET ($($pat:tt)+) => ($($closure:tt)+),)* _ => $def:expr) => {
         {
+            use std;
+
             let ref request = $request;
 
             // ignoring the GET parameters (everything after `?`)
