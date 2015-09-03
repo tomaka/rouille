@@ -7,6 +7,7 @@ use RouteError;
 use std::mem;
 use std::num;
 use std::str::ParseBoolError;
+use url::form_urlencoded;
 
 #[derive(Clone, Debug)]
 pub enum PostError {
@@ -57,18 +58,19 @@ pub fn get_post_input<T>(request: &Request) -> Result<T, PostError> where T: Dec
         return Err(PostError::WrongContentType);
     }
 
-    let mut decoder = PostDecoder::Start(request.data());
+    let data = form_urlencoded::parse(&request.data());
+    let mut decoder = PostDecoder::Start(data);
     T::decode(&mut decoder)
 }
 
 enum PostDecoder {
     Empty,
 
-    Start(Vec<u8>),
+    Start(Vec<(String, String)>),
 
-    ExpectsStructMember(Vec<u8>),
+    ExpectsStructMember(Vec<(String, String)>),
 
-    ExpectsData(Vec<u8>, String),
+    ExpectsData(Vec<(String, String)>, String),
 }
 
 impl Decoder for PostDecoder {
@@ -94,22 +96,15 @@ impl Decoder for PostDecoder {
 
     fn read_str(&mut self) -> Result<String, PostError> {
         match self {
-            &mut PostDecoder::ExpectsData(ref mut data, ref field_name) => {
-                for element in data.split(|&c| c == b'&') {
-                    let mut subsplit = element.splitn(2, |&c| c == b'=');
+            &mut PostDecoder::ExpectsData(ref data, ref field_name) => {
+                let val = data.iter().find(|&&(ref key, _)| key == field_name)
+                              .map(|&(_, ref value)| value);
 
-                    if subsplit.next().unwrap() == field_name.as_bytes() {
-                        let value = subsplit.next().unwrap();
-
-                        // FIXME: decode url encoding
-                        return match String::from_utf8(value.to_owned()) {
-                            Ok(value) => Ok(value),
-                            Err(_) => Err(PostError::NotUtf8(field_name.clone())),
-                        };
-                    }
+                if let Some(val) = val {
+                    Ok(val.clone())
+                } else {
+                    Err(PostError::MissingField(field_name.clone()))
                 }
-
-                return Err(PostError::MissingField(field_name.clone()))
             },
 
             _ => panic!()
@@ -155,7 +150,14 @@ impl Decoder for PostDecoder {
             _ => panic!()
         };
 
-        f(&mut tmp)
+        let result = f(&mut tmp);
+
+        match tmp {
+            PostDecoder::ExpectsData(data, _) => mem::replace(self, PostDecoder::ExpectsStructMember(data)),
+            _ => panic!()
+        };
+
+        result
     }
 
     fn read_tuple<T, F>(&mut self, len: usize, f: F) -> Result<T, PostError> where F: FnOnce(&mut Self) -> Result<T, PostError> {

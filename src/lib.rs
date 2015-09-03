@@ -1,6 +1,7 @@
 extern crate rustc_serialize;
 extern crate time;
 extern crate tiny_http;
+extern crate url;
 
 pub use assets::match_assets;
 pub use log::LogEntry;
