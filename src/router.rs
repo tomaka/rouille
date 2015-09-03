@@ -5,21 +5,33 @@
 // TODO: don't panic if parsing fails
 #[macro_export]
 macro_rules! router {
-    ($request:expr, $(GET ($($pat:tt)+) => ($($closure:tt)+)),*) => {
+    ($request:expr, $(GET ($($pat:tt)+) => ($($closure:tt)+),)* _ => $def:expr) => {
         {
-            let request = $request;
-            let request_url = request.url();
+            let ref request = $request;
+
+            // ignoring the GET parameters (everything after `?`)
+            let request_url = {
+                let url = request.url();
+                let pos = url.find('?').unwrap_or(url.len());
+                &url[..pos]
+            };
 
             let mut ret = None;
 
             $({
-                let mut values = std::collections::HashMap::<&'static str, &str>::new();
+                // we use a RefCell just to avoid warnings about `values doesn't need to be mutable`
+                let values = std::cell::RefCell::new(std::collections::HashMap::<&'static str, &str>::new());
                 if ret.is_none() && router!(__check_pattern values request_url $($pat)+) {
+                    let values = values.borrow();
                     ret = router!(__parse_closure values $($closure)+);
                 }
             })+
 
-            ret
+            if let Some(ret) = ret {
+                ret
+            } else {
+                $def()
+            }
         }
     };
 
@@ -30,7 +42,9 @@ macro_rules! router {
             loop {
                 ret = Some(closure(
                     $(
-                        match $values.get(stringify!($pn)).unwrap().parse() {
+                        match $values.get(stringify!($pn))
+                                     .expect("Closure parameter missing from route").parse()
+                        {
                             Ok(val) => val,
                             Err(_) => { ret = None; break; }
                         }
@@ -58,7 +72,7 @@ macro_rules! router {
             let pat_end = url.find('/').unwrap_or(url.len());
             let rest_url = &url[pat_end..];
             if router!(__check_pattern $values rest_url $($rest)*) {
-                $values.insert(stringify!($p), &url[0 .. pat_end]);
+                $values.borrow_mut().insert(stringify!($p), &url[0 .. pat_end]);
                 true
             } else {
                 false

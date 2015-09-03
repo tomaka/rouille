@@ -1,11 +1,17 @@
 
 extern crate tiny_http;
 
+pub use assets::match_assets;
+
+mod assets;
 mod input;
 mod router;
 
 pub enum RouteError {
+    /// Couldn't find a way to handle this request.
+    NoRouteFound,
 
+    WrongInput,
 }
 
 pub struct Server {
@@ -54,4 +60,23 @@ impl Request {
     pub fn url(&self) -> &str {
         self.request.url()
     }
+
+    #[inline]
+    pub fn respond(self, response: Response) {
+        self.request.respond(response.response)
+    }
+
+    #[inline]
+    pub fn respond_to_error(self, err: &RouteError) {
+        let response = match err {
+            &RouteError::NoRouteFound => tiny_http::Response::empty(404),
+            &RouteError::WrongInput => tiny_http::Response::empty(400),
+        };
+
+        self.request.respond(response);
+    }
+}
+
+pub struct Response {
+    response: tiny_http::ResponseBox,
 }
