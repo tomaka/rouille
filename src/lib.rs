@@ -5,6 +5,8 @@ extern crate tiny_http;
 pub use assets::match_assets;
 pub use log::LogEntry;
 
+use std::str::FromStr;
+
 mod assets;
 mod input;
 mod log;
@@ -82,4 +84,15 @@ impl Request {
 
 pub struct Response {
     response: tiny_http::ResponseBox,
+}
+
+impl Response {
+    /// Builds a `Response` that redirects the user to another URL.
+    pub fn redirect(target: &str) -> Response {
+        let response = tiny_http::Response::empty(303);
+        // TODO: slow \|/
+        let response = response.with_header(tiny_http::Header::from_str(&format!("Location: {}", target)).unwrap());
+
+        Response { response: response.boxed() }
+    }
 }

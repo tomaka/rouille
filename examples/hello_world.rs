@@ -16,8 +16,7 @@ fn main() {
 
         let response = router!(request,
             GET (/) => (|| {
-                println!("test qsdf");
-                Err(rouille::RouteError::WrongInput)
+                Ok(rouille::Response::redirect("/hello/world"))
             }),
 
             GET (/hello/world) => (|| {
