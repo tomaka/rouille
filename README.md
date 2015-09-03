@@ -1,6 +1,6 @@
 # Rouille, Rust web server middleware
 
-
+## [Documentation](http://tomaka.github.io/rouille/rouille/index.html)
 
 
 # FAQ
