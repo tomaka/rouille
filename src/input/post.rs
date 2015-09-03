@@ -9,6 +9,7 @@ pub enum PostError {
 }
 
 impl From<PostError> for RouteError {
+    #[inline]
     fn from(err: PostError) -> RouteError {
         RouteError::WrongInput
     }
