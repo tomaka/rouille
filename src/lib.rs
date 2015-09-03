@@ -1,4 +1,5 @@
 
+extern crate rustc_serialize;
 extern crate tiny_http;
 
 pub use assets::match_assets;
