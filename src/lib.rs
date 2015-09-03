@@ -15,6 +15,7 @@ mod assets;
 mod log;
 mod router;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RouteError {
     /// Couldn't find a way to handle this request.
     NoRouteFound,
