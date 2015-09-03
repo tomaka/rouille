@@ -6,9 +6,11 @@ pub use assets::match_assets;
 pub use log::LogEntry;
 
 use std::str::FromStr;
+use std::sync::Mutex;
+
+pub mod input;
 
 mod assets;
-mod input;
 mod log;
 mod router;
 
@@ -51,15 +53,21 @@ impl Iterator for IncomingRequests {
 
     #[inline]
     fn next(&mut self) -> Option<Request> {
+        let request = self.server.recv().unwrap();
+
         Some(Request {
-            request: self.server.recv().unwrap(),
+            url: request.url().to_owned(),
+            request: Mutex::new(Some(request)),
+            data: Mutex::new(None),
         })
     }
 }
 
 /// Represents a request made by the client.
 pub struct Request {
-    request: tiny_http::Request,
+    url: String,
+    request: Mutex<Option<tiny_http::Request>>,     // TODO: when Mutex gets "into_inner", remove the Option
+    data: Mutex<Option<Vec<u8>>>,
 }
 
 impl Request {
@@ -67,13 +75,36 @@ impl Request {
     /// other characters.
     #[inline]
     pub fn url(&self) -> &str {
-        self.request.url()
+        &self.url
+    }
+
+    /// Returns the value of a header of the request.
+    #[inline]
+    pub fn header(&self, key: &str) -> Option<String> {
+        self.request.lock().unwrap().as_ref().unwrap().headers().iter()
+                    .find(|h| h.field.as_str() == key).map(|h| h.value.as_str().to_owned())
+    }
+
+    /// Returns the data of the request.
+    pub fn data(&self) -> Vec<u8> {
+        let mut data = self.data.lock().unwrap();
+
+        if let Some(ref mut data) = *data {
+            return data.clone();
+        }
+
+        let mut read = Vec::new();
+        let _ = self.request.lock().unwrap().as_mut().unwrap()
+                            .as_reader().read_to_end(&mut read);
+        let read_clone = read.clone();
+        *data = Some(read);
+        read_clone
     }
 
     /// Consumes the `Request` and sends the response to the client.
     #[inline]
     pub fn respond(self, response: Response) {
-        self.request.respond(response.response)
+        self.request.lock().unwrap().take().unwrap().respond(response.response)
     }
 
     /// Utility function similar to `respond`, but builds the "default" response corresponding to
@@ -85,7 +116,7 @@ impl Request {
             &RouteError::WrongInput => tiny_http::Response::empty(400),
         };
 
-        self.request.respond(response);
+        self.request.lock().unwrap().take().unwrap().respond(response);
     }
 }
 
