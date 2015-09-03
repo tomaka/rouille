@@ -1,5 +1,49 @@
 
-
+/// Equivalent to a `match` expression but for routes.
+///
+/// Here is an example usage:
+///
+/// ```ignored      // FIXME: 
+/// # #[macro_use] extern crate rouille; fn main() {
+/// # let request: rouille::Request = unsafe { std::mem::uninitialized() };
+/// router!(request,
+///     // first route
+///     GET (/) => (|| {
+///         12
+///     }),
+///
+///     // other routes here
+///
+///     _ => || 5
+/// )
+/// # }
+/// ```
+///
+/// The macro will take each route one by one and execute the first one that matches, similar to a
+/// `match` language construct. The whole `router!` expression then returns what the closure
+/// returns, therefore they must all return the same type.
+///
+/// You can use parameters by putting them inside `{}`:
+///
+/// ```ignore
+/// GET (/{id}/foo) => (|id: u32| {
+///     ...
+/// }),
+/// ```
+///
+/// If you use parameters inside `{}`, then a field with the same name must exist in the closure's
+/// parameters list. The parameters do not need be in the same order.
+///
+/// Each parameter gets parsed through the `FromStr` trait. If the parsing fails, the route is
+/// ignored.
+///
+/// Some other things to note:
+///
+/// - The right of the `=>` must have a closure-like syntax.
+/// - The pattern of the URL and the closure must be inside parentheses. This is to bypass
+///   limitations of Rust's macros system.
+/// - The default handler (with `_`) must be present or will get a compilation error.
+///
 // FIXME: turn `: $pt:ident` into `ty`
 // TODO: don't use a hashmap for perfs
 // TODO: don't panic if parsing fails
