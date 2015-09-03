@@ -27,7 +27,7 @@ pub struct Server {
 impl Server {
     pub fn start() -> Server {
         Server {
-            server: tiny_http::ServerBuilder::new().build().unwrap(),
+            server: tiny_http::ServerBuilder::new().with_port(8000).build().unwrap(),
         }
     }
 }
