@@ -147,4 +147,15 @@ impl Response {
 
         Response { response: response.boxed() }
     }
+
+    /// Builds a `Response` that outputs JSON.
+    #[inline]
+    pub fn json<T>(content: &T) -> Response where T: rustc_serialize::Encodable {
+        let data = rustc_serialize::json::encode(content).unwrap();
+        let response = tiny_http::Response::from_string(data);
+        // TODO: slow \|/
+        let response = response.with_header(tiny_http::Header::from_str("Content-Type: application/json").unwrap());
+
+        Response { response: response.boxed() }
+    }
 }
