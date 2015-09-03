@@ -83,8 +83,12 @@ macro_rules! router {
     (__check_pattern $values:ident $url:ident /$p:ident $($rest:tt)*) => (
         {
             let required = concat!("/", stringify!($p));
-            let rest_url = &$url[required.len()..];
-            $url.starts_with(required) && router!(__check_pattern $values rest_url $($rest)*)
+            if $url.starts_with(required) {
+                let rest_url = &$url[required.len()..];
+                router!(__check_pattern $values rest_url $($rest)*)
+            } else {
+                false
+            }
         }
     );
 
