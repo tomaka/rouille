@@ -1,11 +1,13 @@
-
 extern crate rustc_serialize;
+extern crate time;
 extern crate tiny_http;
 
 pub use assets::match_assets;
+pub use log::LogEntry;
 
 mod assets;
 mod input;
+mod log;
 mod router;
 
 pub enum RouteError {

@@ -1,11 +1,14 @@
 #[macro_use]
 extern crate rouille;
 
-fn main() {
+use std::io;
 
+fn main() {
     let server = rouille::Server::start();
 
     for request in server {
+        let _entry = rouille::LogEntry::start(io::stdout(), &request);
+
         if let Ok(r) = rouille::match_assets(&request, "examples") {
             request.respond(r);
             continue;
