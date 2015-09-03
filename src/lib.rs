@@ -104,4 +104,14 @@ impl Response {
 
         Response { response: response.boxed() }
     }
+
+    /// Builds a `Response` that outputs HTML.
+    #[inline]
+    pub fn html(content: &[u8]) -> Response {
+        let response = tiny_http::Response::from_data(content);
+        // TODO: slow \|/
+        let response = response.with_header(tiny_http::Header::from_str("Content-Type: text/html; charset=utf8").unwrap());
+
+        Response { response: response.boxed() }
+    }
 }
