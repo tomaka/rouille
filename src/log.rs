@@ -1,5 +1,8 @@
 use std::io::Write;
+use std::thread;
+
 use time;
+
 use Request;
 
 /// RAII guard that ensures that a log entry corresponding to a request will be written.
@@ -35,11 +38,16 @@ impl<'a, W> LogEntry<W> where W: Write {
 
 impl<W> Drop for LogEntry<W> where W: Write {
     fn drop(&mut self) {
-        let now = time::precise_time_ns();
-        let elapsed = now - self.start_time;
-
         write!(self.output, "{} - ", self.line).unwrap();
-        format_time(self.output.by_ref(), elapsed);
+
+        if thread::panicking() {
+            write!(self.output, " - PANIC!").unwrap();
+
+        } else {
+            let elapsed = time::precise_time_ns() - self.start_time;
+            format_time(self.output.by_ref(), elapsed);
+        }
+
         writeln!(self.output, "").unwrap();
     }
 }
