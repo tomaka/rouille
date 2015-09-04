@@ -4,14 +4,11 @@ extern crate rouille;
 use std::io;
 
 fn main() {
-    let server = rouille::Server::start();
+    rouille::start_server("localhost:8000", move |request| {
+        let _entry = rouille::LogEntry::start(io::stdout(), request);
 
-    for request in server {
-        let _entry = rouille::LogEntry::start(io::stdout(), &request);
-
-        if let Ok(r) = rouille::match_assets(&request, "examples") {
-            request.respond(r);
-            continue;
+        if let Ok(r) = rouille::match_assets(request, "examples") {
+            return r;
         }
 
         let response = router!(request,
@@ -37,9 +34,6 @@ fn main() {
             _ => || Err(rouille::RouteError::NoRouteFound)
         );
 
-        match response {
-            Ok(r) => request.respond(r),
-            Err(err) => request.respond_to_error(&err),
-        };
-    }
+        response.unwrap_or_else(|err| rouille::Response::from_error(&err))
+    });
 }

@@ -1,4 +1,6 @@
+extern crate num_cpus;
 extern crate rustc_serialize;
+extern crate threadpool;
 extern crate time;
 extern crate tiny_http;
 extern crate url;
@@ -6,8 +8,12 @@ extern crate url;
 pub use assets::match_assets;
 pub use log::LogEntry;
 
+use std::net::SocketAddr;
+use std::net::ToSocketAddrs;
 use std::str::FromStr;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use threadpool::ThreadPool;
 
 pub mod input;
 
@@ -23,45 +29,33 @@ pub enum RouteError {
     WrongInput,
 }
 
-pub struct Server {
-    #[inline]
-    server: tiny_http::Server,
-}
+/// Starts a server and uses the given requests handler.
+pub fn start_server<A, F>(addr: A, handler: F) -> !
+                          where A: ToSocketAddrs,
+                                F: Send + Sync + 'static + Fn(&Request) -> Response
+{
+    // FIXME: directly pass `addr` to the `TcpListener`
+    let port = addr.to_socket_addrs().unwrap().next().unwrap().port();
+    let server = tiny_http::ServerBuilder::new().with_port(port).build().unwrap();
 
-impl Server {
-    pub fn start() -> Server {
-        Server {
-            server: tiny_http::ServerBuilder::new().with_port(8000).build().unwrap(),
-        }
-    }
-}
+    let handler = Arc::new(handler);
+    let pool = ThreadPool::new(num_cpus::get());
 
-impl IntoIterator for Server {
-    type Item = Request;
-    type IntoIter = IncomingRequests;
+    loop {
+        let request = server.recv().unwrap();
 
-    #[inline]
-    fn into_iter(self) -> IncomingRequests {
-        IncomingRequests { server: self.server }
-    }
-}
-
-pub struct IncomingRequests {
-    server: tiny_http::Server,
-}
-
-impl Iterator for IncomingRequests {
-    type Item = Request;
-
-    #[inline]
-    fn next(&mut self) -> Option<Request> {
-        let request = self.server.recv().unwrap();
-
-        Some(Request {
+        let request = Request {
             url: request.url().to_owned(),
             request: Mutex::new(Some(request)),
             data: Mutex::new(None),
-        })
+        };
+
+        let handler = handler.clone();
+
+        pool.execute(move || {
+            let response = (*handler)(&request);
+            request.request.lock().unwrap().take().unwrap().respond(response.response);
+        });
     }
 }
 
@@ -102,24 +96,6 @@ impl Request {
         *data = Some(read);
         read_clone
     }
-
-    /// Consumes the `Request` and sends the response to the client.
-    #[inline]
-    pub fn respond(self, response: Response) {
-        self.request.lock().unwrap().take().unwrap().respond(response.response)
-    }
-
-    /// Utility function similar to `respond`, but builds the "default" response corresponding to
-    /// the `RouteError`.
-    #[inline]
-    pub fn respond_to_error(self, err: &RouteError) {
-        let response = match err {
-            &RouteError::NoRouteFound => tiny_http::Response::empty(404),
-            &RouteError::WrongInput => tiny_http::Response::empty(400),
-        };
-
-        self.request.lock().unwrap().take().unwrap().respond(response);
-    }
 }
 
 /// Contains a prototype of a response. The response is only sent when you call `Request::respond`.
@@ -128,6 +104,17 @@ pub struct Response {
 }
 
 impl Response {
+    /// Builds a default response to handle the given route error.
+    #[inline]
+    pub fn from_error(err: &RouteError) -> Response {
+        let response = match err {
+            &RouteError::NoRouteFound => tiny_http::Response::empty(404),
+            &RouteError::WrongInput => tiny_http::Response::empty(400),
+        };
+
+        Response { response: response.boxed() }
+    }
+
     /// Builds a `Response` that redirects the user to another URL.
     #[inline]
     pub fn redirect(target: &str) -> Response {

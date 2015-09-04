@@ -26,22 +26,21 @@ server.add_middleware(function() {
 In rouille you just handle each request entirely manually:
 
 ```rust
-for request in requests {
+rouille::start_server(..., move |request| {
     // middleware 1
 
     // middleware 2
 
     // middleware 3
-}
+});
 ```
 
-## What about performances? Single threading is bad.
+## What about performances?
 
 The state of async I/O, green threads, coroutines, etc. in Rust is still blurry.
 
-The rouille library just ignores this optimization and provides an easy-to-use single-thready
-API. However it is possible to spawn threads and use an `Arc` to share the `Server` struct
-between threads.
+The rouille library just ignores this optimization and focuses on providing an easy-to-use
+API instead.
 
 Once async I/O has been figured out, rouille will be updated to take this into account. For the
 moment it favors usability over performances.

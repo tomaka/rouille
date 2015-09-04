@@ -10,13 +10,13 @@ use Request;
 /// # Example
 ///
 /// ```no_run
-/// # let server: rouille::Server = unsafe { std::mem::uninitialized() };
-/// for request in server {
-///     let _entry = rouille::LogEntry::start(std::io::stdout(), &request);
+/// rouille::start_server("localhost:80", move |request| {
+///     let _entry = rouille::LogEntry::start(std::io::stdout(), request);
 ///
 ///     // process the request here
 ///
-/// }   // <-- the log entry is written at the end of this block
+/// # panic!()
+/// }); // <-- the log entry is written at the end of this block
 /// ```
 ///
 pub struct LogEntry<W> where W: Write {

@@ -6,13 +6,11 @@ extern crate rustc_serialize;
 use std::io;
 
 fn main() {
-    let server = rouille::Server::start();
-
     let form = mustache::compile_path("./examples/assets/form.html.mustache").unwrap();
     let form_success = mustache::compile_path("./examples/assets/form_success.html.mustache").unwrap();
 
-    for request in server {
-        let _entry = rouille::LogEntry::start(io::stdout(), &request);
+    rouille::start_server("localhost:8000", move |request| {
+        let _entry = rouille::LogEntry::start(io::stdout(), request);
 
         let response = router!(request,
             GET (/) => (|| {
@@ -22,7 +20,7 @@ fn main() {
             }),
 
             GET (/submit) => (|| {
-                let data: FormData = try!(rouille::input::get_post_input(&request));
+                let data: FormData = try!(rouille::input::get_post_input(request));
                 println!("{:?}", data);
 
                 let mut output = Vec::new();
@@ -33,11 +31,8 @@ fn main() {
             _ => || Err(rouille::RouteError::NoRouteFound)
         );
 
-        match response {
-            Ok(r) => request.respond(r),
-            Err(err) => request.respond_to_error(&err),
-        };
-    }
+        response.unwrap_or_else(|err| rouille::Response::from_error(&err))
+    });
 }
 
 #[derive(Debug, RustcEncodable, RustcDecodable)]

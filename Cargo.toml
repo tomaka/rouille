@@ -4,9 +4,11 @@ version = "0.1.0"
 authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>"]
 
 [dependencies]
+num_cpus = "0.2.6"
 rustc-serialize = "0.3"
 tiny_http = "0.4.0"
 term = "0.2"
+threadpool = "0.1.4"
 time = "0.1.31"
 url = "0.2"
 
