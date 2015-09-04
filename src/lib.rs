@@ -1,3 +1,4 @@
+extern crate backtrace;
 extern crate num_cpus;
 extern crate rustc_serialize;
 extern crate threadpool;

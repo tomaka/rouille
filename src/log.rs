@@ -1,3 +1,4 @@
+use backtrace;
 use std::io::Write;
 use std::thread;
 
@@ -41,7 +42,32 @@ impl<W> Drop for LogEntry<W> where W: Write {
         write!(self.output, "{} - ", self.line).unwrap();
 
         if thread::panicking() {
-            write!(self.output, " - PANIC!").unwrap();
+            writeln!(self.output, " - PANIC!").unwrap();
+
+            let mut frame_num = 0;
+
+            backtrace::trace(&mut |frame| {
+                let ip = frame.ip();
+                frame_num += 1;
+
+                backtrace::resolve(ip, &mut |symbol| {
+                    let name = String::from_utf8(symbol.name()
+                                                       .unwrap_or(&b"<unknown>"[..])
+                                                       .to_owned())
+                                       .unwrap_or_else(|_| "<not-utf8>".to_owned());
+                    let filename = String::from_utf8(symbol.filename()
+                                                           .unwrap_or(&b"<unknown>"[..])
+                                                           .to_owned())
+                                           .unwrap_or_else(|_| "<not-utf8>".to_owned());
+                    let line = symbol.lineno().map(|l| l.to_string())
+                                              .unwrap_or_else(|| "??".to_owned());
+
+                    writeln!(self.output, "{:>#4} - {:p} - {}\n       {}:{}",
+                             frame_num, ip, name, filename, line).unwrap();
+                });
+
+                true
+            });
 
         } else {
             let elapsed = time::precise_time_ns() - self.start_time;
