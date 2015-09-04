@@ -30,6 +30,48 @@ pub enum RouteError {
 }
 
 /// Starts a server and uses the given requests handler.
+///
+/// The request handler takes a `&Request` and must return a `Response` to send to the user.
+///
+/// # Common mistakes
+///
+/// The handler must capture its environment by value and not by reference (`'static`). If you
+/// use closure, don't forget to put `move` in front of the closure.
+///
+/// The handler must also be thread-safe (`Send` and `Sync`).
+/// For example this handler isn't thread-safe:
+///
+/// ```ignore
+/// let mut requests_counter = 0;
+///
+/// rouille::start_server("localhost:80", move |request| {
+///     requests_counter += 1;
+///
+///     // rest of the handler
+/// })
+/// ```
+///
+/// Multiple requests can be processed simultaneously, therefore you can't mutably access
+/// variables from the outside.
+///
+/// Instead you must use a `Mutex`:
+///
+/// ```no_run
+/// use std::sync::Mutex;
+/// let requests_counter = Mutex::new(0);
+///
+/// rouille::start_server("localhost:80", move |request| {
+///     *requests_counter.lock().unwrap() += 1;
+///
+///     // rest of the handler
+/// # panic!()
+/// })
+/// ```
+///
+/// # Panic handling
+///
+/// If your request handler panicks, a 500 error will automatically be sent to the client.
+///
 pub fn start_server<A, F>(addr: A, handler: F) -> !
                           where A: ToSocketAddrs,
                                 F: Send + Sync + 'static + Fn(&Request) -> Response

@@ -3,9 +3,9 @@
 ## [Documentation](http://tomaka.github.io/rouille/rouille/index.html)
 
 
-# FAQ
+## FAQ
 
-## But I'm used to express-like frameworks!
+### But I'm used to express-like frameworks!
 
 Instead of doing this: (pseudo-code)
 
@@ -26,6 +26,8 @@ server.add_middleware(function() {
 In rouille you just handle each request entirely manually:
 
 ```rust
+// initialize everything here
+
 rouille::start_server(..., move |request| {
     // middleware 1
 
@@ -35,7 +37,7 @@ rouille::start_server(..., move |request| {
 });
 ```
 
-## What about performances?
+### What about performances?
 
 The state of async I/O, green threads, coroutines, etc. in Rust is still blurry.
 
@@ -45,16 +47,20 @@ API instead.
 Once async I/O has been figured out, rouille will be updated to take this into account. For the
 moment it favors usability over performances.
 
-## Why isn't it using hyper?
+### Why isn't it using hyper?
 
-Since I'm a Windows developer, I'll switch to hyper only once it's easy to use on Windows.
+Since I'm a Windows developer, I'll switch to hyper once it's easy to use on Windows.
 It's simply too annoying to deal with OpenSSL at the moment.
 
 The web server used as a backend is an implementation detail, so changing it should be
 totally transparent for the user.
 
-## Are there plugins for features such as database connection, templating, etc.
+### Are there plugins for features such as database connection, templating, etc.
 
 It should be trivial to integrate a database or templates to your web server written with
 rouille. Moreover plugins need maintenance tend to create a dependency hell. It is generally
 just better not to use plugins.
+
+### How do you know there is no defect in the API?
+
+I'm using this library to rewrite an existing medium-sized website.
