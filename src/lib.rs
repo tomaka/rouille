@@ -21,12 +21,26 @@ mod assets;
 mod log;
 mod router;
 
+/// An error that one of your routes can return.
+///
+/// This is just a convenience enum and you don't need to use it in your project
+/// if you don't want to.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RouteError {
     /// Couldn't find a way to handle this request.
     NoRouteFound,
 
+    /// The user input is wrong.
     WrongInput,
+
+    /// The user must be logged in.
+    LoginRequired,
+
+    /// The user entered a wrong login or password.
+    WrongLoginPassword,
+
+    /// The user is logged in but shouldn't be there.
+    NotAuthorized,
 }
 
 /// Starts a server and uses the given requests handler.
@@ -146,12 +160,20 @@ pub struct Response {
 }
 
 impl Response {
-    /// Builds a default response to handle the given route error.
+    /// UNSTABLE. Builds a default response to handle the given route error.
+    ///
+    /// Important: don't use this in a real website. This function is just a convenience when
+    /// prototyping.
+    ///
+    /// For authentication-related errors, you are strongly encouraged to handle them yourself.
     #[inline]
     pub fn from_error(err: &RouteError) -> Response {
         let response = match err {
             &RouteError::NoRouteFound => tiny_http::Response::empty(404),
             &RouteError::WrongInput => tiny_http::Response::empty(400),
+            &RouteError::LoginRequired => tiny_http::Response::empty(401),     // TODO: www-auth header?
+            &RouteError::WrongLoginPassword => tiny_http::Response::empty(401),     // TODO: www-auth header?
+            &RouteError::NotAuthorized => tiny_http::Response::empty(403),
         };
 
         Response { response: response.boxed() }
