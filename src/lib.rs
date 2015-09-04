@@ -209,4 +209,16 @@ impl Response {
 
         Response { response: response.boxed() }
     }
+
+    /// Builds a `Response` that returns a `401 Not Authorized` status
+    /// and a `WWW-Authenticate` header.
+    #[inline]
+    pub fn basic_http_auth_login_required(realm: &str) -> Response {
+        // TODO: escape the realm
+        let response = tiny_http::Response::empty(401);
+        // TODO: slow \|/
+        let response = response.with_header(tiny_http::Header::from_str(&format!("WWW-Authenticate: Basic realm=\"{}\"", realm)).unwrap());
+
+        Response { response: response.boxed() }   
+    }
 }

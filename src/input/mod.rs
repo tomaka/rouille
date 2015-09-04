@@ -5,6 +5,7 @@ pub use self::post::get_post_input;
 
 pub mod post;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HttpAuthCredentials {
     pub login: String,
     pub password: String,
