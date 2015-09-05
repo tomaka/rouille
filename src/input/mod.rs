@@ -43,11 +43,39 @@ pub fn get_basic_http_auth(request: &Request) -> Option<HttpAuthCredentials> {
     })
 }
 
+/// Attempts to parse the list of cookies from the request.
+///
+/// Returns a pair of `(key, value)`. If the header is missing or malformed, an empty
+/// `Vec` is returned.
+// TODO: should an error be returned if the header is malformed?
+// TODO: be less tolerent to what is accepted?
+pub fn get_cookies(request: &Request) -> Vec<(String, String)> {
+    let header = match request.header("Cookie") {
+        None => return Vec::new(),
+        Some(h) => h,
+    };
+
+    header
+        .split(|c| c == ';')
+        .filter_map(|cookie| {
+            let mut splits = cookie.splitn(2, |c| c == '=');
+            let key = match splits.next() { None => return None, Some(v) => v };
+            let value = match splits.next() { None => return None, Some(v) => v };
+
+            let key = key.trim().to_owned();
+            let value = value.trim().trim_matches(|c| c == '"').to_owned();
+
+            Some((key, value))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod test {
     use Request;
     use super::HttpAuthCredentials;
     use super::get_basic_http_auth;
+    use super::get_cookies;
 
     #[test]
     fn basic_http_auth_no_header() {
@@ -81,5 +109,18 @@ mod test {
             login: "Aladdin".to_owned(),
             password: "open sesame".to_owned(),
         }));
+    }
+
+    #[test]
+    fn cookies_ok() {
+        let request = Request::fake("/", "GET",
+                                    vec![("Cookie".to_owned(),
+                                          "a=b; hello=world".to_owned())],
+                                    Vec::new());
+
+        assert_eq!(get_cookies(&request), vec![
+            ("a".to_owned(), "b".to_owned()),
+            ("hello".to_owned(), "world".to_owned())
+        ]);
     }
 }
