@@ -135,12 +135,12 @@ enum RequestImpl {
 
 impl Request {
     /// Builds a fake request to be used during tests.
-    pub fn fake(url: String, method: String, headers: Vec<(String, String)>, data: Vec<u8>)
-                -> Request
+    pub fn fake<U, M>(url: U, method: M, headers: Vec<(String, String)>, data: Vec<u8>)
+                      -> Request where U: Into<String>, M: Into<String>
     {
         Request {
-            url: url,
-            method: method,
+            url: url.into(),
+            method: method.into(),
             data: Mutex::new(Some(data)),
             inner: RequestImpl::Fake { headers: headers },
         }
