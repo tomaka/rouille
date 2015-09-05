@@ -103,15 +103,19 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
         let request = Request {
             url: request.url().to_owned(),
             method: request.method().as_str().to_owned(),
-            request: Mutex::new(Some(request)),
             data: Mutex::new(None),
+            inner: RequestImpl::Real(Mutex::new(Some(request))),
         };
 
         let handler = handler.clone();
 
         pool.execute(move || {
             let response = (*handler)(&request);
-            request.request.lock().unwrap().take().unwrap().respond(response.response);
+            match request.inner {
+                RequestImpl::Real(rq) => rq.lock().unwrap().take().unwrap()
+                                           .respond(response.response),
+                RequestImpl::Fake { .. } => unreachable!()
+            }
         });
     }
 }
@@ -120,11 +124,28 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
 pub struct Request {
     url: String,
     method: String,
-    request: Mutex<Option<tiny_http::Request>>,     // TODO: when Mutex gets "into_inner", remove the Option
     data: Mutex<Option<Vec<u8>>>,
+    inner: RequestImpl,
+}
+
+enum RequestImpl {
+    Real(Mutex<Option<tiny_http::Request>>),     // TODO: when Mutex gets "into_inner", remove the Option
+    Fake { headers: Vec<(String, String)> },
 }
 
 impl Request {
+    /// Builds a fake request to be used during tests.
+    pub fn fake(url: String, method: String, headers: Vec<(String, String)>, data: Vec<u8>)
+                -> Request
+    {
+        Request {
+            url: url,
+            method: method,
+            data: Mutex::new(Some(data)),
+            inner: RequestImpl::Fake { headers: headers },
+        }
+    }
+
     /// Returns the method of the request (`GET`, `POST`, etc.).
     #[inline]
     pub fn method(&self) -> &str {
@@ -141,8 +162,14 @@ impl Request {
     /// Returns the value of a header of the request.
     #[inline]
     pub fn header(&self, key: &str) -> Option<String> {
-        self.request.lock().unwrap().as_ref().unwrap().headers().iter()
-                    .find(|h| h.field.as_str() == key).map(|h| h.value.as_str().to_owned())
+        match self.inner {
+            RequestImpl::Real(ref request) => request.lock().unwrap().as_ref().unwrap().headers()
+                                                     .iter().find(|h| h.field.as_str() == key)
+                                                     .map(|h| h.value.as_str().to_owned()),
+
+            RequestImpl::Fake { ref headers } => headers.iter().find(|&&(ref k, _)| k == key)
+                                                        .map(|&(_, ref v)| v.clone())
+        }        
     }
 
     /// Returns the data of the request.
@@ -154,8 +181,13 @@ impl Request {
         }
 
         let mut read = Vec::new();
-        let _ = self.request.lock().unwrap().as_mut().unwrap()
-                            .as_reader().read_to_end(&mut read);
+        match self.inner {
+            RequestImpl::Real(ref request) => {
+                let _ = request.lock().unwrap().as_mut().unwrap()
+                               .as_reader().read_to_end(&mut read);
+            },
+            RequestImpl::Fake { .. } => ()
+        };
         let read_clone = read.clone();
         *data = Some(read);
         read_clone
