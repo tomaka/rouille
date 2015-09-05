@@ -103,6 +103,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
         let request = Request {
             url: request.url().to_owned(),
             method: request.method().as_str().to_owned(),
+            https: false,
             data: Mutex::new(None),
             inner: RequestImpl::Real(Mutex::new(Some(request))),
         };
@@ -124,6 +125,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
 pub struct Request {
     url: String,
     method: String,
+    https: bool,
     data: Mutex<Option<Vec<u8>>>,
     inner: RequestImpl,
 }
@@ -135,15 +137,22 @@ enum RequestImpl {
 
 impl Request {
     /// Builds a fake request to be used during tests.
-    pub fn fake<U, M>(url: U, method: M, headers: Vec<(String, String)>, data: Vec<u8>)
+    pub fn fake<U, M>(https: bool, url: U, method: M, headers: Vec<(String, String)>, data: Vec<u8>)
                       -> Request where U: Into<String>, M: Into<String>
     {
         Request {
             url: url.into(),
             method: method.into(),
+            https: https,
             data: Mutex::new(Some(data)),
             inner: RequestImpl::Fake { headers: headers },
         }
+    }
+
+    /// Returns `true` if the request uses HTTPS instead of HTTP.
+    #[inline]
+    pub fn secure(&self) -> bool {
+        self.https
     }
 
     /// Returns the method of the request (`GET`, `POST`, etc.).
