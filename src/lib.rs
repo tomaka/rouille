@@ -102,6 +102,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
 
         let request = Request {
             url: request.url().to_owned(),
+            method: request.method().as_str().to_owned(),
             request: Mutex::new(Some(request)),
             data: Mutex::new(None),
         };
@@ -118,11 +119,18 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
 /// Represents a request made by the client.
 pub struct Request {
     url: String,
+    method: String,
     request: Mutex<Option<tiny_http::Request>>,     // TODO: when Mutex gets "into_inner", remove the Option
     data: Mutex<Option<Vec<u8>>>,
 }
 
 impl Request {
+    /// Returns the method of the request (`GET`, `POST`, etc.).
+    #[inline]
+    pub fn method(&self) -> &str {
+        &self.method
+    }
+
     /// Returns the URL requested by the client. It is not decoded and thus can contain `%20` or
     /// other characters.
     #[inline]
