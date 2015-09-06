@@ -250,8 +250,8 @@ impl Response {
 
     /// Builds a `Response` that outputs plain text.
     #[inline]
-    pub fn text(text: &str) -> Response {
-        let response = tiny_http::Response::from_string(text);
+    pub fn text<S>(text: S) -> Response where S: Into<String> {
+        let response = tiny_http::Response::from_string(text.into());
         // TODO: slow \|/
         let response = response.with_header(tiny_http::Header::from_str("Content-Type: text/plain; charset=utf8").unwrap());
 
