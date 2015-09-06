@@ -248,6 +248,16 @@ impl Response {
         Response { response: response.boxed() }
     }
 
+    /// Builds a `Response` that outputs plain text.
+    #[inline]
+    pub fn text(text: &str) -> Response {
+        let response = tiny_http::Response::from_string(text);
+        // TODO: slow \|/
+        let response = response.with_header(tiny_http::Header::from_str("Content-Type: text/plain; charset=utf8").unwrap());
+
+        Response { response: response.boxed() }
+    }
+
     /// Builds a `Response` that outputs JSON.
     #[inline]
     pub fn json<T>(content: &T) -> Response where T: rustc_serialize::Encodable {
