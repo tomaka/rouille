@@ -2,6 +2,8 @@
 
 ## [Documentation](http://tomaka.github.io/rouille/rouille/index.html)
 
+## [Link to WIP book](http://tomaka.github.io/rouille/book/)
+
 
 ## FAQ
 
