@@ -8,6 +8,33 @@ use Request;
 use Response;
 use RouteError;
 
+/// Searches inside `path` for a file that matches the given request. If a file is found,
+/// returns a `Response` that would serve this file if returned.
+///
+/// The value of the `Content-Type` header of the response is guessed based on the file's
+/// extension.
+///
+/// # Todo
+///
+/// Prefix system, so that `/prefix/file.png` can match `file.png` even if you don't put it
+/// in a directory named `prefix`.
+///
+/// # Security
+///
+/// Everything inside the directory that you pass as `path` is potentially accessible by any
+/// client. **Do not use assume that client won't be able to guess the URL of a sensitive file**.
+/// All sensitive files should require a login/password to be accessed.
+///
+/// If you want to serve sensitive files, you are encouraged to put them in a different directory
+/// than public files, and call `match_assets` once for public files and once for private files
+/// after you checked the user's credentials.
+/// Only call `match_assets` **after** you know that the user can have access to all the files
+/// that can be served.
+///
+/// If you manage the user's accesses per-file, use a white list of authorized files instead of a
+/// black list of forbidden files. Files can potentially be accessed from multiple different URLs
+/// and a black list may not cover everything.
+///
 pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, RouteError>
                                where P: AsRef<Path>
 {
