@@ -178,8 +178,8 @@ impl Request {
         &self.method
     }
 
-    /// Returns the URL requested by the client. It is not decoded and thus can contain `%20` or
-    /// other characters.
+    /// Returns the URL requested by the client. It is not decoded and thus can contain strings
+    /// such as `%20`.
     ///
     /// See also `url`.
     #[inline]
@@ -187,10 +187,10 @@ impl Request {
         &self.url
     }
 
-    /// Returns the URL requested by the client. Contrary to `raw_url`, special characters have
-    /// been decoded.
+    /// Returns the URL requested by the client.
     ///
-    /// If there is any non-UTF8 character in the URL, it will be replaced with `U+FFFD`.
+    /// Contrary to `raw_url`, special characters have been decoded.
+    /// If there is any non-unicode character in the URL, it will be replaced with `U+FFFD`.
     pub fn url(&self) -> String {
         url::percent_encoding::lossy_utf8_percent_decode(self.url.as_bytes())
     }
