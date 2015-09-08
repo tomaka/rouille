@@ -79,31 +79,31 @@ mod test {
 
     #[test]
     fn basic_http_auth_no_header() {
-        let request = Request::fake(false, "/", "GET", vec![], Vec::new());
+        let request = Request::fake_http("GET", "/", vec![], Vec::new());
         assert_eq!(get_basic_http_auth(&request), None);
     }
 
     #[test]
     fn basic_http_auth_wrong_header() {
-        let request = Request::fake(false, "/", "GET",
-                                    vec![("Authorization".to_owned(),
-                                          "hello world".to_owned())],
-                                    Vec::new());
+        let request = Request::fake_http("GET", "/",
+                                         vec![("Authorization".to_owned(),
+                                               "hello world".to_owned())],
+                                         Vec::new());
         assert_eq!(get_basic_http_auth(&request), None);
 
-        let request = Request::fake(false, "/", "GET",
-                                    vec![("Authorization".to_owned(),
-                                          "Basic \0\0".to_owned())],
-                                    Vec::new());
+        let request = Request::fake_http("GET", "/",
+                                         vec![("Authorization".to_owned(),
+                                               "Basic \0\0".to_owned())],
+                                         Vec::new());
         assert_eq!(get_basic_http_auth(&request), None);
     }
 
     #[test]
     fn basic_http_auth_ok() {
-        let request = Request::fake(false, "/", "GET",
-                                    vec![("Authorization".to_owned(),
-                                          "Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==".to_owned())],
-                                    Vec::new());
+        let request = Request::fake_http("GET", "/",
+                                         vec![("Authorization".to_owned(),
+                                               "Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==".to_owned())],
+                                         Vec::new());
 
         assert_eq!(get_basic_http_auth(&request), Some(HttpAuthCredentials {
             login: "Aladdin".to_owned(),
@@ -113,10 +113,10 @@ mod test {
 
     #[test]
     fn cookies_ok() {
-        let request = Request::fake(false, "/", "GET",
-                                    vec![("Cookie".to_owned(),
-                                          "a=b; hello=world".to_owned())],
-                                    Vec::new());
+        let request = Request::fake_http("GET", "/",
+                                         vec![("Cookie".to_owned(),
+                                               "a=b; hello=world".to_owned())],
+                                         Vec::new());
 
         assert_eq!(get_cookies(&request), vec![
             ("a".to_owned(), "b".to_owned()),

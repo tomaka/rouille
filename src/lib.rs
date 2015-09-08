@@ -140,14 +140,27 @@ enum RequestImpl {
 }
 
 impl Request {
-    /// Builds a fake request to be used during tests.
-    pub fn fake<U, M>(https: bool, url: U, method: M, headers: Vec<(String, String)>, data: Vec<u8>)
-                      -> Request where U: Into<String>, M: Into<String>
+    /// Builds a fake HTTP request to be used during tests.
+    pub fn fake_http<U, M>(method: M, url: U, headers: Vec<(String, String)>, data: Vec<u8>)
+                           -> Request where U: Into<String>, M: Into<String>
     {
         Request {
             url: url.into(),
             method: method.into(),
-            https: https,
+            https: false,
+            data: Mutex::new(Some(data)),
+            inner: RequestImpl::Fake { headers: headers },
+        }
+    }
+
+    /// Builds a fake HTTPS request to be used during tests.
+    pub fn fake_https<U, M>(method: M, url: U, headers: Vec<(String, String)>, data: Vec<u8>)
+                            -> Request where U: Into<String>, M: Into<String>
+    {
+        Request {
+            url: url.into(),
+            method: method.into(),
+            https: true,
             data: Mutex::new(Some(data)),
             inner: RequestImpl::Fake { headers: headers },
         }
