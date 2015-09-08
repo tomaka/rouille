@@ -19,7 +19,7 @@ fn main() {
                 Ok(rouille::Response::html(output))
             }),
 
-            (GET) (/submit) => (|| {
+            (POST) (/submit) => (|| {
                 let data: FormData = try!(rouille::input::get_post_input(request));
                 println!("{:?}", data);
 
