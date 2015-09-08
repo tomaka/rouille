@@ -8,12 +8,13 @@
 /// # let request: rouille::Request = unsafe { std::mem::uninitialized() };
 /// router!(request,
 ///     // first route
-///     GET (/) => (|| {
+///     (GET) (/) => (|| {
 ///         12
 ///     }),
 ///
-///     // other routes here
+///     // ... other routes here ...
 ///
+///     // default route
 ///     _ => || 5
 /// )
 /// # }
@@ -26,7 +27,7 @@
 /// You can use parameters by putting them inside `{}`:
 ///
 /// ```ignore
-/// GET (/{id}/foo) => (|id: u32| {
+/// (GET) (/{id}/foo) => (|id: u32| {
 ///     ...
 /// }),
 /// ```
@@ -49,7 +50,7 @@
 // TODO: don't panic if parsing fails
 #[macro_export]
 macro_rules! router {
-    ($request:expr, $(GET ($($pat:tt)+) => ($($closure:tt)+),)* _ => $def:expr) => {
+    ($request:expr, $(($method:ident) ($($pat:tt)+) => ($($closure:tt)+),)* _ => $def:expr) => {
         {
             use std;
 
@@ -67,7 +68,9 @@ macro_rules! router {
             $({
                 // we use a RefCell just to avoid warnings about `values doesn't need to be mutable`
                 let values = std::cell::RefCell::new(std::collections::HashMap::<&'static str, &str>::new());
-                if ret.is_none() && router!(__check_pattern values request_url $($pat)+) {
+                if ret.is_none() && request.method() == stringify!($method) &&
+                   router!(__check_pattern values request_url $($pat)+)
+                {
                     let values = values.borrow();
                     ret = router!(__parse_closure values $($closure)+);
                 }

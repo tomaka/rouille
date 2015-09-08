@@ -13,13 +13,13 @@ fn main() {
         let _entry = rouille::LogEntry::start(io::stdout(), request);
 
         let response = router!(request,
-            GET (/) => (|| {
+            (GET) (/) => (|| {
                 let mut output = Vec::new();
                 form.render_data(&mut output, &mustache::Data::Bool(false));
                 Ok(rouille::Response::html(output))
             }),
 
-            GET (/submit) => (|| {
+            (GET) (/submit) => (|| {
                 let data: FormData = try!(rouille::input::get_post_input(request));
                 println!("{:?}", data);
 

@@ -12,25 +12,25 @@ fn main() {
         }
 
         let response = router!(request,
-            GET (/) => (|| {
+            (GET) (/) => (|| {
                 Ok(rouille::Response::redirect("/hello/world"))
             }),
 
-            GET (/hello/world) => (|| {
+            (GET) (/hello/world) => (|| {
                 println!("hello world");
                 Ok(rouille::Response::text("hello world"))
             }),
 
-            GET (/panic) => (|| {
+            (GET) (/panic) => (|| {
                 panic!("Oops!")
             }),
 
-            GET (/{id}) => (|id: u32| {
+            (GET) (/{id}) => (|id: u32| {
                 println!("u32 {:?}", id);
                 Err(rouille::RouteError::WrongInput)
             }),
 
-            GET (/{id}) => (|id: String| {
+            (GET) (/{id}) => (|id: String| {
                 println!("String {:?}", id);
                 Ok(rouille::Response::text(format!("hello, {}", id)))
             }),

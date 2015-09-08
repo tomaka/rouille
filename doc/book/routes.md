@@ -38,11 +38,11 @@ fn main() {
     rouille::start_server("locahost:8000", move |request| {
         // dispatching depending on the URL and method
         router!(request,
-            GET (/) => (|| {
+            (GET) (/) => (|| {
                 Response::text("hello from the root")
             }),
 
-            GET (/foo) => (|| {
+            (GET) (/foo) => (|| {
                 Response::text("hello from /foo")
             }),
 
