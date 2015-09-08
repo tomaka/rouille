@@ -1,11 +1,9 @@
-use tiny_http;
-
 use std::fs;
 use std::path::Path;
-use std::str::FromStr;
 
 use Request;
 use Response;
+use ResponseBody;
 use RouteError;
 
 /// Searches inside `path` for a file that matches the given request. If a file is found,
@@ -57,9 +55,13 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
         Err(_) => return Err(RouteError::NoRouteFound)
     };
 
-    let response = tiny_http::Response::from_file(file);
-    let response = response.with_header(tiny_http::Header::from_str(&format!("Content-Type: {}", extension_to_mime(extension))).unwrap());    // TODO: slow
-    Ok(Response { response: response.boxed() })
+    Ok(Response {
+        status_code: 200,
+        headers: vec![
+            ("Content-Type".to_owned(), extension_to_mime(extension).to_owned())
+        ],
+        data: ResponseBody::from_file(file),
+    })
 }
 
 /// Returns the mime type of a file based on its extension.

@@ -16,7 +16,7 @@ fn main() {
             GET (/) => (|| {
                 let mut output = Vec::new();
                 form.render_data(&mut output, &mustache::Data::Bool(false));
-                Ok(rouille::Response::html(&output))
+                Ok(rouille::Response::html(output))
             }),
 
             GET (/submit) => (|| {
@@ -25,7 +25,7 @@ fn main() {
 
                 let mut output = Vec::new();
                 form_success.render(&mut output, &data);
-                Ok(rouille::Response::html(&output))
+                Ok(rouille::Response::html(output))
             }),
 
             _ => || Err(rouille::RouteError::NoRouteFound)
