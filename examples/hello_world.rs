@@ -21,6 +21,10 @@ fn main() {
                 Ok(rouille::Response::text("hello world"))
             }),
 
+            GET (/panic) => (|| {
+                panic!("Oops!")
+            }),
+
             GET (/{id}) => (|id: u32| {
                 println!("u32 {:?}", id);
                 Err(rouille::RouteError::WrongInput)
