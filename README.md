@@ -51,8 +51,8 @@ moment it favors usability over performances.
 
 ### Why isn't it using hyper?
 
-Since I'm a Windows developer, I'll switch to hyper once it's easy to use on Windows.
-It's simply too annoying to deal with OpenSSL at the moment.
+Rouille will switch the hyper eventually. The reason why tiny_http was chosen is that it
+"just works" on Windows, contrary to hyper which requires OpenSSL.
 
 The web server used as a backend is an implementation detail, so changing it should be
 totally transparent for the user.
