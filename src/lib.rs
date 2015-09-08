@@ -116,6 +116,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                                                 .collect(),
                 https: false,
                 data: data,
+                remote_addr: hrequest.remote_addr.clone(),
             };
 
             // calling the handler ; this most likely takes a lot of time
@@ -155,6 +156,7 @@ pub struct Request {
     headers: Vec<(String, String)>,
     https: bool,
     data: Vec<u8>,
+    remote_addr: SocketAddr,
 }
 
 impl Request {
@@ -168,6 +170,22 @@ impl Request {
             https: false,
             data: data,
             headers: headers,
+            remote_addr: "127.0.0.1:12345".parse().unwrap(),
+        }
+    }
+
+    /// Builds a fake HTTP request to be used during tests.
+    pub fn fake_http_from<U, M>(from: SocketAddr, method: M, url: U,
+                                headers: Vec<(String, String)>, data: Vec<u8>)
+                                -> Request where U: Into<String>, M: Into<String>
+    {
+        Request {
+            url: url.into(),
+            method: method.into(),
+            https: false,
+            data: data,
+            headers: headers,
+            remote_addr: from,
         }
     }
 
@@ -181,6 +199,22 @@ impl Request {
             https: true,
             data: data,
             headers: headers,
+            remote_addr: "127.0.0.1:12345".parse().unwrap(),
+        }
+    }
+
+    /// Builds a fake HTTPS request to be used during tests.
+    pub fn fake_https_from<U, M>(from: SocketAddr, method: M, url: U,
+                                 headers: Vec<(String, String)>, data: Vec<u8>)
+                                 -> Request where U: Into<String>, M: Into<String>
+    {
+        Request {
+            url: url.into(),
+            method: method.into(),
+            https: true,
+            data: data,
+            headers: headers,
+            remote_addr: from,
         }
     }
 
@@ -222,6 +256,12 @@ impl Request {
     /// Returns the data of the request.
     pub fn data(&self) -> Vec<u8> {
         self.data.clone()
+    }
+
+    /// Returns the address of the client.
+    #[inline]
+    pub fn remote_addr(&self) -> &SocketAddr {
+        &self.remote_addr
     }
 }
 
