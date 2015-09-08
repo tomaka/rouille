@@ -29,7 +29,7 @@ impl<'a, W> LogEntry<W> where W: Write {
     /// Starts a `LogEntry`.
     pub fn start(output: W, rq: &Request) -> LogEntry<W> {
         LogEntry {
-            line: format!("{} {}", rq.method(), rq.url()),
+            line: format!("{} {}", rq.method(), rq.raw_url()),
             output: output,
             start_time: time::precise_time_ns(),
         }

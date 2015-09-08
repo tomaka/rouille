@@ -56,10 +56,10 @@ macro_rules! router {
             let ref request = $request;
 
             // ignoring the GET parameters (everything after `?`)
+            let request_url = request.url();
             let request_url = {
-                let url = request.url();
-                let pos = url.find('?').unwrap_or(url.len());
-                &url[..pos]
+                let pos = request_url.find('?').unwrap_or(request_url.len());
+                &request_url[..pos]
             };
 
             let mut ret = None;
