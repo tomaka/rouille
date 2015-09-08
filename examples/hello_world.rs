@@ -18,7 +18,7 @@ fn main() {
 
             GET (/hello/world) => (|| {
                 println!("hello world");
-                Err(rouille::RouteError::WrongInput)
+                Ok(rouille::Response::text("hello world"))
             }),
 
             GET (/{id}) => (|id: u32| {
@@ -28,7 +28,7 @@ fn main() {
 
             GET (/{id}) => (|id: String| {
                 println!("String {:?}", id);
-                Err(rouille::RouteError::WrongInput)
+                Ok(rouille::Response::text(format!("hello, {}", id)))
             }),
 
             _ => || Err(rouille::RouteError::NoRouteFound)
