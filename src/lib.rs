@@ -19,6 +19,7 @@ use std::thread;
 pub mod input;
 
 mod assets;
+mod find_route;
 mod log;
 mod router;
 
