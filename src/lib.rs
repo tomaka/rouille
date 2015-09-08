@@ -1,8 +1,6 @@
-extern crate num_cpus;
+extern crate hyper;
 extern crate rustc_serialize;
-extern crate threadpool;
 extern crate time;
-extern crate tiny_http;
 extern crate url;
 
 pub use assets::match_assets;
@@ -17,7 +15,6 @@ use std::net::ToSocketAddrs;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use threadpool::ThreadPool;
 
 pub mod input;
 
@@ -94,49 +91,70 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                           where A: ToSocketAddrs,
                                 F: Send + Sync + 'static + Fn(&Request) -> Response
 {
-    // FIXME: directly pass `addr` to the `TcpListener`
-    let port = addr.to_socket_addrs().unwrap().next().unwrap().port();
-    let server = tiny_http::ServerBuilder::new().with_port(port).build().unwrap();
+    // TODO: unused result?!?
+    // TODO: does this block forever or not?
+    hyper::server::Server::http(addr).unwrap().handle(Handler(handler));
 
-    let handler = Arc::new(handler);
-    let pool = ThreadPool::new(num_cpus::get());
+    struct Handler<H>(H);
+    impl<H> hyper::server::Handler for Handler<H>
+            where H: Send + Sync + 'static + Fn(&Request) -> Response
+    {
+        fn handle<'a, 'k>(&'a self, mut hrequest: hyper::server::request::Request<'a, 'k>,
+                          mut hresponse: hyper::server::response::Response<'a, hyper::net::Fresh>)
+        {
+            *hresponse.status_mut() = hyper::status::StatusCode::InternalServerError;
 
-    loop {
-        let request = server.recv().unwrap();
+            // TODO: don't read the body in memory immediately
+            let mut data = Vec::new();
+            hrequest.read_to_end(&mut data);     // TODO: handle error
 
-        let request = Request {
-            url: request.url().to_owned(),
-            method: request.method().as_str().to_owned(),
-            https: false,
-            data: Mutex::new(None),
-            inner: RequestImpl::Real(Mutex::new(Some(request))),
-        };
+            // building the `Request` object
+            let request = Request {
+                url: format!("{}", hrequest.uri),   // TODO: handle this properly?
+                method: hrequest.method.as_ref().to_owned(),
+                headers: hrequest.headers.iter().map(|h| (h.name().to_owned(), h.value_string()))
+                                                .collect(),
+                https: false,
+                data: data,
+            };
 
-        let handler = handler.clone();
+            // calling the handler ; this most likely takes a lot of time
+            let mut response = (self.0)(&request);
 
-        pool.execute(move || {
-            let response = (*handler)(&request);
-            match request.inner {
-                RequestImpl::Real(rq) => rq.lock().unwrap().take().unwrap()
-                                           .respond(response.into()),
-                RequestImpl::Fake { .. } => unreachable!()
+            // writing the status code
+            *hresponse.status_mut() = hyper::status::StatusCode::from_u16(response.status_code);
+
+            // writing headers
+            for (key, value) in response.headers {
+                // FIXME: multiple headers with the same key
+                hresponse.headers_mut().set_raw(key, vec![value.into_bytes()]);
             }
-        });
+
+            if let Some(len) = response.data.data_length {
+                hresponse.headers_mut().set(hyper::header::ContentLength(len as u64));
+            }
+
+            // sending status code and headers
+            let mut hresponse = match hresponse.start() {
+                Err(_) => return,
+                Ok(r) => r
+            };
+
+            let _ = io::copy(response.data.data.by_ref(), &mut hresponse);
+            let _ = hresponse.end();
+        }
     }
+
+    unreachable!()      // TODO: ?!?
 }
 
 /// Represents a request made by the client.
 pub struct Request {
-    url: String,
     method: String,
+    url: String,
+    headers: Vec<(String, String)>,
     https: bool,
-    data: Mutex<Option<Vec<u8>>>,
-    inner: RequestImpl,
-}
-
-enum RequestImpl {
-    Real(Mutex<Option<tiny_http::Request>>),     // TODO: when Mutex gets "into_inner", remove the Option
-    Fake { headers: Vec<(String, String)> },
+    data: Vec<u8>,
 }
 
 impl Request {
@@ -148,8 +166,8 @@ impl Request {
             url: url.into(),
             method: method.into(),
             https: false,
-            data: Mutex::new(Some(data)),
-            inner: RequestImpl::Fake { headers: headers },
+            data: data,
+            headers: headers,
         }
     }
 
@@ -161,8 +179,8 @@ impl Request {
             url: url.into(),
             method: method.into(),
             https: true,
-            data: Mutex::new(Some(data)),
-            inner: RequestImpl::Fake { headers: headers },
+            data: data,
+            headers: headers,
         }
     }
 
@@ -198,35 +216,12 @@ impl Request {
     /// Returns the value of a header of the request.
     #[inline]
     pub fn header(&self, key: &str) -> Option<String> {
-        match self.inner {
-            RequestImpl::Real(ref request) => request.lock().unwrap().as_ref().unwrap().headers()
-                                                     .iter().find(|h| h.field.as_str() == key)
-                                                     .map(|h| h.value.as_str().to_owned()),
-
-            RequestImpl::Fake { ref headers } => headers.iter().find(|&&(ref k, _)| k == key)
-                                                        .map(|&(_, ref v)| v.clone())
-        }        
+        self.headers.iter().find(|&&(ref k, _)| k == key).map(|&(_, ref v)| v.clone())
     }
 
     /// Returns the data of the request.
     pub fn data(&self) -> Vec<u8> {
-        let mut data = self.data.lock().unwrap();
-
-        if let Some(ref mut data) = *data {
-            return data.clone();
-        }
-
-        let mut read = Vec::new();
-        match self.inner {
-            RequestImpl::Real(ref request) => {
-                let _ = request.lock().unwrap().as_mut().unwrap()
-                               .as_reader().read_to_end(&mut read);
-            },
-            RequestImpl::Fake { .. } => ()
-        };
-        let read_clone = read.clone();
-        *data = Some(read);
-        read_clone
+        self.data.clone()
     }
 }
 
@@ -245,18 +240,6 @@ pub struct Response {
 
     /// An opaque type that contains the body of the response.
     pub data: ResponseBody,
-}
-
-impl Into<tiny_http::ResponseBox> for Response {
-    fn into(self) -> tiny_http::ResponseBox {
-        // TODO: slow
-        let headers = self.headers.into_iter()
-                                  .map(|(h, v)| format!("{}: {}", h, v).parse().unwrap())
-                                  .collect();
-
-        tiny_http::Response::new(self.status_code.into(), headers,
-                                 self.data.data, self.data.data_length, None)
-    }
 }
 
 impl Response {

@@ -49,14 +49,6 @@ API instead.
 Once async I/O has been figured out, rouille will be updated to take this into account. For the
 moment it favors usability over performances.
 
-### Why isn't it using hyper?
-
-Rouille will switch the hyper eventually. The reason why tiny_http was chosen is that it
-"just works" on Windows, contrary to hyper which requires OpenSSL.
-
-The web server used as a backend is an implementation detail, so changing it should be
-totally transparent for the user.
-
 ### Are there plugins for features such as database connection, templating, etc.
 
 It should be trivial to integrate a database or templates to your web server written with
