@@ -11,6 +11,8 @@ pub use input::{SessionsManager, Session, generate_session_id};
 use std::io;
 use std::io::Cursor;
 use std::io::Read;
+use std::error;
+use std::fmt;
 use std::fs::File;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
@@ -45,6 +47,34 @@ pub enum RouteError {
 
     /// The user is logged in but shouldn't be there.
     NotAuthorized,
+}
+
+impl error::Error for RouteError {
+    fn description(&self) -> &str {
+        match self {
+            &RouteError::NoRouteFound => {
+                "Couldn't find a way to handle this request."
+            },
+            &RouteError::WrongInput => {
+                "The body of the request is malformed or missing something."
+            },
+            &RouteError::LoginRequired => {
+                "The client must be logged in before this request can be answered."
+            },
+            &RouteError::WrongLoginPassword => {
+                "The client attempted to login but entered a wrong login or password."
+            },
+            &RouteError::NotAuthorized => {
+                "The client is logged in but doesn't have the permission to access this resource."
+            },
+        }
+    }
+}
+
+impl fmt::Display for RouteError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "{}", error::Error::description(self))
+    }
 }
 
 /// Starts a server and uses the given requests handler.
