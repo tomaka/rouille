@@ -5,6 +5,7 @@ authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>"]
 
 [dependencies]
 hyper = "0.6.13"
+rand = "0.3.11"
 rustc-serialize = "0.3"
 term = "0.2"
 time = "0.1.31"

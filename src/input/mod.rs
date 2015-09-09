@@ -2,8 +2,11 @@ use rustc_serialize::base64::FromBase64;
 use Request;
 
 pub use self::post::get_post_input;
+pub use self::session::{SessionsManager, Session, generate_session_id};
 
 pub mod post;
+
+mod session;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HttpAuthCredentials {

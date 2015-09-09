@@ -1,10 +1,12 @@
 extern crate hyper;
+extern crate rand;
 extern crate rustc_serialize;
 extern crate time;
 extern crate url;
 
 pub use assets::match_assets;
 pub use log::LogEntry;
+pub use input::{SessionsManager, Session, generate_session_id};
 
 use std::io;
 use std::io::Cursor;
