@@ -152,7 +152,10 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
     unreachable!()      // TODO: ?!?
 }
 
-/// Represents a request made by the client.
+/// Represents a request that your handler must answer to.
+///
+/// This can be either a real request (received by the HTTP server) or a mock object created with
+/// one of the `fake_*` constructors.
 pub struct Request {
     method: String,
     url: String,
@@ -164,6 +167,9 @@ pub struct Request {
 
 impl Request {
     /// Builds a fake HTTP request to be used during tests.
+    ///
+    /// The remote address of the client will be `127.0.0.1:12345`. Use `fake_http_from` to
+    /// specify what the client's address should be.
     pub fn fake_http<U, M>(method: M, url: U, headers: Vec<(String, String)>, data: Vec<u8>)
                            -> Request where U: Into<String>, M: Into<String>
     {
@@ -193,6 +199,9 @@ impl Request {
     }
 
     /// Builds a fake HTTPS request to be used during tests.
+    ///
+    /// The remote address of the client will be `127.0.0.1:12345`. Use `fake_https_from` to
+    /// specify what the client's address should be.
     pub fn fake_https<U, M>(method: M, url: U, headers: Vec<(String, String)>, data: Vec<u8>)
                             -> Request where U: Into<String>, M: Into<String>
     {
@@ -236,7 +245,7 @@ impl Request {
     /// Returns the URL requested by the client. It is not decoded and thus can contain strings
     /// such as `%20`.
     ///
-    /// See also `url`.
+    /// See also `url()`.
     #[inline]
     pub fn raw_url(&self) -> &str {
         &self.url
@@ -251,17 +260,21 @@ impl Request {
     }
 
     /// Returns the value of a header of the request.
+    ///
+    /// Returns `None` if no such header could be found.
     #[inline]
     pub fn header(&self, key: &str) -> Option<String> {
         self.headers.iter().find(|&&(ref k, _)| k == key).map(|&(_, ref v)| v.clone())
     }
 
-    /// Returns the data of the request.
+    /// UNSTABLE. Returns the body of the request.
+    ///
+    /// Will eventually return an object that implements `Read` instead of a `Vec<u8>`.
     pub fn data(&self) -> Vec<u8> {
         self.data.clone()
     }
 
-    /// Returns the address of the client.
+    /// Returns the address of the client that made this request.
     #[inline]
     pub fn remote_addr(&self) -> &SocketAddr {
         &self.remote_addr
