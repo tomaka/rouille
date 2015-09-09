@@ -113,6 +113,13 @@ macro_rules! router {
         }
     );
 
+    (__parse_closure $values:ident $val:expr) => (
+        {
+            assert!($values.len() == 0);
+            Some($val)
+        }
+    );
+
     (__check_pattern $values:ident $url:ident /{$p:ident} $($rest:tt)*) => (
         if !$url.starts_with('/') {
             false
