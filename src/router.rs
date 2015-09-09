@@ -8,14 +8,14 @@
 /// # let request: rouille::Request = unsafe { std::mem::uninitialized() };
 /// router!(request,
 ///     // first route
-///     (GET) (/) => (|| {
+///     (GET) (/) => {
 ///         12
-///     }),
+///     },
 ///
 ///     // ... other routes here ...
 ///
 ///     // default route
-///     _ => || 5
+///     _ => 5
 /// )
 /// # }
 /// ```
@@ -27,33 +27,37 @@
 /// You can use parameters by putting them inside `{}`:
 ///
 /// ```ignore
-/// (GET) (/{id}/foo) => (|id: u32| {
+/// (GET) (/{id}/foo) => {
 ///     ...
-/// }),
+/// },
 /// ```
 ///
 /// If you use parameters inside `{}`, then a field with the same name must exist in the closure's
 /// parameters list. The parameters do not need be in the same order.
 ///
 /// Each parameter gets parsed through the `FromStr` trait. If the parsing fails, the route is
-/// ignored.
+/// ignored. If you get an error because the type of the parameter couldn't be inferred, you can
+/// also specify the type inside the brackets:
+///
+/// ```ignore
+/// (GET) (/{id: u32}/foo) => {
+///     ...
+/// },
+/// ```
 ///
 /// Some other things to note:
 ///
-/// - The right of the `=>` must have a closure-like syntax.
+/// - The right of the `=>` must be a block (must be surrounded by `{` and `}`).
 /// - The pattern of the URL and the closure must be inside parentheses. This is to bypass
 ///   limitations of Rust's macros system.
 /// - The default handler (with `_`) must be present or will get a compilation error.
 ///
 // FIXME: turn `: $pt:ident` into `ty`
-// TODO: don't use a hashmap for perfs
 // TODO: don't panic if parsing fails
 #[macro_export]
 macro_rules! router {
-    ($request:expr, $(($method:ident) ($($pat:tt)+) => ($($closure:tt)+),)* _ => $def:expr) => {
+    ($request:expr, $(($method:ident) ($($pat:tt)+) => $value:block,)* _ => $def:expr) => {
         {
-            use std;
-
             let ref request = $request;
 
             // ignoring the GET parameters (everything after `?`)
@@ -66,93 +70,69 @@ macro_rules! router {
             let mut ret = None;
 
             $({
-                // we use a RefCell just to avoid warnings about `values doesn't need to be mutable`
-                let values = std::cell::RefCell::new(std::collections::HashMap::<&'static str, &str>::new());
-                if ret.is_none() && request.method() == stringify!($method) &&
-                   router!(__check_pattern values request_url $($pat)+)
-                {
-                    let values = values.borrow();
-                    ret = router!(__parse_closure values $($closure)+);
+                if ret.is_none() && request.method() == stringify!($method) {
+                    ret = router!(__check_pattern request_url $value $($pat)+);
                 }
             })+
 
             if let Some(ret) = ret {
                 ret
             } else {
-                $def()
+                $def
             }
         }
     };
 
-    (__parse_closure $values:ident |$($pn:ident $(: $pt:ident)*),*| $(-> $ret:ident)* $val:expr) => (
-        {
-            let closure = |$($pn$(:$pt)*),*| $(-> $ret)* { $val };
-            let ret;
-            loop {
-                ret = Some(closure(
-                    $(
-                        match $values.get(stringify!($pn))
-                                     .expect("Closure parameter missing from route").parse()
-                        {
-                            Ok(val) => val,
-                            Err(_) => { ret = None; break; }
-                        }
-                    ),*
-                ));
-                break;
-            }
-            ret
-        }
-    );
-
-    (__parse_closure $values:ident || $val:expr) => (
-        {
-            let closure = || $val;
-            assert!($values.len() == 0);
-            Some(closure())
-        }
-    );
-
-    (__parse_closure $values:ident $val:expr) => (
-        {
-            assert!($values.len() == 0);
-            Some($val)
-        }
-    );
-
-    (__check_pattern $values:ident $url:ident /{$p:ident} $($rest:tt)*) => (
+    (__check_pattern $url:ident $value:block /{$p:ident} $($rest:tt)*) => (
         if !$url.starts_with('/') {
-            false
+            None
         } else {
             let url = &$url[1..];
             let pat_end = url.find('/').unwrap_or(url.len());
             let rest_url = &url[pat_end..];
-            if router!(__check_pattern $values rest_url $($rest)*) {
-                $values.borrow_mut().insert(stringify!($p), &url[0 .. pat_end]);
-                true
+
+            if let Some($p) = url[0 .. pat_end].parse().ok() {
+                router!(__check_pattern rest_url $value $($rest)*)
             } else {
-                false
+                None
             }
         }
     );
 
-    (__check_pattern $values:ident $url:ident /$p:ident $($rest:tt)*) => (
+    (__check_pattern $url:ident $value:block /{$p:ident: $t:ty} $($rest:tt)*) => (
+        if !$url.starts_with('/') {
+            None
+        } else {
+            let url = &$url[1..];
+            let pat_end = url.find('/').unwrap_or(url.len());
+            let rest_url = &url[pat_end..];
+
+            if let Some($p) = url[0 .. pat_end].parse().ok() {
+                let $p: $t = $p;
+                router!(__check_pattern rest_url $value $($rest)*)
+            } else {
+                None
+            }
+        }
+    );
+
+    (__check_pattern $url:ident $value:block /$p:ident $($rest:tt)*) => (
         {
             let required = concat!("/", stringify!($p));
             if $url.starts_with(required) {
                 let rest_url = &$url[required.len()..];
-                router!(__check_pattern $values rest_url $($rest)*)
+                router!(__check_pattern rest_url $value $($rest)*)
             } else {
-                false
+                None
             }
         }
     );
 
-    (__check_pattern $values:ident $url:ident) => (
-        $url.len() == 0
+    (__check_pattern $url:ident $value:block) => (
+        if $url.len() == 0 { Some($value) } else { None }
     );
 
-    (__check_pattern $values:ident $url:ident /) => (
-        $url == "/"
+    (__check_pattern $url:ident $value:block /) => (
+        if $url == "/" { Some($value) } else { None }
     );
 }

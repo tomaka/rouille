@@ -12,30 +12,30 @@ fn main() {
         }
 
         let response = router!(request,
-            (GET) (/) => (|| {
+            (GET) (/) => {
                 Ok(rouille::Response::redirect("/hello/world"))
-            }),
+            },
 
-            (GET) (/hello/world) => (|| {
+            (GET) (/hello/world) => {
                 println!("hello world");
                 Ok(rouille::Response::text("hello world"))
-            }),
+            },
 
-            (GET) (/panic) => (|| {
+            (GET) (/panic) => {
                 panic!("Oops!")
-            }),
+            },
 
-            (GET) (/{id}) => (|id: u32| {
+            (GET) (/{id: u32}) => {
                 println!("u32 {:?}", id);
                 Err(rouille::RouteError::WrongInput)
-            }),
+            },
 
-            (GET) (/{id}) => (|id: String| {
+            (GET) (/{id: String}) => {
                 println!("String {:?}", id);
                 Ok(rouille::Response::text(format!("hello, {}", id)))
-            }),
+            },
 
-            _ => || Err(rouille::RouteError::NoRouteFound)
+            _ => Err(rouille::RouteError::NoRouteFound)
         );
 
         response.unwrap_or_else(|err| rouille::Response::from_error(&err))
