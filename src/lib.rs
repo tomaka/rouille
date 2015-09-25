@@ -409,6 +409,13 @@ impl Response {
             data: ResponseBody::empty(),
         }
     }
+
+    /// Changes the status code of the response.
+    #[inline]
+    pub fn with_status_code(mut self, code: u16) -> Response {
+        self.status_code = code;
+        self
+    }
 }
 
 /// An opaque type that represents the body of a response.
