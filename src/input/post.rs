@@ -207,8 +207,15 @@ impl Decoder for PostDecoder {
         unimplemented!();
     }
 
-    fn read_option<T, F>(&mut self, f: F) -> Result<T, PostError> where F: FnMut(&mut Self, bool) -> Result<T, PostError> {
-        unimplemented!();
+    fn read_option<T, F>(&mut self, mut f: F) -> Result<T, PostError> where F: FnMut(&mut Self, bool) -> Result<T, PostError> {
+        let found = match self {
+            &mut PostDecoder::ExpectsData(ref data, ref field_name) => {
+                data.iter().find(|&&(ref key, _)| key == field_name).is_some()
+            },
+            _ => panic!()
+        };
+
+        f(self, found)
     }
 
     fn read_seq<T, F>(&mut self, f: F) -> Result<T, PostError> where F: FnOnce(&mut Self, usize) -> Result<T, PostError> {
