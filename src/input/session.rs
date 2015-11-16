@@ -73,6 +73,12 @@ impl<'a, T> Session<'a, T> where T: Clone {
         session.insert(self.key.clone(), value);
     }
 
+    /// Removes the session infos from the manager.
+    pub fn clear(&self) {
+        let mut session = self.manager.sessions.lock().unwrap();
+        session.remove(&self.key);
+    }
+
     /// Applies the session on the `Response`. If you don't do that, the session won't be
     /// maintained on further connections.
     pub fn apply(&self, mut response: Response) -> Response {
