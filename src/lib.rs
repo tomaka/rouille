@@ -1,7 +1,7 @@
-extern crate hyper;
 extern crate rand;
 extern crate rustc_serialize;
 extern crate time;
+extern crate tiny_http;
 extern crate url;
 
 pub use assets::match_assets;
@@ -124,63 +124,42 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                           where A: ToSocketAddrs,
                                 F: Send + Sync + 'static + Fn(&Request) -> Response
 {
-    // TODO: unused result?!?
-    // TODO: does this block forever or not?
-    hyper::server::Server::http(addr).unwrap().handle(Handler(handler));
+    let server = tiny_http::ServerBuilder::new().with_port(8000).build().unwrap();
 
-    struct Handler<H>(H);
-    impl<H> hyper::server::Handler for Handler<H>
-            where H: Send + Sync + 'static + Fn(&Request) -> Response
-    {
-        fn handle<'a, 'k>(&'a self, mut hrequest: hyper::server::request::Request<'a, 'k>,
-                          mut hresponse: hyper::server::response::Response<'a, hyper::net::Fresh>)
-        {
-            *hresponse.status_mut() = hyper::status::StatusCode::InternalServerError;
+    for mut request in server.incoming_requests() {
+        // TODO: don't read the body in memory immediately
+        let mut data = Vec::with_capacity(request.body_length().unwrap_or(0));
+        request.as_reader().read_to_end(&mut data);     // TODO: handle error
 
-            // TODO: don't read the body in memory immediately
-            let mut data = Vec::new();
-            hrequest.read_to_end(&mut data);     // TODO: handle error
+        // building the `Request` object
+        let rouille_request = Request {
+            url: request.url().to_owned(),
+            method: request.method().as_str().to_owned(),
+            headers: request.headers().iter().map(|h| (h.field.to_string(), h.value.clone().into())).collect(),
+            https: false,
+            data: data,
+            remote_addr: request.remote_addr().clone(),
+        };
 
-            // building the `Request` object
-            let request = Request {
-                url: format!("{}", hrequest.uri),   // TODO: handle this properly?
-                method: hrequest.method.as_ref().to_owned(),
-                headers: hrequest.headers.iter().map(|h| (h.name().to_owned(), h.value_string()))
-                                                .collect(),
-                https: false,
-                data: data,
-                remote_addr: hrequest.remote_addr.clone(),
-            };
+        // calling the handler ; this most likely takes a lot of time
+        let mut rouille_response = handler(&rouille_request);
 
-            // calling the handler ; this most likely takes a lot of time
-            let mut response = (self.0)(&request);
+        // writing the response
+        let mut response = tiny_http::Response::empty(rouille_response.status_code)
+                    .with_data(rouille_response.data.data, rouille_response.data.data_length);
 
-            // writing the status code
-            *hresponse.status_mut() = hyper::status::StatusCode::from_u16(response.status_code);
-
-            // writing headers
-            for (key, value) in response.headers {
-                // FIXME: multiple headers with the same key
-                hresponse.headers_mut().set_raw(key, vec![value.into_bytes()]);
+        for (key, value) in rouille_response.headers {
+            if let Ok(header) = tiny_http::Header::from_bytes(key, value) {
+                response.add_header(header);
+            } else {
+                // TODO: ?
             }
-
-            // there are some problems with the browser loading forever
-            /*if let Some(len) = response.data.data_length {
-                hresponse.headers_mut().set(hyper::header::ContentLength(len as u64));
-            }*/
-
-            // sending status code and headers
-            let mut hresponse = match hresponse.start() {
-                Err(_) => return,
-                Ok(r) => r
-            };
-
-            let _ = io::copy(response.data.data.by_ref(), &mut hresponse);
-            let _ = hresponse.end();
         }
+
+        request.respond(response);
     }
 
-    unreachable!()      // TODO: ?!?
+    unreachable!()
 }
 
 /// Represents a request that your handler must answer to.
