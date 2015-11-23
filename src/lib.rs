@@ -164,9 +164,10 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                 hresponse.headers_mut().set_raw(key, vec![value.into_bytes()]);
             }
 
-            if let Some(len) = response.data.data_length {
+            // there are some problems with the browser loading forever
+            /*if let Some(len) = response.data.data_length {
                 hresponse.headers_mut().set(hyper::header::ContentLength(len as u64));
-            }
+            }*/
 
             // sending status code and headers
             let mut hresponse = match hresponse.start() {
