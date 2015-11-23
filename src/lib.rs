@@ -125,38 +125,43 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                                 F: Send + Sync + 'static + Fn(&Request) -> Response
 {
     let server = tiny_http::Server::http(addr).unwrap();
+    let handler = Arc::new(handler);
 
     for mut request in server.incoming_requests() {
-        // TODO: don't read the body in memory immediately
-        let mut data = Vec::with_capacity(request.body_length().unwrap_or(0));
-        request.as_reader().read_to_end(&mut data);     // TODO: handle error
+        // we spawn a thread in order to avoid crashing the server in case of a panic
+        let handler = handler.clone();
+        thread::spawn(move || {
+            // TODO: don't read the body in memory immediately
+            let mut data = Vec::with_capacity(request.body_length().unwrap_or(0));
+            request.as_reader().read_to_end(&mut data);     // TODO: handle error
 
-        // building the `Request` object
-        let rouille_request = Request {
-            url: request.url().to_owned(),
-            method: request.method().as_str().to_owned(),
-            headers: request.headers().iter().map(|h| (h.field.to_string(), h.value.clone().into())).collect(),
-            https: false,
-            data: data,
-            remote_addr: request.remote_addr().clone(),
-        };
+            // building the `Request` object
+            let rouille_request = Request {
+                url: request.url().to_owned(),
+                method: request.method().as_str().to_owned(),
+                headers: request.headers().iter().map(|h| (h.field.to_string(), h.value.clone().into())).collect(),
+                https: false,
+                data: data,
+                remote_addr: request.remote_addr().clone(),
+            };
 
-        // calling the handler ; this most likely takes a lot of time
-        let mut rouille_response = handler(&rouille_request);
+            // calling the handler ; this most likely takes a lot of time
+            let mut rouille_response = handler(&rouille_request);
 
-        // writing the response
-        let mut response = tiny_http::Response::empty(rouille_response.status_code)
-                    .with_data(rouille_response.data.data, rouille_response.data.data_length);
+            // writing the response
+            let mut response = tiny_http::Response::empty(rouille_response.status_code)
+                        .with_data(rouille_response.data.data, rouille_response.data.data_length);
 
-        for (key, value) in rouille_response.headers {
-            if let Ok(header) = tiny_http::Header::from_bytes(key, value) {
-                response.add_header(header);
-            } else {
-                // TODO: ?
+            for (key, value) in rouille_response.headers {
+                if let Ok(header) = tiny_http::Header::from_bytes(key, value) {
+                    response.add_header(header);
+                } else {
+                    // TODO: ?
+                }
             }
-        }
 
-        request.respond(response);
+            request.respond(response);
+        });
     }
 
     unreachable!()
