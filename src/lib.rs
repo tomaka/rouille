@@ -124,7 +124,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                           where A: ToSocketAddrs,
                                 F: Send + Sync + 'static + Fn(&Request) -> Response
 {
-    let server = tiny_http::ServerBuilder::new().with_port(8000).build().unwrap();
+    let server = tiny_http::ServerBuilder::new().with_port(8001).build().unwrap();
 
     for mut request in server.incoming_requests() {
         // TODO: don't read the body in memory immediately
