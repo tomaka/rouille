@@ -7,6 +7,26 @@ use Request;
 use Response;
 use input;
 
+/// Manages all active user sessions in memory.
+///
+/// # Example
+///
+/// ```no_run
+/// #[derive(Debug, Clone)]
+/// struct SessionData {
+///     user_id: i32
+/// }
+///
+/// let sessions = rouille::SessionsManager::<SessionData>::new("SID", 3600);
+/// 
+/// rouille::start_server("localhost:80", move |request| {
+///     let session = sessions.start(&request);
+///     // rest of the handler
+/// # let response: rouille::Response = unsafe { ::std::mem::uninitialized() };
+///     session.apply(response)
+/// })
+/// ```
+///
 pub struct SessionsManager<T> where T: Clone {
     // TODO: eventually replace the key with `[u8; 64]` or something similar
     sessions: Mutex<HashMap<String, T>>,
