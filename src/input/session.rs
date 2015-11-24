@@ -87,6 +87,13 @@ impl<'a, T> Session<'a, T> where T: Clone {
         session.get(&self.key).map(|d| d.clone())
     }
 
+    /// Returns true if there is session data.
+    #[inline]
+    pub fn has_data(&self) -> bool {
+        let session = self.manager.sessions.lock().unwrap();
+        session.get(&self.key).is_some()
+    }
+
     /// Stores the session infos in the manager.
     pub fn set(&self, value: T) {
         let mut session = self.manager.sessions.lock().unwrap();
@@ -102,6 +109,10 @@ impl<'a, T> Session<'a, T> where T: Clone {
     /// Applies the session on the `Response`. If you don't do that, the session won't be
     /// maintained on further connections.
     pub fn apply(&self, mut response: Response) -> Response {
+        if !self.has_data() {
+            return response;
+        }
+
         // FIXME: correct interactions with existing headers
         let header_value = format!("{}={}; Max-Age={}", self.manager.cookie_name, self.key,
                                                         self.manager.timeout_s);
