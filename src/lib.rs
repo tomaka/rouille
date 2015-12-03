@@ -274,6 +274,26 @@ impl Request {
         url::percent_encoding::lossy_utf8_percent_decode(self.url.as_bytes())
     }
 
+    /// Returns the value of a GET parameter.
+    /// TODO: clumbsy
+    pub fn get_param(&self, param_name: &str) -> Option<String> {
+        let get_params = &self.raw_url()[self.raw_url().bytes().position(|c| c == b'?').unwrap_or(0) ..];
+
+        // TODO: `hello=5` will be matched for param name `lo`
+
+        let param = match get_params.rfind(&format!("{}=", param_name)) {
+            Some(p) => p + param_name.len() + 1,
+            None => return None,
+        };
+
+        let value = match get_params.bytes().skip(param).position(|c| c == b'&') {
+            None => &get_params[param..],
+            Some(e) => &get_params[param .. e + param],
+        };
+
+        Some(url::percent_encoding::lossy_utf8_percent_decode(value.as_bytes()))
+    }
+
     /// Returns the value of a header of the request.
     ///
     /// Returns `None` if no such header could be found.
