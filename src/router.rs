@@ -167,3 +167,44 @@ macro_rules! router {
         }
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use Request;
+
+    #[test]
+    fn basic() {
+        let request = Request::fake_http("GET", "/", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) (/hello) => { 0 },
+            (GET) (/{val:u32}) => { 0 },
+            (GET) (/) => { 1 },
+            _ => 0
+        ));
+    }
+
+    #[test]
+    fn dash() {
+        let request = Request::fake_http("GET", "/a-b", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) (/a/b) => { 0 },
+            (GET) (/a_b) => { 0 },
+            (GET) (/a-b) => { 1 },
+            _ => 0
+        ));
+    }
+
+    #[test]
+    fn params() {
+        let request = Request::fake_http("GET", "/hello/5", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) (/hello/) => { 0 },
+            (GET) (/hello/{id:u32}) => { if id == 5 { 1 } else { 0 } },
+            (GET) (/hello/{id:String}) => { 0 },
+            _ => 0
+        ));
+    }
+}
