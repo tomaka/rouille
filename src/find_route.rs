@@ -15,6 +15,32 @@
 /// # Example
 ///
 /// ```no_run
+/// # #[macro_use] extern crate rouille;
+/// # fn main() {
+/// use rouille::{Request, Response, RouteError};
+///
+/// fn handle_request_a(_: &Request) -> Result<Response, RouteError> {
+/// # panic!()
+///    // ...
+/// }
+///
+/// fn handle_request_b(_: &Request) -> Result<Response, RouteError> {
+/// # panic!()
+///    // ...
+/// }
+///
+/// fn handle_request_c(_: &Request) -> Result<Response, RouteError> {
+/// # panic!()
+///    // ...
+/// }
+///
+/// # let request = unsafe { ::std::mem::uninitialized() };
+/// let response = find_route!(
+///     handle_request_a(request),
+///     handle_request_b(request),
+///     handle_request_c(request)
+/// );
+/// # }
 /// ```
 ///
 #[macro_export]
