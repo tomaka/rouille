@@ -11,10 +11,10 @@
 ///
 /// Here is an example usage:
 ///
-/// ```ignored      // FIXME: 
+/// ```no_run
 /// # #[macro_use] extern crate rouille; fn main() {
 /// # let request: rouille::Request = unsafe { std::mem::uninitialized() };
-/// router!(request,
+/// let _result = router!(request,
 ///     // first route
 ///     (GET) (/) => {
 ///         12
@@ -24,7 +24,7 @@
 ///
 ///     // default route
 ///     _ => 5
-/// )
+/// );
 /// # }
 /// ```
 ///
