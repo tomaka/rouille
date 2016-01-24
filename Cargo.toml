@@ -2,6 +2,7 @@
 name = "rouille"
 version = "0.1.0"
 authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>"]
+license = "MIT/Apache2"
 
 [dependencies]
 tiny_http = "0.5.0"
