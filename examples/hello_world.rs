@@ -21,6 +21,11 @@ fn main() {
                 Ok(rouille::Response::text("hello world"))
             },
 
+            (GET) (/hello-world) => {
+                println!("hello-world");
+                Ok(rouille::Response::text("hello world"))
+            },
+
             (GET) (/panic) => {
                 panic!("Oops!")
             },

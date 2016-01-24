@@ -136,11 +136,34 @@ macro_rules! router {
         }
     );
 
+    (__check_pattern $url:ident $value:block - $($rest:tt)*) => (
+        {
+            if $url.starts_with('-') {
+                let rest_url = &$url[1..];
+                router!(__check_pattern rest_url $value $($rest)*)
+            } else {
+                None
+            }
+        }
+    );
+
     (__check_pattern $url:ident $value:block) => (
         if $url.len() == 0 { Some($value) } else { None }
     );
 
     (__check_pattern $url:ident $value:block /) => (
         if $url == "/" { Some($value) } else { None }
+    );
+
+    (__check_pattern $url:ident $value:block $p:ident $($rest:tt)*) => (
+        {
+            let required = stringify!($p);
+            if $url.starts_with(required) {
+                let rest_url = &$url[required.len()..];
+                router!(__check_pattern rest_url $value $($rest)*)
+            } else {
+                None
+            }
+        }
     );
 }
