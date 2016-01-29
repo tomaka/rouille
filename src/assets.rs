@@ -498,6 +498,7 @@ fn extension_to_mime(extension: Option<&str>) -> &'static str {
         Some("sv4cpio") => "application/x-sv4cpio",
         Some("sv4crc") => "application/x-sv4crc",
         Some("svc") => "application/xml",
+        Some("svg") => "image/svg+xml",
         Some("swf") => "application/x-shockwave-flash",
         Some("t") => "application/x-troff",
         Some("tar") => "application/x-tar",
