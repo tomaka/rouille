@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["generate_session_id","Generates a string suitable for a session ID."]],"struct":[["Session","Represents an entry in the sessions manager."],["SessionsManager","Manages all active user sessions in memory."]]});

@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="Source to the Rust file `src/assets.rs`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang">
+
+    <title>assets.rs.html -- source</title>
+
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content source"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+<span id="630">630</span>
+<span id="631">631</span>
+<span id="632">632</span>
+<span id="633">633</span>
+<span id="634">634</span>
+<span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+</pre><pre class='rust '>
+<span class='comment'>// Copyright (c) 2016 The Rouille developers</span>
+<span class='comment'>// Licensed under the Apache License, Version 2.0</span>
+<span class='comment'>// &lt;LICENSE-APACHE or</span>
+<span class='comment'>// http://www.apache.org/licenses/LICENSE-2.0&gt; or the MIT</span>
+<span class='comment'>// license &lt;LICENSE-MIT or http://opensource.org/licenses/MIT&gt;,</span>
+<span class='comment'>// at your option. All files in the project carrying such</span>
+<span class='comment'>// notice may not be copied, modified, or distributed except</span>
+<span class='comment'>// according to those terms.</span>
+
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>fs</span>;
+<span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>path</span>::<span class='ident'>Path</span>;
+
+<span class='kw'>use</span> <span class='ident'>Request</span>;
+<span class='kw'>use</span> <span class='ident'>Response</span>;
+<span class='kw'>use</span> <span class='ident'>ResponseBody</span>;
+<span class='kw'>use</span> <span class='ident'>RouteError</span>;
+
+<span class='doccomment'>/// Searches inside `path` for a file that matches the given request. If a file is found,</span>
+<span class='doccomment'>/// returns a `Response` that would serve this file if returned.</span>
+<span class='doccomment'>///</span>
+<span class='doccomment'>/// The value of the `Content-Type` header of the response is guessed based on the file&#39;s</span>
+<span class='doccomment'>/// extension.</span>
+<span class='doccomment'>///</span>
+<span class='doccomment'>/// # Todo</span>
+<span class='doccomment'>///</span>
+<span class='doccomment'>/// Prefix system, so that `/prefix/file.png` can match `file.png` even if you don&#39;t put it</span>
+<span class='doccomment'>/// in a directory named `prefix`.</span>
+<span class='doccomment'>///</span>
+<span class='doccomment'>/// # Security</span>
+<span class='doccomment'>///</span>
+<span class='doccomment'>/// Everything inside the directory that you pass as `path` is potentially accessible by any</span>
+<span class='doccomment'>/// client. **Do not use assume that client won&#39;t be able to guess the URL of a sensitive file**.</span>
+<span class='doccomment'>/// All sensitive files should require a login/password to be accessed.</span>
+<span class='doccomment'>///</span>
+<span class='doccomment'>/// If you want to serve sensitive files, you are encouraged to put them in a different directory</span>
+<span class='doccomment'>/// than public files, and call `match_assets` once for public files and once for private files</span>
+<span class='doccomment'>/// after you checked the user&#39;s credentials.</span>
+<span class='doccomment'>/// Only call `match_assets` **after** you know that the user can have access to all the files</span>
+<span class='doccomment'>/// that can be served.</span>
+<span class='doccomment'>///</span>
+<span class='doccomment'>/// If you manage the user&#39;s accesses per-file, use a white list of authorized files instead of a</span>
+<span class='doccomment'>/// black list of forbidden files. Files can potentially be accessed from multiple different URLs</span>
+<span class='doccomment'>/// and a black list may not cover everything.</span>
+<span class='doccomment'>///</span>
+<span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>match_assets</span><span class='op'>&lt;</span><span class='ident'>P</span>: ?<span class='ident'>Sized</span><span class='op'>&gt;</span>(<span class='ident'>request</span>: <span class='kw-2'>&amp;</span><span class='ident'>Request</span>, <span class='ident'>path</span>: <span class='kw-2'>&amp;</span><span class='ident'>P</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Response</span>, <span class='ident'>RouteError</span><span class='op'>&gt;</span>
+                               <span class='kw'>where</span> <span class='ident'>P</span>: <span class='ident'>AsRef</span><span class='op'>&lt;</span><span class='ident'>Path</span><span class='op'>&gt;</span>
+{
+    <span class='kw'>let</span> <span class='ident'>path</span> <span class='op'>=</span> <span class='ident'>path</span>.<span class='ident'>as_ref</span>();
+
+    <span class='comment'>// FIXME (SECURITY): check with `relative_from` that we&#39;re still in `path`</span>
+    <span class='comment'>//                   once the function is stable</span>
+    <span class='comment'>// TODO: remove GET parameters from URL</span>
+    <span class='kw'>let</span> <span class='ident'>potential_file</span> <span class='op'>=</span> <span class='ident'>path</span>.<span class='ident'>join</span>(<span class='kw-2'>&amp;</span><span class='ident'>request</span>.<span class='ident'>url</span>()[<span class='number'>1</span>..]);        <span class='comment'>// TODO: handle the leading `/` more cleanly</span>
+
+    <span class='kw'>match</span> <span class='ident'>fs</span>::<span class='ident'>metadata</span>(<span class='kw-2'>&amp;</span><span class='ident'>potential_file</span>) {
+        <span class='prelude-val'>Ok</span>(<span class='kw-2'>ref</span> <span class='ident'>m</span>) <span class='kw'>if</span> <span class='ident'>m</span>.<span class='ident'>is_file</span>() <span class='op'>=&gt;</span> (),
+        _ <span class='op'>=&gt;</span> <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>RouteError</span>::<span class='ident'>NoRouteFound</span>)
+    };
+
+    <span class='kw'>let</span> <span class='ident'>extension</span> <span class='op'>=</span> <span class='ident'>potential_file</span>.<span class='ident'>extension</span>().<span class='ident'>and_then</span>(<span class='op'>|</span><span class='ident'>s</span><span class='op'>|</span> <span class='ident'>s</span>.<span class='ident'>to_str</span>());
+
+    <span class='kw'>let</span> <span class='ident'>file</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>fs</span>::<span class='ident'>File</span>::<span class='ident'>open</span>(<span class='kw-2'>&amp;</span><span class='ident'>potential_file</span>) {
+        <span class='prelude-val'>Ok</span>(<span class='ident'>f</span>) <span class='op'>=&gt;</span> <span class='ident'>f</span>,
+        <span class='prelude-val'>Err</span>(_) <span class='op'>=&gt;</span> <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>RouteError</span>::<span class='ident'>NoRouteFound</span>)
+    };
+
+    <span class='prelude-val'>Ok</span>(<span class='ident'>Response</span> {
+        <span class='ident'>status_code</span>: <span class='number'>200</span>,
+        <span class='ident'>headers</span>: <span class='macro'>vec</span><span class='macro'>!</span>[
+            (<span class='string'>&quot;Cache-Control&quot;</span>.<span class='ident'>to_owned</span>(), <span class='string'>&quot;public, max-age=3600&quot;</span>.<span class='ident'>to_owned</span>()),
+            (<span class='string'>&quot;Content-Type&quot;</span>.<span class='ident'>to_owned</span>(), <span class='ident'>extension_to_mime</span>(<span class='ident'>extension</span>).<span class='ident'>to_owned</span>())
+        ],
+        <span class='ident'>data</span>: <span class='ident'>ResponseBody</span>::<span class='ident'>from_file</span>(<span class='ident'>file</span>),
+    })
+}
+
+<span class='doccomment'>/// Returns the mime type of a file based on its extension.</span>
+<span class='kw'>fn</span> <span class='ident'>extension_to_mime</span>(<span class='ident'>extension</span>: <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='kw-2'>&amp;</span><span class='lifetime'>&#39;static</span> <span class='ident'>str</span> {
+    <span class='comment'>// list taken from https://github.com/cybergeek94/mime_guess/blob/master/src/mime_types.rs</span>
+    <span class='comment'>// itself taken from a dead link</span>
+    <span class='kw'>match</span> <span class='ident'>extension</span> {
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;323&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/h323; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;3g2&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/3gpp2&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;3gp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/3gpp&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;3gp2&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/3gpp2&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;3gpp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/3gpp&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;7z&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-7z-compressed&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;aa&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/audible&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;aac&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/aac&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;aaf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;aax&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/vnd.audible.aax&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ac3&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/ac3&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;aca&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;accda&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess.addin&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;accdb&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;accdc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess.cab&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;accde&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;accdr&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess.runtime&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;accdt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;accdw&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess.webapplication&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;accft&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess.ftemplate&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;acx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/internet-property-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;addin&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ade&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;adobebridge&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-bridge-url&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;adp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;adt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/vnd.dlna.adts&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;adts&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/aac&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;afm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ai&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/postscript&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;aif&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-aiff&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;aifc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/aiff&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;aiff&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/aiff&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;air&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.adobe.air-application-installer-package+zip&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;amc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;application&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-ms-application&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;art&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-jg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;asa&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;asax&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ascx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;asd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;asf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-ms-asf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ashx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;asi&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;asm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;asmx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;aspx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;asr&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-ms-asf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;asx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-ms-asf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;atom&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/atom+xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;au&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/basic&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;avi&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-msvideo&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;axs&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/olescript&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;bas&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;bcpio&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-bcpio&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;bin&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;bmp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/bmp&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;c&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cab&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;caf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-caf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;calx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-office.calx&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cat&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-pki.seccat&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cdda&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/aiff&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cdf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-cdf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cer&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-x509-ca-cert&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;chm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;class&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-java-applet&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;clp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-msclip&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cmx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-cmx&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cnf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cod&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/cis-cod&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;config&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;contact&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/x-ms-contact; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;coverage&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cpio&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-cpio&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cpp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;crd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-mscardfile&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;crl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/pkix-crl&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;crt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-x509-ca-cert&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cs&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;csdproj&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;csh&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-csh&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;csproj&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;css&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/css; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;csv&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/csv; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cur&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;cxx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dat&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;datasource&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dbproj&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dcr&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-director&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;def&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;deploy&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;der&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-x509-ca-cert&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dgml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dib&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/bmp&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dif&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-dv&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dir&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-director&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;disco&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dll&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-msdownload&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dll.config&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dlm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/dlm; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;doc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msword&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;docm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-word.document.macroEnabled.12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;docx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.openxmlformats-officedocument.wordprocessingml.document&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dot&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msword&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dotm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-word.template.macroEnabled.12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dotx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.openxmlformats-officedocument.wordprocessingml.template&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dsp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dsw&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dtd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dtsConfig&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dv&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-dv&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dvi&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-dvi&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dwf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;drawing/x-dwf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dwp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;dxr&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-director&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;eml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;message/rfc822&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;emz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;eot&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;eps&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/postscript&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;etl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/etl&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;etx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/x-setext; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;evy&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/envoy&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;exe&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;exe.config&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;fdf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.fdf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;fif&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/fractals&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;filters&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;Application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;fla&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;flr&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;x-world/x-vrml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;flv&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-flv&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;fsscript&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/fsharp-script&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;fsx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/fsharp-script&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;generictest&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;gif&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/gif&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;group&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/x-ms-group; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;gsm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-gsm&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;gtar&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-gtar&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;gz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-gzip&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;h&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hdf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-hdf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hdml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/x-hdml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hhc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-oleobject&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hhk&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hhp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hlp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/winhlp&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hpp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hqx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/mac-binhex40&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hta&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/hta&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;htc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/x-component; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;htm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/html; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;html&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/html; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;htt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/webviewhtml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxa&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxe&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxh&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxi&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxk&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxq&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxr&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxs&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/html; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxv&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxw&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;hxx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;i&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ico&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-icon&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ics&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;idl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ief&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/ief&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;iii&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-iphone&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;inc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;inf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;inl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ins&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-internet-signup&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ipa&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-itunes-ipa&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ipg&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-itunes-ipg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ipproj&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ipsw&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-itunes-ipsw&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;iqy&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/x-ms-iqy; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;isp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-internet-signup&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ite&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-itunes-ite&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;itlp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-itunes-itlp&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;itms&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-itunes-itms&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;itpc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-itunes-itpc&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ivf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-ivf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;jar&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/java-archive&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;java&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;jck&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/liquidmotion&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;jcz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/liquidmotion&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;jfif&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/pjpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;jnlp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-java-jnlp-file&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;jpb&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;jpe&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/jpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;jpeg&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/jpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;jpg&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/jpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;js&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-javascript&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;json&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/json&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;jsx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/jscript; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;jsxbin&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;latex&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-latex&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;library-ms&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/windows-library+xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;lit&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-ms-reader&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;loadtest&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;lpk&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;lsf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-la-asf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;lst&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;lsx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-la-asf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;lzh&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m13&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-msmediaview&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m14&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-msmediaview&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m1v&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m2t&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/vnd.dlna.mpeg-tts&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m2ts&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/vnd.dlna.mpeg-tts&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m2v&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m3u&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-mpegurl&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m3u8&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-mpegurl&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m4a&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/m4a&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m4b&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/m4b&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m4p&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/m4p&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m4r&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-m4r&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;m4v&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-m4v&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mac&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-macpaint&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mak&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;man&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-troff-man&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;manifest&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-ms-manifest&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;map&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;master&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mda&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mdb&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-msaccess&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mde&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msaccess&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mdp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;me&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-troff-me&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mfp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-shockwave-flash&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mht&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;message/rfc822&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mhtml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;message/rfc822&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mid&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/mid&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;midi&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/mid&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mix&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mk&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mmf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-smaf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mno&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mny&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-msmoney&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mod&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mov&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/quicktime&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;movie&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-sgi-movie&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mp2&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mp2v&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mp3&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mp4&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mp4&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mp4v&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mp4&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mpa&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mpe&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mpeg&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mpf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-mediapackage&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mpg&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mpp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-project&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mpv2&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mqv&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/quicktime&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ms&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-troff-ms&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;msi&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mso&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mts&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/vnd.dlna.mpeg-tts&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mtx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mvb&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-msmediaview&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mvc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-miva-compiled&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;mxp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-mmxp&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;nc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-netcdf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;nsc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-ms-asf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;nws&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;message/rfc822&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ocx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;oda&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/oda&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;odc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/x-ms-odc; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;odh&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;odl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;odp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.oasis.opendocument.presentation&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ods&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/oleobject&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;odt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.oasis.opendocument.text&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;one&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/onenote&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;onea&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/onenote&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;onepkg&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/onenote&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;onetmp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/onenote&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;onetoc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/onenote&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;onetoc2&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/onenote&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;orderedtest&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;osdx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/opensearchdescription+xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;p10&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/pkcs10&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;p12&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-pkcs12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;p7b&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-pkcs7-certificates&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;p7c&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/pkcs7-mime&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;p7m&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/pkcs7-mime&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;p7r&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-pkcs7-certreqresp&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;p7s&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/pkcs7-signature&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pbm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-portable-bitmap&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pcast&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-podcast&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pct&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/pict&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pcx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pcz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pdf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/pdf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pfb&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pfm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pfx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-pkcs12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pgm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-portable-graymap&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pic&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/pict&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pict&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/pict&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pkgdef&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pkgundef&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pko&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-pki.pko&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pls&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/scpls&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pma&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-perfmon&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pmc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-perfmon&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-perfmon&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pmr&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-perfmon&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pmw&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-perfmon&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;png&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/png&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pnm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-portable-anymap&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pnt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-macpaint&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pntg&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-macpaint&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pnz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/png&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pot&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-powerpoint&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;potm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-powerpoint.template.macroEnabled.12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;potx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.openxmlformats-officedocument.presentationml.template&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ppa&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-powerpoint&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ppam&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-powerpoint.addin.macroEnabled.12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ppm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-portable-pixmap&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pps&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-powerpoint&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ppsm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-powerpoint.slideshow.macroEnabled.12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ppsx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.openxmlformats-officedocument.presentationml.slideshow&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ppt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-powerpoint&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pptm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-powerpoint.presentation.macroEnabled.12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pptx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.openxmlformats-officedocument.presentationml.presentation&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;prf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/pics-rules&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;prm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;prx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ps&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/postscript&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;psc1&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/PowerShell&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;psd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;psess&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;psm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;psp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pub&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-mspublisher&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;pwz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-powerpoint&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;qht&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/x-html-insertion; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;qhtm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/x-html-insertion; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;qt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/quicktime&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;qti&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-quicktime&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;qtif&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-quicktime&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;qtl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-quicktimeplayer&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;qxd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ra&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-pn-realaudio&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ram&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-pn-realaudio&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rar&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ras&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-cmu-raster&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rat&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/rat-file&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rc2&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rct&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rdlc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;resx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/vnd.rn-realflash&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rgb&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-rgb&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rgs&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.rn-realmedia&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rmi&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/mid&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rmp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.rn-rn_music_package&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;roff&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-troff&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rpm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-pn-realaudio-plugin&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rqy&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/x-ms-rqy; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rtf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/rtf&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;rtx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/richtext; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ruleset&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;s&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;safariextz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-safari-safariextz&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;scd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-msschedule&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sct&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/scriptlet; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sd2&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-sd2&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sdp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/sdp&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sea&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;searchConnector-ms&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/windows-search-connector+xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;setpay&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/set-payment-initiation&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;setreg&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/set-registration-initiation&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;settings&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sgimb&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-sgimb&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sgml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/sgml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sh&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-sh&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;shar&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-shar&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;shtml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/html; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sit&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-stuffit&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sitemap&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;skin&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sldm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-powerpoint.slide.macroEnabled.12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sldx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.openxmlformats-officedocument.presentationml.slide&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;slk&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sln&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;slupkg-ms&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-ms-license&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;smd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-smd&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;smi&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;smx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-smd&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;smz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-smd&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;snd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/basic&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;snippet&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;snp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sol&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sor&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;spc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-pkcs7-certificates&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;spl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/futuresplash&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;src&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-wais-source&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;srf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ssisdeploymentmanifest&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ssm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/streamingmedia&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sst&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-pki.certstore&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;stl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-pki.stl&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sv4cpio&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-sv4cpio&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;sv4crc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-sv4crc&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;svc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;svg&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/svg+xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;swf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-shockwave-flash&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;t&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-troff&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;tar&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-tar&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;tcl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-tcl&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;testrunconfig&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;testsettings&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;tex&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-tex&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;texi&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-texinfo&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;texinfo&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-texinfo&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;tgz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-compressed&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;thmx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-officetheme&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;thn&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;tif&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/tiff&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;tiff&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/tiff&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;tlh&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;tli&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;toc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;tr&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-troff&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;trm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-msterminal&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;trx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ts&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/vnd.dlna.mpeg-tts&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;tsv&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/tab-separated-values; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ttf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;tts&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/vnd.dlna.mpeg-tts&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;txt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;u32&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;uls&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/iuls; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;user&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;ustar&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-ustar&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vb&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vbdproj&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vbk&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/mpeg&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vbproj&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vbs&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/vbscript; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vcf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/x-vcard; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vcproj&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;Application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vcs&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vcxproj&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;Application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vddproj&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vdp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vdproj&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vdx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-visio.viewer&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vscontent&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vsct&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vsd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.visio&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vsi&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/ms-vsi&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vsix&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vsix&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vsixlangpack&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vsixmanifest&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vsmdi&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vspscc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vss&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.visio&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vsscc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vssettings&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vssscc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vst&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.visio&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vstemplate&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vsto&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-ms-vsto&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vsw&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.visio&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vsx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.visio&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;vtx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.visio&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wav&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/wav&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wave&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/wav&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wax&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-ms-wax&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wbk&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msword&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wbmp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/vnd.wap.wbmp&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wcm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-works&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wdb&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-works&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wdp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/vnd.ms-photo&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;webarchive&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-safari-webarchive&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;webtest&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wiq&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wiz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/msword&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wks&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-works&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wlmp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/wlmoviemaker&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wlpginstall&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-wlpg-detect&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wlpginstall3&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-wlpg3-detect&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-ms-wm&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wma&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;audio/x-ms-wma&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wmd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-ms-wmd&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wmf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-msmetafile&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/vnd.wap.wml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wmlc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.wap.wmlc&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wmls&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/vnd.wap.wmlscript; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wmlsc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.wap.wmlscriptc&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wmp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-ms-wmp&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wmv&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-ms-wmv&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wmx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-ms-wmx&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wmz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-ms-wmz&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wpl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-wpl&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wps&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-works&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wri&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-mswrite&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wrl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;x-world/x-vrml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wrz&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;x-world/x-vrml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wsc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/scriptlet; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wsdl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;wvx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;video/x-ms-wvx&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;x&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/directx&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xaf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;x-world/x-vrml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xaml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xaml+xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xap&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-silverlight-app&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xbap&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-ms-xbap&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xbm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-xbitmap&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xdr&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xht&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xhtml+xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xhtml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xhtml+xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xla&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xlam&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel.addin.macroEnabled.12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xlc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xld&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xlk&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xll&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xlm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xls&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xlsb&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel.sheet.binary.macroEnabled.12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xlsm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel.sheet.macroEnabled.12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xlsx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xlt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xltm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel.template.macroEnabled.12&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xltx&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.openxmlformats-officedocument.spreadsheetml.template&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xlw&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-excel&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xmta&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xof&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;x-world/x-vrml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xoml&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/plain; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xpm&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-xpixmap&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xps&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/vnd.ms-xpsdocument&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xrm-ms&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xsc&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xsd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xsf&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xsl&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xslt&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;text/xml; charset=utf8&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xsn&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xss&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/xml&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xtp&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;xwd&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;image/x-xwindowdump&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;z&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-compress&quot;</span>,
+        <span class='prelude-val'>Some</span>(<span class='string'>&quot;zip&quot;</span>) <span class='op'>=&gt;</span> <span class='string'>&quot;application/x-zip-compressed&quot;</span>,
+        _ <span class='op'>=&gt;</span> <span class='string'>&quot;application/octet-stream&quot;</span>
+    }
+}
+</pre>
+</section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "rouille";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../../jquery.js"></script>
+    <script src="../../main.js"></script>
+    
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>

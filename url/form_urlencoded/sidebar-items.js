@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["parse","Convert a byte string in the `application/x-www-form-urlencoded` format into a vector of (name, value) pairs."],["serialize","Convert an iterator of (name, value) pairs into a string in the `application/x-www-form-urlencoded` format."]]});

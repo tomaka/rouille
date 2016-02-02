@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["msys_terminfo","Create a dummy TermInfo struct for msys terminals"],["parse","Parse a compiled terminfo entry, using long capability names if `longnames` is true"]],"static":[["boolfnames",""],["boolnames",""],["numfnames",""],["numnames",""],["stringfnames",""],["stringnames",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Encoder","Splits the incoming data into HTTP chunks."]]});

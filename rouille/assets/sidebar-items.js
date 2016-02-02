@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["match_assets","Searches inside `path` for a file that matches the given request. If a file is found, returns a `Response` that would serve this file if returned."]]});

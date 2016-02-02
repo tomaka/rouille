@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `router!` macro in crate `rouille`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, router!">
+
+    <title>rouille::router! - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>rouille</a></p><script>window.sidebarCurrent = {name: 'router!', ty: 'macro', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content macro">
+<h1 class='fqn'><span class='in-band'><a href='index.html'>rouille</a>::<wbr><a class='macro' href=''>router!</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-788' class='srclink' href='../src/rouille/router.rs.html#66-169' title='goto source code'>[src]</a></span></h1>
+<pre class='rust macro'>
+<span class='macro'>macro_rules</span><span class='macro'>!</span> <span class='ident'>router</span> {
+    (<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>request</span>:<span class='ident'>expr</span>, $((<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>method</span>:<span class='ident'>ident</span>) ($(<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>pat</span>:<span class='ident'>tt</span>)<span class='op'>+</span>) <span class='op'>=&gt;</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>value</span>:<span class='ident'>block</span>,)<span class='op'>*</span> _ <span class='op'>=&gt;</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>def</span>:<span class='ident'>expr</span>) <span class='op'>=&gt;</span> { ... };
+    (<span class='ident'>__check_pattern</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>url</span>:<span class='ident'>ident</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>value</span>:<span class='ident'>block</span> <span class='op'>/</span>{<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>p</span>:<span class='ident'>ident</span>} $(<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>rest</span>:<span class='ident'>tt</span>)<span class='op'>*</span>) <span class='op'>=&gt;</span> { ... };
+    (<span class='ident'>__check_pattern</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>url</span>:<span class='ident'>ident</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>value</span>:<span class='ident'>block</span> <span class='op'>/</span>{<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>p</span>:<span class='ident'>ident</span>: <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>t</span>:<span class='ident'>ty</span>} $(<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>rest</span>:<span class='ident'>tt</span>)<span class='op'>*</span>) <span class='op'>=&gt;</span> { ... };
+    (<span class='ident'>__check_pattern</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>url</span>:<span class='ident'>ident</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>value</span>:<span class='ident'>block</span> <span class='op'>/</span><span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>p</span>:<span class='ident'>ident</span> $(<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>rest</span>:<span class='ident'>tt</span>)<span class='op'>*</span>) <span class='op'>=&gt;</span> { ... };
+    (<span class='ident'>__check_pattern</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>url</span>:<span class='ident'>ident</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>value</span>:<span class='ident'>block</span> <span class='op'>-</span> $(<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>rest</span>:<span class='ident'>tt</span>)<span class='op'>*</span>) <span class='op'>=&gt;</span> { ... };
+    (<span class='ident'>__check_pattern</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>url</span>:<span class='ident'>ident</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>value</span>:<span class='ident'>block</span>) <span class='op'>=&gt;</span> { ... };
+    (<span class='ident'>__check_pattern</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>url</span>:<span class='ident'>ident</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>value</span>:<span class='ident'>block</span> <span class='op'>/</span>) <span class='op'>=&gt;</span> { ... };
+    (<span class='ident'>__check_pattern</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>url</span>:<span class='ident'>ident</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>value</span>:<span class='ident'>block</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>p</span>:<span class='ident'>ident</span> $(<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>rest</span>:<span class='ident'>tt</span>)<span class='op'>*</span>) <span class='op'>=&gt;</span> { ... };
+}</pre>
+<div class='docblock'><p>Equivalent to a <code>match</code> expression but for routes.</p>
+
+<p>Here is an example usage:</p>
+<pre class='rust rust-example-rendered'>
+<span class='kw'>let</span> <span class='ident'>_result</span> <span class='op'>=</span> <span class='macro'>router</span><span class='macro'>!</span>(<span class='ident'>request</span>,
+    <span class='comment'>// first route</span>
+    (<span class='ident'>GET</span>) (<span class='op'>/</span>) <span class='op'>=&gt;</span> {
+        <span class='number'>12</span>
+    },
+
+    <span class='comment'>// ... other routes here ...</span>
+
+    <span class='comment'>// default route</span>
+    _ <span class='op'>=&gt;</span> <span class='number'>5</span>
+);</pre>
+
+<p>The macro will take each route one by one and execute the first one that matches, similar to a
+<code>match</code> language construct. The whole <code>router!</code> expression then returns what the closure
+returns, therefore they must all return the same type.</p>
+
+<p>You can use parameters by putting them inside <code>{}</code>:</p>
+<pre class='rust rust-example-rendered'>
+(<span class='ident'>GET</span>) (<span class='op'>/</span>{<span class='ident'>id</span>}<span class='op'>/</span><span class='ident'>foo</span>) <span class='op'>=&gt;</span> {
+    ...
+},</pre>
+
+<p>If you use parameters inside <code>{}</code>, then a field with the same name must exist in the closure&#39;s
+parameters list. The parameters do not need be in the same order.</p>
+
+<p>Each parameter gets parsed through the <code>FromStr</code> trait. If the parsing fails, the route is
+ignored. If you get an error because the type of the parameter couldn&#39;t be inferred, you can
+also specify the type inside the brackets:</p>
+<pre class='rust rust-example-rendered'>
+(<span class='ident'>GET</span>) (<span class='op'>/</span>{<span class='ident'>id</span>: <span class='ident'>u32</span>}<span class='op'>/</span><span class='ident'>foo</span>) <span class='op'>=&gt;</span> {
+    ...
+},</pre>
+
+<p>Some other things to note:</p>
+
+<ul>
+<li>The right of the <code>=&gt;</code> must be a block (must be surrounded by <code>{</code> and <code>}</code>).</li>
+<li>The pattern of the URL and the closure must be inside parentheses. This is to bypass
+limitations of Rust&#39;s macros system.</li>
+<li>The default handler (with <code>_</code>) must be present or will get a compilation error.</li>
+</ul>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "rouille";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

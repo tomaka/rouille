@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `UTF_16LE` constant in crate `encoding`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, UTF_16LE">
+
+    <title>encoding::all::UTF_16LE - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='../index.html'>encoding</a>::<wbr><a href='index.html'>all</a></p><script>window.sidebarCurrent = {name: 'UTF_16LE', ty: 'constant', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content constant">
+<h1 class='fqn'><span class='in-band'><a href='../index.html'>encoding</a>::<wbr><a href='index.html'>all</a>::<wbr><a class='constant' href=''>UTF_16LE</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-2438' class='srclink' href='../../src/encoding/all.rs.html#16' title='goto source code'>[src]</a></span></h1>
+<pre class='rust const'>pub const UTF_16LE: &amp;'static <a class='type' href='../../encoding/codec/utf_16/type.UTF16LEEncoding.html' title='encoding::codec::utf_16::UTF16LEEncoding'>UTF16LEEncoding</a><code> = </code><code>&$($module)::+::$val;
+    );
+);
+
+macro_rules! singlebyte(
+    ($(#[$attr:meta])* var=$var:ident, mod=$($module:ident)::+, name=$name:expr) => (
+        singlebyte!($(#[$attr])* var=$var, mod=$($module)::+, name=$name, whatwg=None);
+    );
+    ($(#[$attr:meta])* var=$var:ident, mod=$($module:ident)::+, name|whatwg=$name:expr) => (
+        singlebyte!($(#[$attr])* var=$var, mod=$($module)::+, name=$name, whatwg=Some($name));
+    );
+    ($(#[$attr:meta])* var=$var:ident, mod=$($module:ident)::+,
+                       name=$name:expr, whatwg=$whatwg:expr) => (
+        $(#[$attr])* pub const $var: &'static codec::singlebyte::SingleByteEncoding =
+            &codec::singlebyte::SingleByteEncoding {
+                name: $name,
+                whatwg_name: $whatwg,
+                index_forward: $($module)::+::forward,
+                index_backward: $($module)::+::backward,
+            };
+    )
+);
+
+unique!(var=ERROR, mod=codec::error, val=ErrorEncoding);
+unique!(var=ASCII, mod=codec::ascii, val=ASCIIEncoding);
+singlebyte!(var=IBM866, mod=index::ibm866, name|whatwg="ibm866");
+singlebyte!(var=ISO_8859_1, mod=codec::singlebyte::iso_8859_1, name="iso-8859-1");
+singlebyte!(var=ISO_8859_2, mod=index::iso_8859_2, name|whatwg="iso-8859-2");
+singlebyte!(var=ISO_8859_3, mod=index::iso_8859_3, name|whatwg="iso-8859-3");
+singlebyte!(var=ISO_8859_4, mod=index::iso_8859_4, name|whatwg="iso-8859-4");
+singlebyte!(var=ISO_8859_5, mod=index::iso_8859_5, name|whatwg="iso-8859-5");
+singlebyte!(var=ISO_8859_6, mod=index::iso_8859_6, name|whatwg="iso-8859-6");
+singlebyte!(var=ISO_8859_7, mod=index::iso_8859_7, name|whatwg="iso-8859-7");
+singlebyte!(var=ISO_8859_8, mod=index::iso_8859_8, name|whatwg="iso-8859-8");
+singlebyte!(var=ISO_8859_10, mod=index::iso_8859_10, name|whatwg="iso-8859-10");
+singlebyte!(var=ISO_8859_13, mod=index::iso_8859_13, name|whatwg="iso-8859-13");
+singlebyte!(var=ISO_8859_14, mod=index::iso_8859_14, name|whatwg="iso-8859-14");
+singlebyte!(var=ISO_8859_15, mod=index::iso_8859_15, name|whatwg="iso-8859-15");
+singlebyte!(var=ISO_8859_16, mod=index::iso_8859_16, name|whatwg="iso-8859-16");
+singlebyte!(var=KOI8_R, mod=index::koi8_r, name|whatwg="koi8-r");
+singlebyte!(var=KOI8_U, mod=index::koi8_u, name|whatwg="koi8-u");
+singlebyte!(var=MAC_ROMAN, mod=index::macintosh, name="mac-roman", whatwg=Some("macintosh"));
+singlebyte!(var=WINDOWS_874, mod=index::windows_874, name|whatwg="windows-874");
+singlebyte!(var=WINDOWS_1250, mod=index::windows_1250, name|whatwg="windows-1250");
+singlebyte!(var=WINDOWS_1251, mod=index::windows_1251, name|whatwg="windows-1251");
+singlebyte!(var=WINDOWS_1252, mod=index::windows_1252, name|whatwg="windows-1252");
+singlebyte!(var=WINDOWS_1253, mod=index::windows_1253, name|whatwg="windows-1253");
+singlebyte!(var=WINDOWS_1254, mod=index::windows_1254, name|whatwg="windows-1254");
+singlebyte!(var=WINDOWS_1255, mod=index::windows_1255, name|whatwg="windows-1255");
+singlebyte!(var=WINDOWS_1256, mod=index::windows_1256, name|whatwg="windows-1256");
+singlebyte!(var=WINDOWS_1257, mod=index::windows_1257, name|whatwg="windows-1257");
+singlebyte!(var=WINDOWS_1258, mod=index::windows_1258, name|whatwg="windows-1258");
+singlebyte!(var=MAC_CYRILLIC, mod=index::x_mac_cyrillic,
+            name="mac-cyrillic", whatwg=Some("x-mac-cyrillic"));
+unique!(var=UTF_8, mod=codec::utf_8, val=UTF8Encoding);
+unique!(var=UTF_16LE, mod=codec::utf_16, ty=UTF16LEEncoding, val=UTF_16LE_ENCODING</code></pre></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "encoding";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../../jquery.js"></script>
+    <script src="../../main.js"></script>
+    
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>

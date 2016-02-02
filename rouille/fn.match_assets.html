@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `match_assets` fn in crate `rouille`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, match_assets">
+
+    <title>rouille::match_assets - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>rouille</a></p><script>window.sidebarCurrent = {name: 'match_assets', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content fn">
+<h1 class='fqn'><span class='in-band'>Function <a href='index.html'>rouille</a>::<wbr><a class='fn' href=''>match_assets</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-528' class='srclink' href='../src/rouille/assets.rs.html#45-75' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn match_assets&lt;P: ?<a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html' title='core::marker::Sized'>Sized</a>&gt;(request: &amp;<a class='struct' href='../rouille/struct.Request.html' title='rouille::Request'>Request</a>, path: &amp;P) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='struct' href='../rouille/struct.Response.html' title='rouille::Response'>Response</a>, <a class='enum' href='../rouille/enum.RouteError.html' title='rouille::RouteError'>RouteError</a>&gt; <span class='where'>where P: <a class='trait' href='https://doc.rust-lang.org/nightly/core/convert/trait.AsRef.html' title='core::convert::AsRef'>AsRef</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/path/struct.Path.html' title='std::path::Path'>Path</a>&gt;</span></pre><div class='docblock'><p>Searches inside <code>path</code> for a file that matches the given request. If a file is found,
+returns a <code>Response</code> that would serve this file if returned.</p>
+
+<p>The value of the <code>Content-Type</code> header of the response is guessed based on the file&#39;s
+extension.</p>
+
+<h1 id='todo' class='section-header'><a href='#todo'>Todo</a></h1>
+<p>Prefix system, so that <code>/prefix/file.png</code> can match <code>file.png</code> even if you don&#39;t put it
+in a directory named <code>prefix</code>.</p>
+
+<h1 id='security' class='section-header'><a href='#security'>Security</a></h1>
+<p>Everything inside the directory that you pass as <code>path</code> is potentially accessible by any
+client. <strong>Do not use assume that client won&#39;t be able to guess the URL of a sensitive file</strong>.
+All sensitive files should require a login/password to be accessed.</p>
+
+<p>If you want to serve sensitive files, you are encouraged to put them in a different directory
+than public files, and call <code>match_assets</code> once for public files and once for private files
+after you checked the user&#39;s credentials.
+Only call <code>match_assets</code> <strong>after</strong> you know that the user can have access to all the files
+that can be served.</p>
+
+<p>If you manage the user&#39;s accesses per-file, use a white list of authorized files instead of a
+black list of forbidden files. Files can potentially be accessed from multiple different URLs
+and a black list may not cover everything.</p>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "rouille";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `UrlParser` struct in crate `url`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, UrlParser">
+
+    <title>url::UrlParser - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>url</a></p><script>window.sidebarCurrent = {name: 'UrlParser', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>url</a>::<wbr><a class='struct' href=''>UrlParser</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-1523' class='srclink' href='../src/url/lib.rs.html#320-325' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct UrlParser&lt;'a&gt; {
+    // some fields omitted
+}</pre><div class='docblock'><p>A set of optional parameters for URL parsing.</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl&lt;'a&gt; <a class='struct' href='../url/struct.UrlParser.html' title='url::UrlParser'>UrlParser</a>&lt;'a&gt;</code></h3><div class='docblock'><p>A method-chaining API to provide a set of optional parameters for URL parsing.</p>
+</div><div class='impl-items'><h4 id='method.new' class='method'><code>fn <a href='#method.new' class='fnname'>new</a>() -&gt; <a class='struct' href='../url/struct.UrlParser.html' title='url::UrlParser'>UrlParser</a>&lt;'a&gt;</code></h4>
+<div class='docblock'><p>Return a new UrlParser with default parameters.</p>
+</div><h4 id='method.base_url' class='method'><code>fn <a href='#method.base_url' class='fnname'>base_url</a>&lt;'b&gt;(&amp;'b mut self, value: &amp;'a <a class='struct' href='../url/struct.Url.html' title='url::Url'>Url</a>) -&gt; &amp;'b mut <a class='struct' href='../url/struct.UrlParser.html' title='url::UrlParser'>UrlParser</a>&lt;'a&gt;</code></h4>
+<div class='docblock'><p>Set the base URL used for resolving relative URL references, and return the <code>UrlParser</code>.
+The default is no base URL, so that relative URLs references fail to parse.</p>
+</div><h4 id='method.error_handler' class='method'><code>fn <a href='#method.error_handler' class='fnname'>error_handler</a>&lt;'b&gt;(&amp;'b mut self, value: <a class='type' href='../url/type.ErrorHandler.html' title='url::ErrorHandler'>ErrorHandler</a>) -&gt; &amp;'b mut <a class='struct' href='../url/struct.UrlParser.html' title='url::UrlParser'>UrlParser</a>&lt;'a&gt;</code></h4>
+<div class='docblock'><p>Set an error handler for non-fatal parse errors, and return the <code>UrlParser</code>.</p>
+
+<p>Non-fatal parse errors are normally ignored by the parser,
+but indicate violations of authoring requirements.
+An error handler can be used, for example, to log these errors in the console
+of a browser’s developer tools.</p>
+
+<p>The error handler can choose to make the error fatal by returning <code>Err(..)</code></p>
+</div><h4 id='method.scheme_type_mapper' class='method'><code>fn <a href='#method.scheme_type_mapper' class='fnname'>scheme_type_mapper</a>&lt;'b&gt;(&amp;'b mut self, value: fn(scheme: &amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='enum' href='../url/enum.SchemeType.html' title='url::SchemeType'>SchemeType</a>) -&gt; &amp;'b mut <a class='struct' href='../url/struct.UrlParser.html' title='url::UrlParser'>UrlParser</a>&lt;'a&gt;</code></h4>
+<div class='docblock'><p>Set a <em>scheme type mapper</em>, and return the <code>UrlParser</code>.</p>
+
+<p>The URL parser behaves differently based on the <code>SchemeType</code> of the URL.
+See the documentation for <code>SchemeType</code> for more details.
+A <em>scheme type mapper</em> returns a <code>SchemeType</code>
+based on the scheme as an ASCII lower case string,
+as found in the <code>scheme</code> field of an <code>Url</code> struct.</p>
+
+<p>The default scheme type mapper is as follows:</p>
+<pre class='rust rust-example-rendered'>
+<span class='kw'>fn</span> <span class='ident'>whatwg_scheme_type_mapper</span>(<span class='ident'>scheme</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>) <span class='op'>-&gt;</span> <span class='ident'>SchemeType</span> {
+    <span class='kw'>match</span> <span class='ident'>scheme</span> {
+        <span class='string'>&quot;file&quot;</span> <span class='op'>=&gt;</span> <span class='ident'>SchemeType</span>::<span class='ident'>FileLike</span>,
+        <span class='string'>&quot;ftp&quot;</span> <span class='op'>=&gt;</span> <span class='ident'>SchemeType</span>::<span class='ident'>Relative</span>(<span class='number'>21</span>),
+        <span class='string'>&quot;gopher&quot;</span> <span class='op'>=&gt;</span> <span class='ident'>SchemeType</span>::<span class='ident'>Relative</span>(<span class='number'>70</span>),
+        <span class='string'>&quot;http&quot;</span> <span class='op'>=&gt;</span> <span class='ident'>SchemeType</span>::<span class='ident'>Relative</span>(<span class='number'>80</span>),
+        <span class='string'>&quot;https&quot;</span> <span class='op'>=&gt;</span> <span class='ident'>SchemeType</span>::<span class='ident'>Relative</span>(<span class='number'>443</span>),
+        <span class='string'>&quot;ws&quot;</span> <span class='op'>=&gt;</span> <span class='ident'>SchemeType</span>::<span class='ident'>Relative</span>(<span class='number'>80</span>),
+        <span class='string'>&quot;wss&quot;</span> <span class='op'>=&gt;</span> <span class='ident'>SchemeType</span>::<span class='ident'>Relative</span>(<span class='number'>443</span>),
+        _ <span class='op'>=&gt;</span> <span class='ident'>NonRelative</span>,
+    }
+}</pre>
+
+<p>Note that unknown schemes default to non-relative.
+Overriding the scheme type mapper can allow, for example,
+parsing URLs in the <code>git</code> or <code>irc</code> scheme as relative.</p>
+</div><h4 id='method.parse' class='method'><code>fn <a href='#method.parse' class='fnname'>parse</a>(&amp;self, input: &amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='type' href='../url/type.ParseResult.html' title='url::ParseResult'>ParseResult</a>&lt;<a class='struct' href='../url/struct.Url.html' title='url::Url'>Url</a>&gt;</code></h4>
+<div class='docblock'><p>Parse <code>input</code> as an URL, with all the parameters previously set in the <code>UrlParser</code>.</p>
+</div><h4 id='method.parse_path' class='method'><code>fn <a href='#method.parse_path' class='fnname'>parse_path</a>(&amp;self, input: &amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='type' href='../url/type.ParseResult.html' title='url::ParseResult'>ParseResult</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>(</a><a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;, <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;, <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>)</a>&gt;</code></h4>
+<div class='docblock'><p>Parse <code>input</code> as a “standalone” URL path,
+with an optional query string and fragment identifier.</p>
+
+<p>This is typically found in the start line of an HTTP header.</p>
+
+<p>Note that while the start line has no fragment identifier in the HTTP RFC,
+servers typically parse it and ignore it
+(rather than having it be part of the path or query string.)</p>
+
+<p>On success, return <code>(path, query_string, fragment_identifier)</code></p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "url";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

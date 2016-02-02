@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Response","Contains a prototype of a response. The response is only sent when you call `Request::respond`."],["ResponseBody","An opaque type that represents the body of a response."]]});

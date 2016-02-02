@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Terminal` trait in crate `term`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Terminal">
+
+    <title>term::Terminal - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    <link rel="shortcut icon" href="https://www.rust-lang.org/favicon.ico">
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        <a href='../term/index.html'><img src='https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png' alt='logo' width='100'></a>
+        <p class='location'><a href='index.html'>term</a></p><script>window.sidebarCurrent = {name: 'Terminal', ty: 'trait', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content trait">
+<h1 class='fqn'><span class='in-band'>Trait <a href='index.html'>term</a>::<wbr><a class='trait' href=''>Terminal</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-775' class='srclink' href='../src/term/lib.rs.html#186-254' title='goto source code'>[src]</a></span></h1>
+<pre class='rust trait'>pub trait Terminal: <a class='trait' href='https://doc.rust-lang.org/nightly/std/io/trait.Write.html' title='std::io::Write'>Write</a> {
+    type Output: <a class='trait' href='https://doc.rust-lang.org/nightly/std/io/trait.Write.html' title='std::io::Write'>Write</a>;
+    fn <a href='#tymethod.fg' class='fnname'>fg</a>(&amp;mut self, color: <a class='type' href='../term/color/type.Color.html' title='term::color::Color'>Color</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;;
+    fn <a href='#tymethod.bg' class='fnname'>bg</a>(&amp;mut self, color: <a class='type' href='../term/color/type.Color.html' title='term::color::Color'>Color</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;;
+    fn <a href='#tymethod.attr' class='fnname'>attr</a>(&amp;mut self, attr: <a class='enum' href='../term/enum.Attr.html' title='term::Attr'>Attr</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;;
+    fn <a href='#tymethod.supports_attr' class='fnname'>supports_attr</a>(&amp;self, attr: <a class='enum' href='../term/enum.Attr.html' title='term::Attr'>Attr</a>) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>;
+    fn <a href='#tymethod.reset' class='fnname'>reset</a>(&amp;mut self) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;;
+    fn <a href='#tymethod.cursor_up' class='fnname'>cursor_up</a>(&amp;mut self) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;;
+    fn <a href='#tymethod.delete_line' class='fnname'>delete_line</a>(&amp;mut self) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;;
+    fn <a href='#tymethod.carriage_return' class='fnname'>carriage_return</a>(&amp;mut self) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;;
+    fn <a href='#tymethod.get_ref' class='fnname'>get_ref</a>&lt;'a&gt;(&amp;'a self) -&gt; &amp;'a Self::<a class='trait' href='../term/trait.Terminal.html' title='term::Terminal'>Output</a>;
+    fn <a href='#tymethod.get_mut' class='fnname'>get_mut</a>&lt;'a&gt;(&amp;'a mut self) -&gt; &amp;'a mut Self::<a class='trait' href='../term/trait.Terminal.html' title='term::Terminal'>Output</a>;
+    fn <a href='#tymethod.into_inner' class='fnname'>into_inner</a>(self) -&gt; Self::<a class='trait' href='../term/trait.Terminal.html' title='term::Terminal'>Output</a> <span class='where'>where Self: <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html' title='core::marker::Sized'>Sized</a></span>;
+}</pre><div class='docblock'><p>A terminal with similar capabilities to an ANSI Terminal
+(foreground/background colors etc).</p>
+</div>
+            <h2 id='associated-types'>Associated Types</h2>
+            <div class='methods'>
+        <h3 id='associatedtype.Output' class='method stab '><code>type Output: <a class='trait' href='https://doc.rust-lang.org/nightly/std/io/trait.Write.html' title='std::io::Write'>Write</a></code></h3><div class='docblock'><p>The terminal&#39;s output writer type.</p>
+</div></div>
+            <h2 id='required-methods'>Required Methods</h2>
+            <div class='methods'>
+        <h3 id='tymethod.fg' class='method stab '><code>fn <a href='#tymethod.fg' class='fnname'>fg</a>(&amp;mut self, color: <a class='type' href='../term/color/type.Color.html' title='term::color::Color'>Color</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;</code></h3><div class='docblock'><p>Sets the foreground color to the given color.</p>
+
+<p>If the color is a bright color, but the terminal only supports 8 colors,
+the corresponding normal color will be used instead.</p>
+
+<p>Returns <code>Ok(true)</code> if the color was set, <code>Ok(false)</code> otherwise, and <code>Err(e)</code>
+if there was an I/O error.</p>
+</div><h3 id='tymethod.bg' class='method stab '><code>fn <a href='#tymethod.bg' class='fnname'>bg</a>(&amp;mut self, color: <a class='type' href='../term/color/type.Color.html' title='term::color::Color'>Color</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;</code></h3><div class='docblock'><p>Sets the background color to the given color.</p>
+
+<p>If the color is a bright color, but the terminal only supports 8 colors,
+the corresponding normal color will be used instead.</p>
+
+<p>Returns <code>Ok(true)</code> if the color was set, <code>Ok(false)</code> otherwise, and <code>Err(e)</code>
+if there was an I/O error.</p>
+</div><h3 id='tymethod.attr' class='method stab '><code>fn <a href='#tymethod.attr' class='fnname'>attr</a>(&amp;mut self, attr: <a class='enum' href='../term/enum.Attr.html' title='term::Attr'>Attr</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;</code></h3><div class='docblock'><p>Sets the given terminal attribute, if supported.  Returns <code>Ok(true)</code>
+if the attribute was supported, <code>Ok(false)</code> otherwise, and <code>Err(e)</code> if
+there was an I/O error.</p>
+</div><h3 id='tymethod.supports_attr' class='method stab '><code>fn <a href='#tymethod.supports_attr' class='fnname'>supports_attr</a>(&amp;self, attr: <a class='enum' href='../term/enum.Attr.html' title='term::Attr'>Attr</a>) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h3><div class='docblock'><p>Returns whether the given terminal attribute is supported.</p>
+</div><h3 id='tymethod.reset' class='method stab '><code>fn <a href='#tymethod.reset' class='fnname'>reset</a>(&amp;mut self) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;</code></h3><div class='docblock'><p>Resets all terminal attributes and colors to their defaults.</p>
+
+<p>Returns <code>Ok(true)</code> if the terminal was reset, <code>Ok(false)</code> otherwise, and <code>Err(e)</code> if there
+was an I/O error.</p>
+
+<p><em>Note: This does not flush.</em></p>
+
+<p>That means the reset command may get buffered so, if you aren&#39;t planning on doing anything
+else that might flush stdout&#39;s buffer (e.g. writing a line of text), you should flush after
+calling reset.</p>
+</div><h3 id='tymethod.cursor_up' class='method stab '><code>fn <a href='#tymethod.cursor_up' class='fnname'>cursor_up</a>(&amp;mut self) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;</code></h3><div class='docblock'><p>Moves the cursor up one line.</p>
+
+<p>Returns <code>Ok(true)</code> if the cursor was moved, <code>Ok(false)</code> otherwise, and <code>Err(e)</code>
+if there was an I/O error.</p>
+</div><h3 id='tymethod.delete_line' class='method stab '><code>fn <a href='#tymethod.delete_line' class='fnname'>delete_line</a>(&amp;mut self) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;</code></h3><div class='docblock'><p>Deletes the text from the cursor location to the end of the line.</p>
+
+<p>Returns <code>Ok(true)</code> if the text was deleted, <code>Ok(false)</code> otherwise, and <code>Err(e)</code>
+if there was an I/O error.</p>
+</div><h3 id='tymethod.carriage_return' class='method stab '><code>fn <a href='#tymethod.carriage_return' class='fnname'>carriage_return</a>(&amp;mut self) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>&gt;</code></h3><div class='docblock'><p>Moves the cursor to the left edge of the current line.</p>
+
+<p>Returns <code>Ok(true)</code> if the text was deleted, <code>Ok(false)</code> otherwise, and <code>Err(e)</code>
+if there was an I/O error.</p>
+</div><h3 id='tymethod.get_ref' class='method stab '><code>fn <a href='#tymethod.get_ref' class='fnname'>get_ref</a>&lt;'a&gt;(&amp;'a self) -&gt; &amp;'a Self::<a class='trait' href='../term/trait.Terminal.html' title='term::Terminal'>Output</a></code></h3><div class='docblock'><p>Gets an immutable reference to the stream inside</p>
+</div><h3 id='tymethod.get_mut' class='method stab '><code>fn <a href='#tymethod.get_mut' class='fnname'>get_mut</a>&lt;'a&gt;(&amp;'a mut self) -&gt; &amp;'a mut Self::<a class='trait' href='../term/trait.Terminal.html' title='term::Terminal'>Output</a></code></h3><div class='docblock'><p>Gets a mutable reference to the stream inside</p>
+</div><h3 id='tymethod.into_inner' class='method stab '><code>fn <a href='#tymethod.into_inner' class='fnname'>into_inner</a>(self) -&gt; Self::<a class='trait' href='../term/trait.Terminal.html' title='term::Terminal'>Output</a> <span class='where'>where Self: <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html' title='core::marker::Sized'>Sized</a></span></code></h3><div class='docblock'><p>Returns the contained stream, destroying the <code>Terminal</code></p>
+</div></div>
+        <h2 id='implementors'>Implementors</h2>
+        <ul class='item-list' id='implementors-list'>
+    <li><code>impl&lt;T: <a class='trait' href='https://doc.rust-lang.org/nightly/std/io/trait.Write.html' title='std::io::Write'>Write</a> + <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a>&gt; <a class='trait' href='../term/trait.Terminal.html' title='term::Terminal'>Terminal</a> for <a class='struct' href='../term/terminfo/struct.TerminfoTerminal.html' title='term::terminfo::TerminfoTerminal'>TerminfoTerminal</a>&lt;T&gt;</code></li>
+</ul><script type="text/javascript" async
+                              src="../implementors/term/trait.Terminal.js">
+                      </script></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "term";
+        window.playgroundUrl = "http://play.rust-lang.org/";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    <script src="../playpen.js"></script>
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

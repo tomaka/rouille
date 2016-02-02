@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Response","Object representing an HTTP response whose purpose is to be given to a `Request`."]],"type":[["ResponseBox","A `Response` without a template parameter."]]});

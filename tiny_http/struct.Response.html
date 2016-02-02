@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Response` struct in crate `tiny_http`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Response">
+
+    <title>tiny_http::Response - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>tiny_http</a></p><script>window.sidebarCurrent = {name: 'Response', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>tiny_http</a>::<wbr><a class='struct' href=''>Response</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-667' class='srclink' href='../src/tiny_http/response.rs.html#51-56' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Response&lt;R&gt; <span class='where'>where R: <a class='trait' href='https://doc.rust-lang.org/nightly/std/io/trait.Read.html' title='std::io::Read'>Read</a></span> {
+    // some fields omitted
+}</pre><div class='docblock'><p>Object representing an HTTP response whose purpose is to be given to a <code>Request</code>.</p>
+
+<p>Some headers cannot be changed. Trying to define the value
+of one of these will have no effect:</p>
+
+<ul>
+<li><code>Accept-Ranges</code></li>
+<li><code>Connection</code></li>
+<li><code>Content-Range</code></li>
+<li><code>Trailer</code></li>
+<li><code>Transfer-Encoding</code></li>
+<li><code>Upgrade</code></li>
+</ul>
+
+<p>Some headers have special behaviors:</p>
+
+<ul>
+<li><p><code>Content-Encoding</code>: If you define this header, the library
+will assume that the data from the <code>Read</code> object has the specified encoding
+and will just pass-through.</p></li>
+<li><p><code>Content-Length</code>: The length of the data should be set manually
+using the <code>Reponse</code> object&#39;s API. Attempting to set the value of this
+header will be equivalent to modifying the size of the data but the header
+itself may not be present in the final result.</p></li>
+</ul>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl&lt;R&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;R&gt; <span class='where'>where R: <a class='trait' href='https://doc.rust-lang.org/nightly/std/io/trait.Read.html' title='std::io::Read'>Read</a></span></code></h3><div class='impl-items'><h4 id='method.new' class='method'><code>fn <a href='#method.new' class='fnname'>new</a>(status_code: <a class='struct' href='../tiny_http/struct.StatusCode.html' title='tiny_http::StatusCode'>StatusCode</a>, headers: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='../tiny_http/struct.Header.html' title='tiny_http::Header'>Header</a>&gt;, data: R, data_length: <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>&gt;, additional_headers: <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/sync/mpsc/struct.Receiver.html' title='std::sync::mpsc::Receiver'>Receiver</a>&lt;<a class='struct' href='../tiny_http/struct.Header.html' title='tiny_http::Header'>Header</a>&gt;&gt;) -&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;R&gt;</code></h4>
+<div class='docblock'><p>Creates a new Response object.</p>
+
+<p>The <code>additional_headers</code> argument is a receiver that
+ may provide headers even after the response has been sent.</p>
+
+<p>All the other arguments are straight-forward.</p>
+</div><h4 id='method.add_header' class='method'><code>fn <a href='#method.add_header' class='fnname'>add_header</a>&lt;H&gt;(&amp;mut self, header: H) <span class='where'>where H: <a class='trait' href='https://doc.rust-lang.org/nightly/core/convert/trait.Into.html' title='core::convert::Into'>Into</a>&lt;<a class='struct' href='../tiny_http/struct.Header.html' title='tiny_http::Header'>Header</a>&gt;</span></code></h4>
+<div class='docblock'><p>Adds a header to the list.
+Does all the checks.</p>
+</div><h4 id='method.with_header' class='method'><code>fn <a href='#method.with_header' class='fnname'>with_header</a>&lt;H&gt;(self, header: H) -&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;R&gt; <span class='where'>where H: <a class='trait' href='https://doc.rust-lang.org/nightly/core/convert/trait.Into.html' title='core::convert::Into'>Into</a>&lt;<a class='struct' href='../tiny_http/struct.Header.html' title='tiny_http::Header'>Header</a>&gt;</span></code></h4>
+<div class='docblock'><p>Returns the same request, but with an additional header.</p>
+
+<p>Some headers cannot be modified and some other have a
+ special behavior. See the documentation above.</p>
+</div><h4 id='method.with_status_code' class='method'><code>fn <a href='#method.with_status_code' class='fnname'>with_status_code</a>&lt;S&gt;(self, code: S) -&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;R&gt; <span class='where'>where S: <a class='trait' href='https://doc.rust-lang.org/nightly/core/convert/trait.Into.html' title='core::convert::Into'>Into</a>&lt;<a class='struct' href='../tiny_http/struct.StatusCode.html' title='tiny_http::StatusCode'>StatusCode</a>&gt;</span></code></h4>
+<div class='docblock'><p>Returns the same request, but with a different status code.</p>
+</div><h4 id='method.with_data' class='method'><code>fn <a href='#method.with_data' class='fnname'>with_data</a>&lt;S&gt;(self, reader: S, data_length: <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a>&gt;) -&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;S&gt; <span class='where'>where S: <a class='trait' href='https://doc.rust-lang.org/nightly/std/io/trait.Read.html' title='std::io::Read'>Read</a></span></code></h4>
+<div class='docblock'><p>Returns the same request, but with different data.</p>
+</div><h4 id='method.raw_print' class='method'><code>fn <a href='#method.raw_print' class='fnname'>raw_print</a>&lt;W: <a class='trait' href='https://doc.rust-lang.org/nightly/std/io/trait.Write.html' title='std::io::Write'>Write</a>&gt;(self, writer: W, http_version: <a class='struct' href='../tiny_http/struct.HTTPVersion.html' title='tiny_http::HTTPVersion'>HTTPVersion</a>, request_headers: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;[</a><a class='struct' href='../tiny_http/struct.Header.html' title='tiny_http::Header'>Header</a><a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>]</a>, do_not_send_body: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a>, upgrade: <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>&gt;) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>IoResult</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
+<div class='docblock'><p>Prints the HTTP response to a writer.</p>
+
+<p>This function is the one used to send the response to the client&#39;s socket.
+Therefore you shouldn&#39;t expect anything pretty-printed or even readable.</p>
+
+<p>The HTTP version and headers passed as arguments are used to
+ decide which features (most notably, encoding) to use.</p>
+
+<p>Note: does not flush the writer.</p>
+</div></div><h3 class='impl'><code>impl&lt;R&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;R&gt; <span class='where'>where R: <a class='trait' href='https://doc.rust-lang.org/nightly/std/io/trait.Read.html' title='std::io::Read'>Read</a> + <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static</span></code></h3><div class='impl-items'><h4 id='method.boxed' class='method'><code>fn <a href='#method.boxed' class='fnname'>boxed</a>(self) -&gt; <a class='type' href='../tiny_http/type.ResponseBox.html' title='tiny_http::ResponseBox'>ResponseBox</a></code></h4>
+<div class='docblock'><p>Turns this response into a <code>Response&lt;Box&lt;Read + Send&gt;&gt;</code>.</p>
+</div></div><h3 class='impl'><code>impl <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/fs/struct.File.html' title='std::fs::File'>File</a>&gt;</code></h3><div class='impl-items'><h4 id='method.from_file' class='method'><code>fn <a href='#method.from_file' class='fnname'>from_file</a>(file: <a class='struct' href='https://doc.rust-lang.org/nightly/std/fs/struct.File.html' title='std::fs::File'>File</a>) -&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/fs/struct.File.html' title='std::fs::File'>File</a>&gt;</code></h4>
+<div class='docblock'><p>Builds a new <code>Response</code> from a <code>File</code>.</p>
+
+<p>The <code>Content-Type</code> will <strong>not</strong> be automatically detected,
+ you must set it yourself.</p>
+</div></div><h3 class='impl'><code>impl <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/io/cursor/struct.Cursor.html' title='std::io::cursor::Cursor'>Cursor</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a>&gt;&gt;&gt;</code></h3><div class='impl-items'><h4 id='method.from_data' class='method'><code>fn <a href='#method.from_data' class='fnname'>from_data</a>&lt;D&gt;(data: D) -&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/io/cursor/struct.Cursor.html' title='std::io::cursor::Cursor'>Cursor</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a>&gt;&gt;&gt; <span class='where'>where D: <a class='trait' href='https://doc.rust-lang.org/nightly/core/convert/trait.Into.html' title='core::convert::Into'>Into</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a>&gt;&gt;</span></code></h4>
+<h4 id='method.from_string' class='method'><code>fn <a href='#method.from_string' class='fnname'>from_string</a>&lt;S&gt;(data: S) -&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/io/cursor/struct.Cursor.html' title='std::io::cursor::Cursor'>Cursor</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a>&gt;&gt;&gt; <span class='where'>where S: <a class='trait' href='https://doc.rust-lang.org/nightly/core/convert/trait.Into.html' title='core::convert::Into'>Into</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;</span></code></h4>
+</div><h3 class='impl'><code>impl <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/io/util/struct.Empty.html' title='std::io::util::Empty'>Empty</a>&gt;</code></h3><div class='impl-items'><h4 id='method.empty' class='method'><code>fn <a href='#method.empty' class='fnname'>empty</a>&lt;S&gt;(status_code: S) -&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/io/util/struct.Empty.html' title='std::io::util::Empty'>Empty</a>&gt; <span class='where'>where S: <a class='trait' href='https://doc.rust-lang.org/nightly/core/convert/trait.Into.html' title='core::convert::Into'>Into</a>&lt;<a class='struct' href='../tiny_http/struct.StatusCode.html' title='tiny_http::StatusCode'>StatusCode</a>&gt;</span></code></h4>
+<div class='docblock'><p>Builds an empty <code>Response</code> with the given status code.</p>
+</div><h4 id='method.new_empty' class='method'><code>fn <a href='#method.new_empty' class='fnname'>new_empty</a>(status_code: <a class='struct' href='../tiny_http/struct.StatusCode.html' title='tiny_http::StatusCode'>StatusCode</a>) -&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/io/util/struct.Empty.html' title='std::io::util::Empty'>Empty</a>&gt;</code></h4>
+<div class='docblock'><p>DEPRECATED. Use <code>empty</code> instead.</p>
+</div></div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/io/util/struct.Empty.html' title='std::io::util::Empty'>Empty</a>&gt;</code></h3><div class='impl-items'><h4 id='method.clone' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='struct' href='../tiny_http/struct.Response.html' title='tiny_http::Response'>Response</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/io/util/struct.Empty.html' title='std::io::util::Empty'>Empty</a>&gt;</code></h4>
+<h4 id='method.clone_from' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: &amp;Self)</code></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "tiny_http";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

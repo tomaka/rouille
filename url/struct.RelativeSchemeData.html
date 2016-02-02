@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `RelativeSchemeData` struct in crate `url`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, RelativeSchemeData">
+
+    <title>url::RelativeSchemeData - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>url</a></p><script>window.sidebarCurrent = {name: 'RelativeSchemeData', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>url</a>::<wbr><a class='struct' href=''>RelativeSchemeData</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-1471' class='srclink' href='../src/url/lib.rs.html#233-269' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct RelativeSchemeData {
+    pub username: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>,
+    pub password: <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;,
+    pub host: <a class='enum' href='../url/enum.Host.html' title='url::Host'>Host</a>,
+    pub port: <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u16.html'>u16</a>&gt;,
+    pub default_port: <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u16.html'>u16</a>&gt;,
+    pub path: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;,
+}</pre><div class='docblock'><p>Components for URLs in a <em>relative</em> scheme such as HTTP.</p>
+</div><h2 class='fields'>Fields</h2>
+<table><tr class='stab '>
+                                  <td id='structfield.username'><code>username</code></td><td><div class='docblock'><p>The username of the URL, as a possibly empty, percent-encoded string.</p>
+
+<p>Percent encoded strings are within the ASCII range.</p>
+
+<p>See also the <code>lossy_percent_decode_username</code> method.</p>
+</div></td></tr><tr class='stab '>
+                                  <td id='structfield.password'><code>password</code></td><td><div class='docblock'><p>The password of the URL.</p>
+
+<p><code>None</code> if the <code>:</code> delimiter character was not part of the parsed input,
+otherwise a possibly empty, percent-encoded string.</p>
+
+<p>Percent encoded strings are within the ASCII range.</p>
+
+<p>See also the <code>lossy_percent_decode_password</code> method.</p>
+</div></td></tr><tr class='stab '>
+                                  <td id='structfield.host'><code>host</code></td><td><div class='docblock'><p>The host of the URL, either a domain name or an IPv4 address</p>
+</div></td></tr><tr class='stab '>
+                                  <td id='structfield.port'><code>port</code></td><td><div class='docblock'><p>The port number of the URL.
+<code>None</code> for file-like schemes, or to indicate the default port number.</p>
+</div></td></tr><tr class='stab '>
+                                  <td id='structfield.default_port'><code>default_port</code></td><td><div class='docblock'><p>The default port number for the URL’s scheme.
+<code>None</code> for file-like schemes.</p>
+</div></td></tr><tr class='stab '>
+                                  <td id='structfield.path'><code>path</code></td><td><div class='docblock'><p>The path of the URL, as vector of percent-encoded strings.</p>
+
+<p>Percent encoded strings are within the ASCII range.</p>
+
+<p>See also the <code>serialize_path</code> method and,
+for URLs in the <code>file</code> scheme, the <code>to_file_path</code> method.</p>
+</div></td></tr></table><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl <a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a></code></h3><div class='impl-items'><h4 id='method.lossy_percent_decode_username' class='method'><code>fn <a href='#method.lossy_percent_decode_username' class='fnname'>lossy_percent_decode_username</a>(&amp;self) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a></code></h4>
+<div class='docblock'><p>Percent-decode the URL’s username.</p>
+
+<p>This is “lossy”: invalid UTF-8 percent-encoded byte sequences
+will be replaced � U+FFFD, the replacement character.</p>
+</div><h4 id='method.lossy_percent_decode_password' class='method'><code>fn <a href='#method.lossy_percent_decode_password' class='fnname'>lossy_percent_decode_password</a>(&amp;self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;</code></h4>
+<div class='docblock'><p>Percent-decode the URL’s password, if any.</p>
+
+<p>This is “lossy”: invalid UTF-8 percent-encoded byte sequences
+will be replaced � U+FFFD, the replacement character.</p>
+</div><h4 id='method.to_file_path' class='method'><code>fn <a href='#method.to_file_path' class='fnname'>to_file_path</a>(&amp;self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/std/path/struct.PathBuf.html' title='std::path::PathBuf'>PathBuf</a>, <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
+<div class='docblock'><p>Assuming the URL is in the <code>file</code> scheme or similar,
+convert its path to an absolute <code>std::path::Path</code>.</p>
+
+<p><strong>Note:</strong> This does not actually check the URL’s <code>scheme</code>,
+and may give nonsensical results for other schemes.
+It is the user’s responsibility to check the URL’s scheme before calling this.</p>
+
+<p>The return type (when <code>Ok()</code>) is generic and can be either <code>std::path::posix::Path</code>
+or <code>std::path::windows::Path</code>.
+(Use <code>std::path::Path</code> to pick one of them depending on the local system.)
+If the compiler can not infer the desired type from context, you may have to specifiy it:</p>
+<pre class='rust rust-example-rendered'>
+<span class='kw'>let</span> <span class='ident'>path</span> <span class='op'>=</span> <span class='ident'>url</span>.<span class='ident'>to_file_path</span>::<span class='op'>&lt;</span><span class='ident'>std</span>::<span class='ident'>path</span>::<span class='ident'>posix</span>::<span class='ident'>Path</span><span class='op'>&gt;</span>();</pre>
+
+<p>Returns <code>Err</code> if the host is neither empty nor <code>&quot;localhost&quot;</code>,
+or if <code>Path::new_opt()</code> returns <code>None</code>.
+(That is, if the percent-decoded path contains a NUL byte or,
+for a Windows path, is not UTF-8.)</p>
+</div><h4 id='method.domain' class='method'><code>fn <a href='#method.domain' class='fnname'>domain</a>&lt;'a&gt;(&amp;'a self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;'a <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>&gt;</code></h4>
+<div class='docblock'><p>If the host is a domain, return the domain as a string.</p>
+</div><h4 id='method.domain_mut' class='method'><code>fn <a href='#method.domain_mut' class='fnname'>domain_mut</a>&lt;'a&gt;(&amp;'a mut self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;'a mut <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;</code></h4>
+<div class='docblock'><p>If the host is a domain, return a mutable reference to the domain string.</p>
+</div><h4 id='method.port_or_default' class='method'><code>fn <a href='#method.port_or_default' class='fnname'>port_or_default</a>(&amp;self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u16.html'>u16</a>&gt;</code></h4>
+<div class='docblock'><p>Return the port number of the URL, even if it is the default.
+Return <code>None</code> for file-like URLs.</p>
+</div><h4 id='method.serialize_path' class='method'><code>fn <a href='#method.serialize_path' class='fnname'>serialize_path</a>(&amp;self) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a></code></h4>
+<div class='docblock'><p>Serialize the path as a string.</p>
+
+<p>The returned string starts with a &quot;/&quot; slash, and components are separated by slashes.
+A trailing slash represents an empty last component.</p>
+</div><h4 id='method.serialize_userinfo' class='method'><code>fn <a href='#method.serialize_userinfo' class='fnname'>serialize_userinfo</a>(&amp;self) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a></code></h4>
+<div class='docblock'><p>Serialize the userinfo as a string.</p>
+
+<p>Format: &quot;<username>:<password>@&quot;.</p>
+</div></div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html' title='core::cmp::PartialEq'>PartialEq</a> for <a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a></code></h3><div class='impl-items'><h4 id='method.eq' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#method.eq' class='fnname'>eq</a>(&amp;self, other: &amp;<a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a>) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+<h4 id='method.ne' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html#method.ne' class='fnname'>ne</a>(&amp;self, other: &amp;Rhs) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+</div><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/cmp/trait.Eq.html' title='core::cmp::Eq'>Eq</a> for <a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a></code></h3><div class='impl-items'></div><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/hash/trait.Hash.html' title='core::hash::Hash'>Hash</a> for <a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a></code></h3><div class='impl-items'><h4 id='method.hash' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/hash/trait.Hash.html#method.hash' class='fnname'>hash</a>&lt;H: <a class='trait' href='https://doc.rust-lang.org/nightly/core/hash/trait.Hasher.html' title='core::hash::Hasher'>Hasher</a>&gt;(&amp;self, state: &amp;mut H)</code></h4>
+<h4 id='method.hash_slice' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/hash/trait.Hash.html#method.hash_slice' class='fnname'>hash_slice</a>&lt;H&gt;(data: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;[Self]</a>, state: &amp;mut H) <span class='where'>where H: <a class='trait' href='https://doc.rust-lang.org/nightly/core/hash/trait.Hasher.html' title='core::hash::Hasher'>Hasher</a></span></code></h4>
+</div><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html' title='core::cmp::PartialOrd'>PartialOrd</a> for <a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a></code></h3><div class='impl-items'><h4 id='method.partial_cmp' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html#method.partial_cmp' class='fnname'>partial_cmp</a>(&amp;self, other: &amp;<a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='enum' href='https://doc.rust-lang.org/nightly/core/cmp/enum.Ordering.html' title='core::cmp::Ordering'>Ordering</a>&gt;</code></h4>
+<h4 id='method.lt' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html#method.lt' class='fnname'>lt</a>(&amp;self, other: &amp;Rhs) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+<h4 id='method.le' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html#method.le' class='fnname'>le</a>(&amp;self, other: &amp;Rhs) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+<h4 id='method.gt' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html#method.gt' class='fnname'>gt</a>(&amp;self, other: &amp;Rhs) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+<h4 id='method.ge' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html#method.ge' class='fnname'>ge</a>(&amp;self, other: &amp;Rhs) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+</div><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html' title='core::cmp::Ord'>Ord</a> for <a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a></code></h3><div class='impl-items'><h4 id='method.cmp' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html#method.cmp' class='fnname'>cmp</a>(&amp;self, other: &amp;Self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/cmp/enum.Ordering.html' title='core::cmp::Ordering'>Ordering</a></code></h4>
+</div><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Display.html' title='core::fmt::Display'>Display</a> for <a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a></code></h3><div class='impl-items'><h4 id='method.fmt' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Display.html#method.fmt' class='fnname'>fmt</a>(&amp;self, formatter: &amp;mut <a class='struct' href='https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html' title='core::fmt::Formatter'>Formatter</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/core/fmt/type.Result.html' title='core::fmt::Result'>Result</a></code></h4>
+</div><h3 id='derived_implementations'>Derived Implementations </h3><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a></code></h3><div class='impl-items'><h4 id='method.fmt-1' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#method.fmt' class='fnname'>fmt</a>(&amp;self, __arg_0: &amp;mut <a class='struct' href='https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html' title='core::fmt::Formatter'>Formatter</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/core/fmt/type.Result.html' title='core::fmt::Result'>Result</a></code></h4>
+</div><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a></code></h3><div class='impl-items'><h4 id='method.clone' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='struct' href='../url/struct.RelativeSchemeData.html' title='url::RelativeSchemeData'>RelativeSchemeData</a></code></h4>
+<h4 id='method.clone_from' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: &amp;Self)</code></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "url";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Server` struct in crate `tiny_http`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Server">
+
+    <title>tiny_http::Server - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>tiny_http</a></p><script>window.sidebarCurrent = {name: 'Server', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>tiny_http</a>::<wbr><a class='struct' href=''>Server</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-1167' class='srclink' href='../src/tiny_http/lib.rs.html#148-158' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Server {
+    // some fields omitted
+}</pre><div class='docblock'><p>The main class of this library.</p>
+
+<p>Destroying this object will immediatly close the listening socket annd the reading
+ part of all the client&#39;s connections. Requests that have already been returned by
+ the <code>recv()</code> function will not close and the responses will be transferred to the client.</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl <a class='struct' href='../tiny_http/struct.Server.html' title='tiny_http::Server'>Server</a></code></h3><div class='impl-items'><h4 id='method.http' class='method'><code>fn <a href='#method.http' class='fnname'>http</a>&lt;A&gt;(addr: A) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='struct' href='../tiny_http/struct.Server.html' title='tiny_http::Server'>Server</a>, <a class='struct' href='https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html' title='alloc::boxed::Box'>Box</a>&lt;<a class='trait' href='https://doc.rust-lang.org/nightly/std/error/trait.Error.html' title='std::error::Error'>Error</a> + <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Sync.html' title='core::marker::Sync'>Sync</a> + 'static&gt;&gt; <span class='where'>where A: <a class='trait' href='https://doc.rust-lang.org/nightly/std/net/addr/trait.ToSocketAddrs.html' title='std::net::addr::ToSocketAddrs'>ToSocketAddrs</a></span></code></h4>
+<div class='docblock'><p>Shortcut for a simple server on a specific address.</p>
+</div><h4 id='method.new' class='method'><code>fn <a href='#method.new' class='fnname'>new</a>&lt;A&gt;(config: <a class='struct' href='../tiny_http/struct.ServerConfig.html' title='tiny_http::ServerConfig'>ServerConfig</a>&lt;A&gt;) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='struct' href='../tiny_http/struct.Server.html' title='tiny_http::Server'>Server</a>, <a class='struct' href='https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html' title='alloc::boxed::Box'>Box</a>&lt;<a class='trait' href='https://doc.rust-lang.org/nightly/std/error/trait.Error.html' title='std::error::Error'>Error</a> + <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Sync.html' title='core::marker::Sync'>Sync</a> + 'static&gt;&gt; <span class='where'>where A: <a class='trait' href='https://doc.rust-lang.org/nightly/std/net/addr/trait.ToSocketAddrs.html' title='std::net::addr::ToSocketAddrs'>ToSocketAddrs</a></span></code></h4>
+<div class='docblock'><p>Builds a new server that listens on the specified address.</p>
+</div><h4 id='method.incoming_requests' class='method'><code>fn <a href='#method.incoming_requests' class='fnname'>incoming_requests</a>(&amp;self) -&gt; <a class='struct' href='../tiny_http/struct.IncomingRequests.html' title='tiny_http::IncomingRequests'>IncomingRequests</a></code></h4>
+<div class='docblock'><p>Returns an iterator for all the incoming requests.</p>
+
+<p>The iterator will return <code>None</code> if the server socket is shutdown.</p>
+</div><h4 id='method.server_addr' class='method'><code>fn <a href='#method.server_addr' class='fnname'>server_addr</a>(&amp;self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/std/net/addr/enum.SocketAddr.html' title='std::net::addr::SocketAddr'>SocketAddr</a></code></h4>
+<div class='docblock'><p>Returns the address the server is listening to.</p>
+</div><h4 id='method.num_connections' class='method'><code>fn <a href='#method.num_connections' class='fnname'>num_connections</a>(&amp;self) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.usize.html'>usize</a></code></h4>
+<div class='docblock'><p>Returns the number of clients currently connected to the server.</p>
+</div><h4 id='method.recv' class='method'><code>fn <a href='#method.recv' class='fnname'>recv</a>(&amp;self) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>IoResult</a>&lt;<a class='struct' href='../tiny_http/struct.Request.html' title='tiny_http::Request'>Request</a>&gt;</code></h4>
+<div class='docblock'><p>Blocks until an HTTP request has been submitted and returns it.</p>
+</div><h4 id='method.try_recv' class='method'><code>fn <a href='#method.try_recv' class='fnname'>try_recv</a>(&amp;self) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>IoResult</a>&lt;<a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='struct' href='../tiny_http/struct.Request.html' title='tiny_http::Request'>Request</a>&gt;&gt;</code></h4>
+<div class='docblock'><p>Same as <code>recv()</code> but doesn&#39;t block.</p>
+</div></div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/ops/trait.Drop.html' title='core::ops::Drop'>Drop</a> for <a class='struct' href='../tiny_http/struct.Server.html' title='tiny_http::Server'>Server</a></code></h3><div class='impl-items'><h4 id='method.drop' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/ops/trait.Drop.html#method.drop' class='fnname'>drop</a>(&amp;mut self)</code></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "tiny_http";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `types` mod in crate `encoding`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, types">
+
+    <title>encoding::types - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='../index.html'>encoding</a></p><script>window.sidebarCurrent = {name: 'types', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content mod">
+<h1 class='fqn'><span class='in-band'>Module <a href='../index.html'>encoding</a>::<wbr><a class='mod' href=''>types</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-78' class='srclink' href='../../src/encoding/types.rs.html#5-513' title='goto source code'>[src]</a></span></h1>
+<div class='docblock'><p>Interface to the character encoding.</p>
+
+<h1 id='raw-incremental-interface' class='section-header'><a href='#raw-incremental-interface'>Raw incremental interface</a></h1>
+<p>Methods which name starts with <code>raw_</code> constitute the raw incremental interface,
+the lowest-available API for encoders and decoders.
+This interface divides the entire input to four parts:</p>
+
+<ul>
+<li><strong>Processed</strong> bytes do not affect the future result.</li>
+<li><strong>Unprocessed</strong> bytes may affect the future result
+and can be a part of problematic sequence according to the future input.</li>
+<li><strong>Problematic</strong> byte is the first byte that causes an error condition.</li>
+<li><strong>Remaining</strong> bytes are not yet processed nor read,
+so the caller should feed any remaining bytes again.</li>
+</ul>
+
+<p>The following figure illustrates an example of successive <code>raw_feed</code> calls:</p>
+
+<pre><code class="language-notrust">1st raw_feed   :2nd raw_feed   :3rd raw_feed
+----------+----:---------------:--+--+---------
+          |    :               :  |  |
+----------+----:---------------:--+--+---------
+processed  unprocessed             |  remaining
+                              problematic
+</code></pre>
+
+<p>Since these parts can span the multiple input sequences to <code>raw_feed</code>,
+<code>raw_feed</code> returns two offsets (one optional)
+with that the caller can track the problematic sequence.
+The first offset (the first <code>usize</code> in the tuple) points to the first unprocessed bytes,
+or is zero when unprocessed bytes have started before the current call.
+(The first unprocessed byte can also be at offset 0,
+which doesn&#39;t make a difference for the caller.)
+The second offset (<code>upto</code> field in the <code>CodecError</code> struct), if any,
+points to the first remaining bytes.</p>
+
+<p>If the caller needs to recover the error via the problematic sequence,
+then the caller starts to save the unprocessed bytes when the first offset &lt; the input length,
+appends any new unprocessed bytes while the first offset is zero,
+and discards unprocessed bytes when first offset becomes non-zero
+while saving new unprocessed bytes when the first offset &lt; the input length.
+Then the caller checks for the error condition
+and can use the saved unprocessed bytes for error recovery.
+Alternatively, if the caller only wants to replace the problematic sequence
+with a fixed string (like U+FFFD),
+then it can just discard the first sequence and can emit the fixed string on an error.
+It still has to feed the input bytes starting at the second offset again.</p>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table>
+                    <tr class=' module-item'>
+                        <td><a class='struct' href='struct.CodecError.html'
+                               title='encoding::types::CodecError'>CodecError</a></td>
+                        <td class='docblock short'>
+                             <p>Error information from either encoder or decoder.</p>
+
+                        </td>
+                    </tr>
+                </table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
+<table>
+                    <tr class=' module-item'>
+                        <td><a class='enum' href='enum.DecoderTrap.html'
+                               title='encoding::types::DecoderTrap'>DecoderTrap</a></td>
+                        <td class='docblock short'>
+                             <p>Trap, which handles decoder errors.</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='enum' href='enum.EncoderTrap.html'
+                               title='encoding::types::EncoderTrap'>EncoderTrap</a></td>
+                        <td class='docblock short'>
+                             
+                        </td>
+                    </tr>
+                </table><h2 id='traits' class='section-header'><a href="#traits">Traits</a></h2>
+<table>
+                    <tr class=' module-item'>
+                        <td><a class='trait' href='trait.ByteWriter.html'
+                               title='encoding::types::ByteWriter'>ByteWriter</a></td>
+                        <td class='docblock short'>
+                             <p>Byte writer used by encoders. In most cases this will be an owned vector of <code>u8</code>.</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='trait' href='trait.Encoding.html'
+                               title='encoding::types::Encoding'>Encoding</a></td>
+                        <td class='docblock short'>
+                             <p>Character encoding.</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='trait' href='trait.RawDecoder.html'
+                               title='encoding::types::RawDecoder'>RawDecoder</a></td>
+                        <td class='docblock short'>
+                             <p>Decoder converting a byte sequence into a Unicode string.
+This is a lower level interface, and normally <code>Encoding::decode</code> should be used instead.</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='trait' href='trait.RawEncoder.html'
+                               title='encoding::types::RawEncoder'>RawEncoder</a></td>
+                        <td class='docblock short'>
+                             <p>Encoder converting a Unicode string into a byte sequence.
+This is a lower level interface, and normally <code>Encoding::encode</code> should be used instead.</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='trait' href='trait.StringWriter.html'
+                               title='encoding::types::StringWriter'>StringWriter</a></td>
+                        <td class='docblock short'>
+                             <p>String writer used by decoders. In most cases this will be an owned string.</p>
+
+                        </td>
+                    </tr>
+                </table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table>
+                    <tr class=' module-item'>
+                        <td><a class='fn' href='fn.decode.html'
+                               title='encoding::types::decode'>decode</a></td>
+                        <td class='docblock short'>
+                             <p>Determine the encoding by looking for a Byte Order Mark (BOM)
+and decoded a single string in memory.
+Return the result and the used encoding.</p>
+
+                        </td>
+                    </tr>
+                </table><h2 id='types' class='section-header'><a href="#types">Type Definitions</a></h2>
+<table>
+                    <tr class=' module-item'>
+                        <td><a class='type' href='type.DecoderTrapFunc.html'
+                               title='encoding::types::DecoderTrapFunc'>DecoderTrapFunc</a></td>
+                        <td class='docblock short'>
+                             <p>A type of the bare function in <code>DecoderTrap</code> values.</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='type' href='type.EncoderTrapFunc.html'
+                               title='encoding::types::EncoderTrapFunc'>EncoderTrapFunc</a></td>
+                        <td class='docblock short'>
+                             <p>A type of the bare function in <code>EncoderTrap</code> values.</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='type' href='type.EncodingRef.html'
+                               title='encoding::types::EncodingRef'>EncodingRef</a></td>
+                        <td class='docblock short'>
+                             <p>A trait object using dynamic dispatch which is a sendable reference to the encoding,
+for code where the encoding is not known at compile-time.</p>
+
+                        </td>
+                    </tr>
+                </table></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "encoding";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../../jquery.js"></script>
+    <script src="../../main.js"></script>
+    
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `EUCJPEncoding` struct in crate `encoding`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, EUCJPEncoding">
+
+    <title>encoding::codec::japanese::EUCJPEncoding - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='../../index.html'>encoding</a>::<wbr><a href='../index.html'>codec</a>::<wbr><a href='index.html'>japanese</a></p><script>window.sidebarCurrent = {name: 'EUCJPEncoding', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='../../index.html'>encoding</a>::<wbr><a href='../index.html'>codec</a>::<wbr><a href='index.html'>japanese</a>::<wbr><a class='struct' href=''>EUCJPEncoding</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-918' class='srclink' href='../../../src/encoding/codec/japanese.rs.html#30' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct EUCJPEncoding;</pre><div class='docblock'><p>EUC-JP. (XXX with asymmetric JIS X 0212 support)</p>
+
+<p>This is a Japanese encoding created from three JIS character sets:</p>
+
+<ul>
+<li>JIS X 0201, which lower half is ISO/IEC 646:JP (US-ASCII with yen sign and overline)
+and upper half contains legacy half-width Katakanas.</li>
+<li>JIS X 0208, a primary graphic character set (94x94).</li>
+<li>JIS X 0212, a supplementary graphic character set (94x94).</li>
+</ul>
+
+<p>EUC-JP contains the lower half of JIS X 0201 in G0 (<code>[21-7E]</code>),
+JIS X 0208 in G1 (<code>[A1-FE] [A1-FE]</code>),
+the upper half of JIS X 0212 in G2 (<code>8E [A1-DF]</code>), and
+JIS X 0212 in G3 (<code>8F [A1-FE] [A1-FE]</code>).</p>
+</div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><code>impl <a class='trait' href='../../../encoding/types/trait.Encoding.html' title='encoding::types::Encoding'>Encoding</a> for <a class='struct' href='../../../encoding/codec/japanese/struct.EUCJPEncoding.html' title='encoding::codec::japanese::EUCJPEncoding'>EUCJPEncoding</a></code></h3><div class='impl-items'><h4 id='method.name' class='method'><code>fn <a href='../../../encoding/types/trait.Encoding.html#method.name' class='fnname'>name</a>(&amp;self) -&gt; &amp;'static <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a></code></h4>
+<h4 id='method.whatwg_name' class='method'><code>fn <a href='../../../encoding/types/trait.Encoding.html#method.whatwg_name' class='fnname'>whatwg_name</a>(&amp;self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;'static <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>&gt;</code></h4>
+<h4 id='method.raw_encoder' class='method'><code>fn <a href='../../../encoding/types/trait.Encoding.html#method.raw_encoder' class='fnname'>raw_encoder</a>(&amp;self) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html' title='alloc::boxed::Box'>Box</a>&lt;<a class='trait' href='../../../encoding/types/trait.RawEncoder.html' title='encoding::types::RawEncoder'>RawEncoder</a>&gt;</code></h4>
+<h4 id='method.raw_decoder' class='method'><code>fn <a href='../../../encoding/types/trait.Encoding.html#method.raw_decoder' class='fnname'>raw_decoder</a>(&amp;self) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html' title='alloc::boxed::Box'>Box</a>&lt;<a class='trait' href='../../../encoding/types/trait.RawDecoder.html' title='encoding::types::RawDecoder'>RawDecoder</a>&gt;</code></h4>
+<h4 id='method.encode' class='method'><code>fn <a href='../../../encoding/types/trait.Encoding.html#method.encode' class='fnname'>encode</a>(&amp;self, input: &amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>, trap: <a class='enum' href='../../../encoding/types/enum.EncoderTrap.html' title='encoding::types::EncoderTrap'>EncoderTrap</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a>&gt;, <a class='enum' href='https://doc.rust-lang.org/nightly/collections/borrow/enum.Cow.html' title='collections::borrow::Cow'>Cow</a>&lt;'static, <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>&gt;&gt;</code></h4>
+<h4 id='method.encode_to' class='method'><code>fn <a href='../../../encoding/types/trait.Encoding.html#method.encode_to' class='fnname'>encode_to</a>(&amp;self, input: &amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>, trap: <a class='enum' href='../../../encoding/types/enum.EncoderTrap.html' title='encoding::types::EncoderTrap'>EncoderTrap</a>, ret: &amp;mut <a class='trait' href='../../../encoding/types/trait.ByteWriter.html' title='encoding::types::ByteWriter'>ByteWriter</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, <a class='enum' href='https://doc.rust-lang.org/nightly/collections/borrow/enum.Cow.html' title='collections::borrow::Cow'>Cow</a>&lt;'static, <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>&gt;&gt;</code></h4>
+<h4 id='method.decode' class='method'><code>fn <a href='../../../encoding/types/trait.Encoding.html#method.decode' class='fnname'>decode</a>(&amp;self, input: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;[</a><a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a><a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>]</a>, trap: <a class='enum' href='../../../encoding/types/enum.DecoderTrap.html' title='encoding::types::DecoderTrap'>DecoderTrap</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, <a class='enum' href='https://doc.rust-lang.org/nightly/collections/borrow/enum.Cow.html' title='collections::borrow::Cow'>Cow</a>&lt;'static, <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>&gt;&gt;</code></h4>
+<h4 id='method.decode_to' class='method'><code>fn <a href='../../../encoding/types/trait.Encoding.html#method.decode_to' class='fnname'>decode_to</a>(&amp;self, input: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>&amp;[</a><a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a><a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.slice.html'>]</a>, trap: <a class='enum' href='../../../encoding/types/enum.DecoderTrap.html' title='encoding::types::DecoderTrap'>DecoderTrap</a>, ret: &amp;mut <a class='trait' href='../../../encoding/types/trait.StringWriter.html' title='encoding::types::StringWriter'>StringWriter</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, <a class='enum' href='https://doc.rust-lang.org/nightly/collections/borrow/enum.Cow.html' title='collections::borrow::Cow'>Cow</a>&lt;'static, <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>&gt;&gt;</code></h4>
+</div><h3 id='derived_implementations'>Derived Implementations </h3><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Copy.html' title='core::marker::Copy'>Copy</a> for <a class='struct' href='../../../encoding/codec/japanese/struct.EUCJPEncoding.html' title='encoding::codec::japanese::EUCJPEncoding'>EUCJPEncoding</a></code></h3><div class='impl-items'></div><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='struct' href='../../../encoding/codec/japanese/struct.EUCJPEncoding.html' title='encoding::codec::japanese::EUCJPEncoding'>EUCJPEncoding</a></code></h3><div class='impl-items'><h4 id='method.clone' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='struct' href='../../../encoding/codec/japanese/struct.EUCJPEncoding.html' title='encoding::codec::japanese::EUCJPEncoding'>EUCJPEncoding</a></code></h4>
+<h4 id='method.clone_from' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: &amp;Self)</code></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../../";
+        window.currentCrate = "encoding";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../../../jquery.js"></script>
+    <script src="../../../main.js"></script>
+    
+    <script defer src="../../../search-index.js"></script>
+</body>
+</html>

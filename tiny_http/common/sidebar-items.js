@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Method","HTTP request methods"]],"struct":[["HTTPVersion","HTTP version (usually 1.0 or 1.1)."],["Header","Represents a HTTP header."],["HeaderField","Field of a header (eg. `Content-Type`, `Content-Length`, etc.)"],["StatusCode","Status code of a request or response."]]});

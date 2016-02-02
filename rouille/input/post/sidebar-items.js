@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["PostError","Error that can happen when decoding POST data."]],"fn":[["get_post_input","Attempts to decode the `POST` data received by the request into a struct."]]});

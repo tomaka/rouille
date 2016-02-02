@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Response` struct in crate `rouille`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Response">
+
+    <title>rouille::Response - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>rouille</a></p><script>window.sidebarCurrent = {name: 'Response', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>rouille</a>::<wbr><a class='struct' href=''>Response</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-596' class='srclink' href='../src/rouille/response.rs.html#20-33' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Response {
+    pub status_code: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u16.html'>u16</a>,
+    pub headers: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>(</a><a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a><a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>)</a>&gt;,
+    pub data: <a class='struct' href='../rouille/struct.ResponseBody.html' title='rouille::ResponseBody'>ResponseBody</a>,
+}</pre><div class='docblock'><p>Contains a prototype of a response.
+The response is only sent when you call <code>Request::respond</code>.</p>
+</div><h2 class='fields'>Fields</h2>
+<table><tr class='stab '>
+                                  <td id='structfield.status_code'><code>status_code</code></td><td><div class='docblock'><p>The status code to return to the user.</p>
+</div></td></tr><tr class='stab '>
+                                  <td id='structfield.headers'><code>headers</code></td><td><div class='docblock'><p>List of headers to be returned in the response.</p>
+
+<p>Note that important headers such as <code>Connection</code> or <code>Content-Length</code> will be ignored
+from this list.</p>
+</div></td></tr><tr class='stab '>
+                                  <td id='structfield.data'><code>data</code></td><td><div class='docblock'><p>An opaque type that contains the body of the response.</p>
+</div></td></tr></table><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl <a class='struct' href='../rouille/struct.Response.html' title='rouille::Response'>Response</a></code></h3><div class='impl-items'><h4 id='method.from_error' class='method'><code>fn <a href='#method.from_error' class='fnname'>from_error</a>(err: &amp;<a class='enum' href='../rouille/enum.RouteError.html' title='rouille::RouteError'>RouteError</a>) -&gt; <a class='struct' href='../rouille/struct.Response.html' title='rouille::Response'>Response</a></code></h4>
+<div class='docblock'><p>UNSTABLE. Builds a default response to handle the given route error.</p>
+
+<p>Important: don&#39;t use this in a real website. This function is just a convenience when
+prototyping.</p>
+
+<p>For authentication-related errors, you are strongly encouraged to handle them yourself.</p>
+</div><h4 id='method.redirect' class='method'><code>fn <a href='#method.redirect' class='fnname'>redirect</a>(target: &amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='struct' href='../rouille/struct.Response.html' title='rouille::Response'>Response</a></code></h4>
+<div class='docblock'><p>Builds a <code>Response</code> that redirects the user to another URL.</p>
+</div><h4 id='method.html' class='method'><code>fn <a href='#method.html' class='fnname'>html</a>&lt;D&gt;(content: D) -&gt; <a class='struct' href='../rouille/struct.Response.html' title='rouille::Response'>Response</a> <span class='where'>where D: <a class='trait' href='https://doc.rust-lang.org/nightly/core/convert/trait.Into.html' title='core::convert::Into'>Into</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u8.html'>u8</a>&gt;&gt;</span></code></h4>
+<div class='docblock'><p>Builds a <code>Response</code> that outputs HTML.</p>
+</div><h4 id='method.text' class='method'><code>fn <a href='#method.text' class='fnname'>text</a>&lt;S&gt;(text: S) -&gt; <a class='struct' href='../rouille/struct.Response.html' title='rouille::Response'>Response</a> <span class='where'>where S: <a class='trait' href='https://doc.rust-lang.org/nightly/core/convert/trait.Into.html' title='core::convert::Into'>Into</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>&gt;</span></code></h4>
+<div class='docblock'><p>Builds a <code>Response</code> that outputs plain text.</p>
+</div><h4 id='method.json' class='method'><code>fn <a href='#method.json' class='fnname'>json</a>&lt;T&gt;(content: &amp;T) -&gt; <a class='struct' href='../rouille/struct.Response.html' title='rouille::Response'>Response</a> <span class='where'>where T: <a class='trait' href='../rustc_serialize/serialize/trait.Encodable.html' title='rustc_serialize::serialize::Encodable'>Encodable</a></span></code></h4>
+<div class='docblock'><p>Builds a <code>Response</code> that outputs JSON.</p>
+</div><h4 id='method.basic_http_auth_login_required' class='method'><code>fn <a href='#method.basic_http_auth_login_required' class='fnname'>basic_http_auth_login_required</a>(realm: &amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='struct' href='../rouille/struct.Response.html' title='rouille::Response'>Response</a></code></h4>
+<div class='docblock'><p>Builds a <code>Response</code> that returns a <code>401 Not Authorized</code> status
+and a <code>WWW-Authenticate</code> header.</p>
+</div><h4 id='method.with_status_code' class='method'><code>fn <a href='#method.with_status_code' class='fnname'>with_status_code</a>(self, code: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.u16.html'>u16</a>) -&gt; <a class='struct' href='../rouille/struct.Response.html' title='rouille::Response'>Response</a></code></h4>
+<div class='docblock'><p>Changes the status code of the response.</p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "rouille";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

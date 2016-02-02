@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Param","Types of parameters a capability can use"]],"fn":[["expand","Expand a parameterized capability"]],"struct":[["Variables","Container for static and dynamic variable arrays"]]});

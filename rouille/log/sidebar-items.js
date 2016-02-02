@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["LogEntry","RAII guard that ensures that a log entry corresponding to a request will be written."]]});
