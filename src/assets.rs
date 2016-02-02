@@ -67,6 +67,7 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
     Ok(Response {
         status_code: 200,
         headers: vec![
+            ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
             ("Content-Type".to_owned(), extension_to_mime(extension).to_owned())
         ],
         data: ResponseBody::from_file(file),
