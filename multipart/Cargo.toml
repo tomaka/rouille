@@ -4,7 +4,7 @@ name = "multipart"
 version = "0.3.1"
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
-description = "An extension to the Hyper HTTP library that provides support for POST multipart/form-data requests on for both client and server."
+description = "A backend-agnostic extension for HTTP libraries that provides support for POST multipart/form-data requests on for both client and server."
 
 repository = "http://github.com/cybergeek94/multipart"
 
@@ -15,7 +15,7 @@ license = "MIT"
 keywords = ["form-data", "hyper", "http", "post", "upload"]
 
 [features]
-server = []
+server = ["buf_redux"]
 client = []
 default = ["hyper", "server", "client"]
 
@@ -28,6 +28,10 @@ rand = "*"
 
 [dependencies.hyper]
 version = "*"
+optional = true
+
+[dependencies.buf_redux]
+version = "0.1"
 optional = true
 
 [dev-dependencies.hyper]

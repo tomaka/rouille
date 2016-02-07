@@ -19,7 +19,6 @@ use std::path::{Path, PathBuf};
 
 pub use self::boundary::BoundaryReader;
 
-mod buf_read;
 mod boundary;
 
 #[cfg(feature = "hyper")]

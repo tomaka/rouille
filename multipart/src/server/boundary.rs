@@ -1,4 +1,6 @@
-use server::buf_read::CustomBufReader;
+extern crate buf_redux;
+
+use self::buf_redux::BufReader;
 
 use std::cmp;
 use std::borrow::Borrow;
@@ -6,12 +8,10 @@ use std::borrow::Borrow;
 use std::io;
 use std::io::prelude::*;
 
-use std::ptr;
-
 /// A struct implementing `Read` and `BufRead` that will yield bytes until it sees a given sequence.
 #[derive(Debug)]
 pub struct BoundaryReader<R> {
-    buffer: CustomBufReader<R>,
+    buf: BufReader<R>,
     boundary: Vec<u8>,
     search_idx: usize,
     boundary_read: bool,
@@ -22,7 +22,7 @@ impl<R> BoundaryReader<R> where R: Read {
     #[doc(hidden)]
     pub fn from_reader<B: Into<Vec<u8>>>(reader: R, boundary: B) -> BoundaryReader<R> {
         BoundaryReader {
-            buffer: CustomBufReader::new(reader),
+            buf: BufReader::new(reader),
             boundary: boundary.into(),
             search_idx: 0,
             boundary_read: false,
@@ -33,7 +33,7 @@ impl<R> BoundaryReader<R> where R: Read {
     fn read_to_boundary(&mut self) -> io::Result<&[u8]> {
         use log::LogLevel;
 
-        let buf = try!(self.buffer.fill_buf_min(self.boundary.len()));
+        let buf = try!(fill_buf_min(&mut self.buf, self.boundary.len()));
 
         while !(self.boundary_read || self.at_end) && self.search_idx < buf.len() {
             let lookahead = &buf[self.search_idx..];
@@ -84,7 +84,7 @@ impl<R> BoundaryReader<R> where R: Read {
         
 
         let consume_amt = {
-            let mut buf = try!(self.buffer.fill_buf_min(self.boundary.len() + 4));
+            let mut buf = try!(fill_buf_min(&mut self.buf, self.boundary.len() + 4));
             let mut consume_amt = self.boundary.len() + 2;
 
             if self.search_idx != 0 {
@@ -125,7 +125,7 @@ impl<R> BoundaryReader<R> where R: Read {
             consume_amt
         };
 
-        self.buffer.consume(consume_amt);
+        self.buf.consume(consume_amt);
 
         self.search_idx = 0;
         self.boundary_read = false;
@@ -143,22 +143,20 @@ impl<R> BoundaryReader<R> where R: Read {
 
 impl<R: Read> Borrow<R> for BoundaryReader<R> {
     fn borrow(&self) -> &R {
-        self.buffer.get_ref() 
+        self.buf.get_ref() 
     }
 }
 
 impl<R> Read for BoundaryReader<R> where R: Read {
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
-        let consume_len = {
-            let buf = try!(self.read_to_boundary());
-            let trunc_len = cmp::min(buf.len(), out.len());
-            copy_bytes(&buf[..trunc_len], out);
-            trunc_len
+        let read = {
+            let mut buf = try!(self.read_to_boundary());
+            // This shouldn't ever be an error so unwrapping is fine.
+            buf.read(out).unwrap()
         };
 
-        self.consume(consume_len);
-
-        Ok(consume_len)
+        self.consume(read);
+        Ok(read)
     }
 }
 
@@ -175,30 +173,22 @@ impl<R> BufRead for BoundaryReader<R> where R: Read {
         }
 
         let true_amt = cmp::min(amt, search_idx);
-        self.buffer.consume(true_amt);
+        self.buf.consume(true_amt);
         self.search_idx -= true_amt;
     }
 }
 
-// copied from `std::slice::bytes` due to unstable
-fn copy_bytes(src: &[u8], dst: &mut [u8]) {
-    let len_src = src.len();
-    assert!(dst.len() >= len_src);
-    // `dst` is unaliasable, so we know statically it doesn't overlap with `src`.
-    unsafe {
-        ptr::copy_nonoverlapping(
-            src.as_ptr(),
-            dst.as_mut_ptr(),
-            len_src
-        );
+fn fill_buf_min<R: Read>(buf: &mut BufReader<R>, min: usize) -> io::Result<&[u8]> {
+    if buf.available() < min {
+        try!(buf.read_into_buf());
     }
+
+    Ok(buf.get_buf())
 }
 
 #[cfg(test)]
 mod test {
     use super::BoundaryReader;
-
-    use std::cmp;
 
     use std::io;
     use std::io::prelude::*;
@@ -240,10 +230,7 @@ dashed-value-2\r
     impl<'a> Read for SplitReader<'a> {
         fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
             fn copy_bytes_partial(src: &mut &[u8], dst: &mut [u8]) -> usize {
-                let copy_amt = cmp::min(src.len(), dst.len());
-                super::copy_bytes(&src[..copy_amt], dst);
-                *src = &src[copy_amt..];
-                copy_amt
+                src.read(dst).unwrap()
             }
 
             let mut copy_amt = copy_bytes_partial(&mut self.left, dst);
