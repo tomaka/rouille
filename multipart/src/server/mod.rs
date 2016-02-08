@@ -53,7 +53,7 @@ impl<R> Multipart<R> where R: HttpRequest {
             return Err(req);     
         }
 
-        let boundary = format!("--{}", req.multipart_boundary().unwrap());
+        let boundary = format!("\r\n--{}", req.multipart_boundary().unwrap());
 
         debug!("Boundary: {}", boundary);
 
@@ -73,7 +73,10 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// If the previously returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry.
     pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<R>>> {
-        try!(self.source.consume_boundary());
+        if !try!(self.consume_boundary()) {
+            return Ok(None);
+        }
+
         MultipartField::read_from(self)
     }
 
@@ -144,6 +147,23 @@ impl<R> Multipart<R> where R: HttpRequest {
         match self.source.read_to_string(&mut self.line_buf) {
             Ok(read) => Ok(&self.line_buf[..read]),
             Err(err) => Err(err),
+        }
+    }
+
+    fn consume_boundary(&mut self) -> io::Result<bool> {
+        try!(self.source.consume_boundary());
+
+        let mut out = [0; 2];
+        let _ = try!(self.source.read(&mut out));
+
+        if *b"\r\n" == out {
+            return Ok(true);
+        } else {
+            if *b"--" != out {
+                warn!("Unexpected 2-bytes after boundary: {:?}", out);
+            }
+
+            return Ok(false);
         }
     }
 }

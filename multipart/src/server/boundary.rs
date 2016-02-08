@@ -1,6 +1,8 @@
 extern crate buf_redux;
+extern crate memchr;
 
 use self::buf_redux::BufReader;
+use self::memchr::memchr;
 
 use std::cmp;
 use std::borrow::Borrow;
@@ -35,35 +37,47 @@ impl<R> BoundaryReader<R> where R: Read {
 
         let buf = try!(fill_buf_min(&mut self.buf, self.boundary.len()));
 
+        debug!(
+            "Before-loop Buf len: {} Search idx: {} Boundary read: {:?}", 
+            buf.len(), self.search_idx, self.boundary_read
+        );
+
         while !(self.boundary_read || self.at_end) && self.search_idx < buf.len() {
             let lookahead = &buf[self.search_idx..];
 
-            let safe_len = cmp::min(lookahead.len(), self.boundary.len());
+            let maybe_boundary = memchr(self.boundary[0], lookahead);
 
-            if &lookahead[..safe_len] == &self.boundary[..safe_len] {
-                self.boundary_read = safe_len == self.boundary.len();
+            debug!("maybe_boundary: {:?}", maybe_boundary);
+
+            self.search_idx = match maybe_boundary {
+                Some(boundary_start) => self.search_idx + boundary_start,
+                None => buf.len(),
+            };
+
+            if self.search_idx + self.boundary.len() <= buf.len() {
+                let test = &buf[self.search_idx .. self.search_idx + self.boundary.len()];
+
+                match first_nonmatching_idx(test, &self.boundary) {
+                    Some(idx) => self.search_idx += idx,
+                    None => self.boundary_read = true,
+                } 
+            } else {
                 break;
-            }
-
-            self.search_idx += 1;
-        }
-
+            }            
+        }  
+        
         debug!(
-            "Buf len: {} Search idx: {} Boundary read: {:?}", 
+            "After-loop Buf len: {} Search idx: {} Boundary read: {:?}", 
             buf.len(), self.search_idx, self.boundary_read
-        );
+        );      
         
         if log_enabled!(LogLevel::Info) {
             let _ = ::std::str::from_utf8(buf).map(|buf|
                 info!("Buf: {:?}", buf)
             );
         }
-
-        if self.search_idx >= 2 {
-            Ok(&buf[..self.search_idx - 2])
-        } else {
-            Ok(&buf[..self.search_idx])
-        }
+       
+        Ok(&buf[..self.search_idx])
     }
 
     #[doc(hidden)]
@@ -81,51 +95,8 @@ impl<R> BoundaryReader<R> where R: Read {
 
             self.consume(buf_len);
         }
-        
 
-        let consume_amt = {
-            let mut buf = try!(fill_buf_min(&mut self.buf, self.boundary.len() + 4));
-            let mut consume_amt = self.boundary.len() + 2;
-
-            if self.search_idx != 0 {
-                let (before, new_buf) = buf.split_at(2);
-                if before != b"\r\n" {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Expected {:?}, got {:?}", b"\r\n", &before)
-                    ));
-                }
-
-                buf = new_buf;
-                consume_amt += 2;
-            }
-
-            let (boundary, after) = buf.split_at(self.boundary.len());
-            if &*self.boundary != boundary {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Expected {:?}, got {:?}", self.boundary, boundary)
-                ));
-            }
-
-            if &after[..2] != b"\r\n" {
-                self.at_end = &after[..2] == b"--";
-
-                if !self.at_end {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!(
-                            "Expected {:?} or {:?}, got {:?}", 
-                                b"\r\n", b"--", after
-                        )
-                    ));
-                }
-            }
-
-            consume_amt
-        };
-
-        self.buf.consume(consume_amt);
+        self.buf.consume(self.boundary.len());
 
         self.search_idx = 0;
         self.boundary_read = false;
@@ -166,13 +137,10 @@ impl<R> BufRead for BoundaryReader<R> where R: Read {
     }
 
     fn consume(&mut self, amt: usize) {
-        let mut search_idx = self.search_idx;
+        let true_amt = cmp::min(amt, self.search_idx);
 
-        if search_idx >= 2 {
-            search_idx -= 2;
-        }
+        debug!("Consume! amt: {} true amt: {}", amt, true_amt);
 
-        let true_amt = cmp::min(amt, search_idx);
         self.buf.consume(true_amt);
         self.search_idx -= true_amt;
     }
@@ -186,6 +154,16 @@ fn fill_buf_min<R: Read>(buf: &mut BufReader<R>, min: usize) -> io::Result<&[u8]
     Ok(buf.get_buf())
 }
 
+fn first_nonmatching_idx(left: &[u8], right: &[u8]) -> Option<usize> {
+    for (idx, (lb, rb)) in left.iter().zip(right).enumerate() {
+        if lb != rb {
+            return Some(idx);
+        }
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod test {
     use super::BoundaryReader;
@@ -193,8 +171,8 @@ mod test {
     use std::io;
     use std::io::prelude::*;
 
-    const BOUNDARY: &'static str = "--boundary";
-    const TEST_VAL: &'static str = "--boundary\r
+    const BOUNDARY: &'static str = "\r\n--boundary";
+    const TEST_VAL: &'static str = "\r\n--boundary\r
 dashed-value-1\r
 --boundary\r
 dashed-value-2\r
@@ -272,7 +250,7 @@ dashed-value-2\r
 
         debug!("Read 2");
         let _ = reader.read_to_string(buf).unwrap();
-        assert_eq!(buf, "dashed-value-1");
+        assert_eq!(buf, "\r\ndashed-value-1");
         buf.clear();
 
         debug!("Consume 2");
@@ -280,7 +258,7 @@ dashed-value-2\r
 
         debug!("Read 3");
         let _ = reader.read_to_string(buf).unwrap();
-        assert_eq!(buf, "dashed-value-2");
+        assert_eq!(buf, "\r\ndashed-value-2");
         buf.clear();
 
         debug!("Consume 3");
@@ -288,9 +266,6 @@ dashed-value-2\r
 
         debug!("Read 4");
         let _ = reader.read_to_string(buf).unwrap();
-        assert!(buf.is_empty(), "Buffer not empty: {:?}", buf);
-
-        debug!("Extra Consume");
-        reader.consume_boundary().unwrap();
+        assert_eq!(buf, "--");
     }
 }

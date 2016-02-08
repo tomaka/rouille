@@ -1,7 +1,7 @@
 [package]
 
 name = "multipart"
-version = "0.3.1"
+version = "0.4"
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
 description = "A backend-agnostic extension for HTTP libraries that provides support for POST multipart/form-data requests on for both client and server."
@@ -15,7 +15,7 @@ license = "MIT"
 keywords = ["form-data", "hyper", "http", "post", "upload"]
 
 [features]
-server = ["buf_redux"]
+server = ["buf_redux", "memchr"]
 client = []
 default = ["hyper", "server", "client"]
 
@@ -34,7 +34,6 @@ optional = true
 version = "0.1"
 optional = true
 
-[dev-dependencies.hyper]
-version = "*"
-# Disable SSL for testing purposes
-default-features = false
+[dependencies.memchr]
+version = "0.1"
+optional = true
