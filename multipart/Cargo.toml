@@ -20,14 +20,14 @@ client = []
 default = ["hyper", "server", "client"]
 
 [dependencies]
-log = "*"
-env_logger = "*"
-mime = "*"
-mime_guess = "*"
-rand = "*"
+log = "0.3"
+env_logger = "0.3"
+mime = "0.1"
+mime_guess = "1.4"
+rand = "0.3"
 
 [dependencies.hyper]
-version = "*"
+version = "0.7"
 optional = true
 
 [dependencies.buf_redux]
