@@ -53,7 +53,7 @@ impl<R> Multipart<R> where R: HttpRequest {
             return Err(req);     
         }
 
-        let boundary = format!("\r\n--{}", req.multipart_boundary().unwrap());
+        let boundary = format!("--{}", req.multipart_boundary().unwrap());
 
         debug!("Boundary: {}", boundary);
 

@@ -36,6 +36,10 @@ impl<R> BoundaryReader<R> where R: Read {
         use log::LogLevel;
 
         let buf = try!(fill_buf_min(&mut self.buf, self.boundary.len()));
+        
+        if log_enabled!(LogLevel::Trace) {
+            trace!("Buf: {:?}", String::from_utf8_lossy(buf));
+        }
 
         debug!(
             "Before-loop Buf len: {} Search idx: {} Boundary read: {:?}", 
@@ -64,20 +68,34 @@ impl<R> BoundaryReader<R> where R: Read {
             } else {
                 break;
             }            
-        }  
+        }        
         
         debug!(
             "After-loop Buf len: {} Search idx: {} Boundary read: {:?}", 
             buf.len(), self.search_idx, self.boundary_read
-        );      
+        );
+
+
+        let mut buf_end = self.search_idx;
         
-        if log_enabled!(LogLevel::Info) {
-            let _ = ::std::str::from_utf8(buf).map(|buf|
-                info!("Buf: {:?}", buf)
-            );
+        if self.boundary_read && self.search_idx >= 2 {
+            let two_bytes_before = &buf[self.search_idx - 2 .. self.search_idx];
+
+            debug!("Two bytes before: {:?} (\"\\r\\n\": {:?})", two_bytes_before, b"\r\n");
+
+            if two_bytes_before == &*b"\r\n" {
+                debug!("Subtract two!");
+                buf_end -= 2;
+            } 
         }
-       
-        Ok(&buf[..self.search_idx])
+
+        let ret_buf = &buf[..buf_end];
+
+        if log_enabled!(LogLevel::Trace) {
+            trace!("Returning buf: {:?}", String::from_utf8_lossy(ret_buf));
+        }
+
+        Ok(ret_buf)
     }
 
     #[doc(hidden)]
@@ -96,7 +114,7 @@ impl<R> BoundaryReader<R> where R: Read {
             self.consume(buf_len);
         }
 
-        self.buf.consume(self.boundary.len());
+        self.buf.consume(self.search_idx + self.boundary.len());
 
         self.search_idx = 0;
         self.boundary_read = false;

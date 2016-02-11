@@ -23,7 +23,7 @@ fn local_test() {
 
     let buf = test_client(&test_fields);
 
-    info!(
+    trace!(
         "\n--Test Buffer Begin--\n{}\n--Test Buffer End--", 
         String::from_utf8_lossy(&buf.buf)
     );
@@ -33,7 +33,7 @@ fn local_test() {
 
 fn gen_test_fields() -> TestFields {
     const MIN_FIELDS: usize = 1;
-    const MAX_FIELDS: usize = 5;
+    const MAX_FIELDS: usize = 3;
 
     let texts_count = gen_range(MIN_FIELDS, MAX_FIELDS);
     let files_count = gen_range(MIN_FIELDS, MAX_FIELDS);
@@ -50,7 +50,7 @@ fn gen_range(min: usize, max: usize) -> usize {
 
 fn gen_string() -> String {
     const MIN_LEN: usize = 3;
-    const MAX_LEN: usize = 12;
+    const MAX_LEN: usize = 8;
 
     let mut rng = ::rand::weak_rng();
     let str_len = gen_range(MIN_LEN, MAX_LEN);
@@ -60,16 +60,14 @@ fn gen_string() -> String {
 
 fn gen_bytes() -> Vec<u8> {
     const MIN_LEN: usize = 8;
-    const MAX_LEN: usize = 32;
+    const MAX_LEN: usize = 16;
 
     let mut rng = ::rand::weak_rng();
     let bytes_len = gen_range(MIN_LEN, MAX_LEN);
 
-    let mut vec = vec![0u8; bytes_len];
-    rng.fill_bytes(&mut vec);
-    vec
+    rng.gen_ascii_chars().take(bytes_len)
+        .map(|c| c as u8).collect()
 }
-
 
 fn test_client(test_fields: &TestFields) -> HttpBuffer {
     use client::Multipart;
@@ -110,8 +108,8 @@ fn test_server(buf: HttpBuffer, mut fields: TestFields) {
                 let test_text = fields.texts.remove(&field.name).unwrap();
                 assert!(
                     text == test_text, 
-                    "Expected {:?} for {:?} got {:?}", 
-                    test_text, field.name, text
+                    "Unexpected data for field {:?}: Expected {:?}, got {:?}", 
+                    field.name, test_text, text
                 );
 
             },
@@ -121,7 +119,9 @@ fn test_server(buf: HttpBuffer, mut fields: TestFields) {
                 let mut bytes = Vec::with_capacity(test_bytes.len());
                 file.read_to_end(&mut bytes).unwrap();
 
-                assert!(bytes == test_bytes, "Unexpected data for {:?}", field.name);
+                assert!(bytes == test_bytes, "Unexpected data for file {:?}: Expected {:?}, Got {:?}", 
+                        field.name, String::from_utf8_lossy(&test_bytes), String::from_utf8_lossy(&bytes)
+                );
             },
         }
     }
