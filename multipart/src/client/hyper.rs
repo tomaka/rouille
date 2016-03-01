@@ -8,17 +8,25 @@
 //! Enabled with the `hyper` feature (on by default).
 //!
 //! Contains `impl HttpRequest for Request<Fresh>` and `impl HttpStream for Request<Streaming>`.
+//!
+//! Also see: [`lazy::Multipart::client_request()`][lazy-multi-creq]
+//! and [`lazy::Multipart::client_request_mut()`][lazy-multi-creq-mut]
+//! (adaptors for `hyper::client::RequestBuilder`).
+//! [lazy-multipart-creq]: ../lazy/struct.Multipart.html#method.client_request
+//! [lazy-mutlipart-creq-mut]: ../lazy/struct.Multipart.html#method.client_request_mut
 use hyper::client::request::Request;
 use hyper::client::response::Response;
-use hyper::error::Error as HyperError;
 use hyper::header::{ContentType, ContentLength};
 use hyper::method::Method;
 use hyper::net::{Fresh, Streaming};
+
+use hyper::Error as HyperError;
 
 use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
 use super::{HttpRequest, HttpStream};
 
+/// ####Feature: `hyper`
 impl HttpRequest for Request<Fresh> {
     type Stream = Request<Streaming>;
     type Error = HyperError;
@@ -53,6 +61,7 @@ impl HttpRequest for Request<Fresh> {
     }
 } 
 
+/// ####Feature: `hyper`
 impl HttpStream for Request<Streaming> {
     type Request = Request<Fresh>;
     type Response = Response;
@@ -63,10 +72,14 @@ impl HttpStream for Request<Streaming> {
     }
 }
 
+/// Create a `Content-Type: multipart/form-data;boundary={bound}`
+pub fn content_type(bound: &str) -> ContentType {
+    ContentType(multipart_mime(bound))
+}
+
 fn multipart_mime(bound: &str) -> Mime {
     Mime(
         TopLevel::Multipart, SubLevel::Ext("form-data".into()),
         vec![(Attr::Ext("boundary".into()), Value::Ext(bound.into()))]
     )         
 }
-
