@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
 
+#[derive(Debug)]
 struct TestFields {
     texts: HashMap<String, String>,
     files: HashMap<String, Vec<u8>>,
@@ -108,10 +109,21 @@ fn test_server(buf: HttpBuffer, mut fields: TestFields) {
     let mut multipart = Multipart::from_request(buf.for_server())
         .unwrap_or_else(|_| panic!("Buffer should be multipart!"));
 
+    trace!("Fields for server test: {:?}", fields);
+
     while let Ok(Some(mut field)) = multipart.read_entry() {
         match field.data {
             MultipartData::Text(text) => {
-                let test_text = fields.texts.remove(&field.name).unwrap();
+                let test_text = fields.texts.remove(&field.name);
+
+                assert!(
+                    test_text.is_some(),
+                    "Got text field that wasn't in original dataset: {:?} : {:?} ",
+                    field.name, text
+                );
+
+                let test_text = test_text.unwrap();
+
                 assert!(
                     text == test_text, 
                     "Unexpected data for field {:?}: Expected {:?}, got {:?}", 
@@ -215,6 +227,12 @@ impl<'a> Read for ServerBuffer<'a> {
 }
 
 impl<'a> ServerRequest for ServerBuffer<'a> {
+    type Body = Self;
+
     fn multipart_boundary(&self) -> Option<&str> { Some(&self.boundary) }
+
+    fn body(self) -> Self::Body {
+        self
+    }
 }
 
