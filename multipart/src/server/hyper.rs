@@ -6,10 +6,15 @@
 // copied, modified, or distributed except according to those terms.
 //! Server-side integration with [Hyper](https://github.com/hyperium/hyper).
 //! Enabled with the `hyper` feature (on by default).
+//!
+//! Also contains an implementation of [`HttpRequest`](../trait.HttpRequest.html)`
+//! for `hyper::server::Request` and `&mut hyper::server::Request`.
 use hyper::net::Fresh;
 use hyper::header::ContentType;
 use hyper::method::Method;
 use hyper::server::{Handler, Request, Response};
+
+pub use hyper::server::Request as HyperRequest;
 
 use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
@@ -67,7 +72,7 @@ where F: Fn(Multipart<Request>, Response<Fresh>), F: Send + Sync {
     }
 }
 
-impl<'a, 'b> HttpRequest for Request<'a, 'b> {
+impl<'a, 'b> HttpRequest for HyperRequest<'a, 'b> {
     type Body = Self;
 
     fn multipart_boundary(&self) -> Option<&str> {
@@ -101,8 +106,8 @@ impl<'a, 'b> HttpRequest for Request<'a, 'b> {
     }
 }
 
-impl<'r, 'a, 'b> HttpRequest for &'r mut Request<'a, 'b> {
-    type Body = &'r mut Request<'a, 'b>;
+impl<'r, 'a, 'b> HttpRequest for &'r mut HyperRequest<'a, 'b> {
+    type Body = Self;
 
     fn multipart_boundary(&self) -> Option<&str> {
         if self.method != Method::Post {

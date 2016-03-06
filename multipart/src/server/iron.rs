@@ -1,8 +1,11 @@
-//! Adaptor types and impls for `iron::Request`. Includes a `BeforeMiddleware` implementation. 
+//! Integration with the [Iron](https://ironframework.io) framework, enabled with the `iron` feature (optional). Includes a `BeforeMiddleware` implementation.
+//!
+//! Not shown here: `impl `[`HttpRequest`](../trait.HttpRequest.html#implementors)` for
+//! iron::Request`.
 
 use iron::headers::ContentType;
 use iron::mime::{Mime, TopLevel, SubLevel};
-use iron::request::{Body, Request};
+use iron::request::{Body as IronBody, Request as IronRequest};
 use iron::typemap::Key;
 use iron::{BeforeMiddleware, IronError, IronResult};
 
@@ -11,8 +14,8 @@ use std::{error, fmt};
 
 use super::{Entries, HttpRequest, Multipart, MultipartData};
 
-impl<'r, 'a, 'b> HttpRequest for &'r mut Request<'a, 'b> {
-    type Body = &'r mut Body<'a, 'b>;
+impl<'r, 'a, 'b> HttpRequest for &'r mut IronRequest<'a, 'b> {
+    type Body = &'r mut IronBody<'a, 'b>;
 
     fn multipart_boundary(&self) -> Option<&str> {
         let content_type = try_opt!(self.headers.get::<ContentType>());
@@ -23,25 +26,49 @@ impl<'r, 'a, 'b> HttpRequest for &'r mut Request<'a, 'b> {
         }
     }
 
-    fn body(self) -> &'r mut Body<'a, 'b> {
+    fn body(self) -> &'r mut IronBody<'a, 'b> {
         &mut self.body
     }
 }
 
-/// The default file size limit for `Intercept`, in bytes.
+/// The default file size limit for [`Intercept`](struct.Intercept.html), in bytes.
 pub const DEFAULT_FILE_SIZE_LIMIT: u64 = 2 * 1024 * 1024;
 
-/// The default file count limit for `Intercept`.
+/// The default file count limit for [`Intercept`](struct.Intercept.html).
 pub const DEFAULT_FILE_COUNT_LIMIT: u32 = 16;
 
-/// A `BeforeMiddleware` for Iron which will intercept and read-out multipart requests.
+/// A `BeforeMiddleware` for Iron which will intercept and read-out multipart requests and store
+/// the result in the request.
+///
+/// Successful reads will be placed in the `extensions: TypeMap` field of `iron::Request` as an
+/// [`Entries`](../struct.Entries.html) instance (as both key-type and value):
+///
+/// ```no_run
+/// extern crate iron;
+/// extern crate multipart;
+///
+/// use iron::prelude::*;
+///
+/// use multipart::server::Entries;
+/// use multipart::server::iron::Intercept;
+///
+/// fn main() {
+///     Iron::new(Chain::new(|req: &mut Request| if let Some(entries) =
+///         req.extensions.get::<Entries>() {
+///         
+///         Ok(Response::with(format!("{:?}", entries)))
+///     } else {
+///         Ok(Response::with("Not a multipart request"))
+///     })).http("localhost:80").unwrap();
+/// }
+/// ```
 ///
 /// Any errors during which occur during reading will be passed on as `IronError`.
 #[derive(Debug)]
 pub struct Intercept {
     /// The parent directory for all temporary directories created by this middleware.
-    /// Will be created if it doesn't exist.
-    ///
+    /// Will be created if it doesn't exist (lazy).
+    /// 
     /// If omitted, uses the OS temporary directory.
     ///
     /// Default value: `None`.
@@ -51,25 +78,20 @@ pub struct Intercept {
     /// Files which exceed this size will be rejected. 
     /// See the `limit_behavior` field for more info.
     ///
-    /// Default value: [`DEFAULT_FILE_SIZE_LIMIT`](../constant.default_file_size_limit.html)
+    /// Default value: [`DEFAULT_FILE_SIZE_LIMIT`](constant.default_file_size_limit.html)
     pub file_size_limit: u64,
     /// The limit on the number of files which will be saved from
     /// the request. Requests which exceed this count will be rejected.
     ///
-    /// Default value: [`DEFAULT_FILE_COUNT_LIMT`](../constant.default_file_count_limit.html)
+    /// Default value: [`DEFAULT_FILE_COUNT_LIMT`](constant.default_file_count_limit.html)
     pub file_count_limit: u32,
     /// What to do when a file count or size limit has been exceeded.
     ///
-    /// See [`LimitBehavior`](../enum.limitbehavior.html)
+    /// See [`LimitBehavior`](enum.limitbehavior.html) for more info.
     pub limit_behavior: LimitBehavior,
 }
 
-impl Intercept {
-    /// Create a new `Intercept` with default values.
-    pub fn new() -> Self {
-        Default::default()
-    }
-
+impl Intercept { 
     /// Set the `temp_dir_path` for this middleware.
     pub fn temp_dir_path<P: Into<PathBuf>>(self, path: P) -> Self {
         Intercept { temp_dir_path: Some(path.into()), .. self }
@@ -90,7 +112,7 @@ impl Intercept {
         Intercept { limit_behavior: behavior, .. self }
     }
 
-    fn read_request(&self, req: &mut Request) -> IronResult<Option<Entries>> {
+    fn read_request(&self, req: &mut IronRequest) -> IronResult<Option<Entries>> {
         macro_rules! try_iron(
             ($try:expr; $($fmt_args:tt)+) => (
                 match $try {
@@ -172,7 +194,7 @@ impl Default for Intercept {
 }
 
 impl BeforeMiddleware for Intercept {
-    fn before(&self, req: &mut Request) -> IronResult<()> {
+    fn before(&self, req: &mut IronRequest) -> IronResult<()> {
         try!(self.read_request(req))
             .map(|entries| req.extensions.insert::<Entries>(entries));
 

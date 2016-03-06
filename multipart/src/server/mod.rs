@@ -22,7 +22,7 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::{fmt, io, mem, ptr};
 
-pub use self::boundary::BoundaryReader;
+use self::boundary::BoundaryReader;
 
 macro_rules! try_opt (
     ($expr:expr) => (
@@ -42,12 +42,10 @@ pub mod hyper;
 pub mod iron;
 
 #[cfg(feature = "nickel2")]
-pub mod nickel;
+mod nickel;
 
-/* FIXME: when tiny_http gains proper header parsing. 
 #[cfg(feature = "tiny_http")]
 pub mod tiny_http;
-*/
 
 const RANDOM_FILENAME_LEN: usize = 12;
 
@@ -60,8 +58,9 @@ pub struct Multipart<B> {
 }
 
 impl Multipart<()> {
-    /// If the given `R: HttpRequest` is a POST request of `Content-Type: multipart/form-data`,
-    /// return the wrapped request as `Ok(Multipart<R::Body>)`, otherwise `Err(R)`.
+    /// If the given `HttpRequest` is a multipart/form-data POST request,
+    /// return the request body wrapped in the multipart reader. Otherwise,
+    /// returns the original request.
     pub fn from_request<R: HttpRequest>(req: R) -> Result<Multipart<R::Body>, R> {
         //FIXME: move `map` expr to `Some` arm when nonlexical borrow scopes land.
         let boundary = match req.multipart_boundary().map(String::from) {
@@ -129,10 +128,10 @@ impl<B: Read> Multipart<B> {
     }
 
     /// Read the request fully, parsing all fields and saving all files in a new temporary
-    /// directory. 
+    /// directory under the OS temporary directory. 
     ///
     /// If there is an error in reading the request, returns the partial result along with the
-    /// error. See [`SaveResult`](../enum.saveresult.html) for more information.
+    /// error. See [`SaveResult`](enum.saveresult.html) for more information.
     pub fn save_all(&mut self) -> SaveResult {
         let mut entries = match Entries::new_tempdir() {
             Ok(entries) => entries,
@@ -149,7 +148,7 @@ impl<B: Read> Multipart<B> {
     /// directory under `dir`. 
     ///
     /// If there is an error in reading the request, returns the partial result along with the
-    /// error. See [`SaveResult`](../enum.saveresult.html) for more information.
+    /// error. See [`SaveResult`](enum.saveresult.html) for more information.
     pub fn save_all_under<P: AsRef<Path>>(&mut self, dir: P) -> SaveResult {
         let mut entries = match Entries::new_tempdir_in(dir) {
             Ok(entries) => entries,
@@ -220,7 +219,7 @@ impl<B> Borrow<B> for Multipart<B> {
     }
 }
 
-/// The result of [`Multipart::save_all()`](../struct.multipart.html#method.save_all).
+/// The result of [`Multipart::save_all()`](struct.multipart.html#method.save_all).
 #[derive(Debug)]
 pub enum SaveResult {
     /// The operation was a total success. Contained are all entries of the request.
@@ -447,7 +446,7 @@ impl<'a, B> MultipartData<'a, B> {
 
 /// A representation of a file in HTTP `multipart/form-data`.
 ///
-/// Note that the file is not yet saved to the system; 
+/// Note that the file is not yet saved to the local filesystem; 
 /// instead, this struct exposes `Read` and `BufRead` impls which point
 /// to the beginning of the file's contents in the HTTP stream. 
 ///
@@ -480,7 +479,7 @@ impl<'a, B: Read> MultipartFile<'a, B> {
         retry_on_interrupt(|| io::copy(self.stream, &mut out))
     }
 
-    /// Save this file to the given output stream, truncated to `limit` 
+    /// Save this file to the given output stream, **truncated** to `limit` 
     /// (no more than `limit` bytes will be written out).
     ///
     /// If successful, returns the number of bytes written.
@@ -520,7 +519,7 @@ impl<'a, B: Read> MultipartFile<'a, B> {
         self.save_as(path)
     }
 
-    /// Save this file to `path`, truncated to `limit` (no more than `limit` bytes will be written out).
+    /// Save this file to `path`, **truncated** to `limit` (no more than `limit` bytes will be written out).
     ///
     /// Any missing directories in the `dir` path will be created.
     ///
@@ -542,7 +541,7 @@ impl<'a, B: Read> MultipartFile<'a, B> {
     /// Save this file in the directory pointed at by `dir`,
     /// using a random alphanumeric string as the filename.
     ///
-    /// Truncates file to `limit` (no more than `limit` bytes will be written out).
+    /// **Truncates** file to `limit` (no more than `limit` bytes will be written out).
     ///
     /// Any missing directories in the `dir` path will be created.
     ///
@@ -618,9 +617,10 @@ impl Entries {
 
 /// The save directory for `Entries`. May be temporary (delete-on-drop) or permanent.
 pub enum SaveDir {
-    /// This directory is temporary and will be deleted, along with its contents, when dropped.
+    /// This directory is temporary and will be deleted, along with its contents, when this wrapper
+    /// is dropped.
     Temp(TempDir),
-    /// This directory is permanent and will be left on the filesystem.
+    /// This directory is permanent and will be left on the filesystem when this wrapper is dropped.
     Perm(PathBuf),
 }
 
@@ -643,13 +643,27 @@ impl SaveDir {
         }
     }
 
+    /// Unwrap the `PathBuf` from `self`; if this is a temporary directory,
+    /// it will be converted to a permanent one.
+    pub fn into_path(self) -> PathBuf {
+        use self::SaveDir::*;
+
+        match self {
+            Temp(tempdir) => tempdir.into_path(),
+            Perm(pathbuf) => pathbuf,
+        }
+    }
+
     /// If this `SaveDir` is temporary, convert it to permanent.
     /// This is a no-op if it already is permanent.
     ///
-    /// ##Note
+    /// ###Warning: Potential Data Loss
     /// Even though this will prevent deletion on-drop, the temporary folder on most OSes
     /// (where this directory is created by default) can be automatically cleared by the OS at any
     /// time, usually on reboot or when free space is low.
+    ///
+    /// It is recommended that you relocate the files from a request which you want to keep to a 
+    /// permanent folder on the filesystem.
     pub fn keep(&mut self) {
         use self::SaveDir::*;
         *self = match mem::replace(self, Perm(PathBuf::new())) {
@@ -660,7 +674,7 @@ impl SaveDir {
 
     /// Delete this directory and its contents, regardless of its permanence.
     ///
-    /// ###Warning
+    /// ###Warning: Potential Data Loss
     /// This is very likely irreversible, depending on the OS implementation.
     ///
     /// Files deleted programmatically are deleted directly from disk, as compared to most file
@@ -682,7 +696,7 @@ impl AsRef<Path> for SaveDir {
 }
 
 // grrr, no Debug impl for TempDir, can't derive
-// FIXME when this lands: https://github.com/rust-lang-nursery/tempdir/pull/9
+// FIXME when tempdir > 0.3.4 is released (Debug PR landed 3/3/2016) 
 impl fmt::Debug for SaveDir {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::SaveDir::*;
