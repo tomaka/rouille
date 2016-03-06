@@ -41,7 +41,11 @@ version = "0.1"
 
 [dependencies.nickel]
 optional = true
-version = "0.7.3"
+version = "0.7"
+
+[dependencies.tiny_http]
+optional = true
+version = "0.5"
 
 [features]
 client = []
