@@ -53,13 +53,17 @@ pub const DEFAULT_FILE_COUNT_LIMIT: u32 = 16;
 /// use multipart::server::iron::Intercept;
 ///
 /// fn main() {
-///     Iron::new(Chain::new(|req: &mut Request| if let Some(entries) =
+///     let mut chain = Chain::new(|req: &mut Request| if let Some(entries) =
 ///         req.extensions.get::<Entries>() {
 ///         
 ///         Ok(Response::with(format!("{:?}", entries)))
 ///     } else {
 ///         Ok(Response::with("Not a multipart request"))
-///     })).http("localhost:80").unwrap();
+///     });
+///
+///     chain.link_before(Intercept::default());
+///
+///     Iron::new(chain).http("localhost:80").unwrap();
 /// }
 /// ```
 ///
@@ -118,12 +122,6 @@ impl Intercept {
                 match $try {
                     Ok(ok) => ok,
                     Err(err) => return Err(IronError::new(err, format!($($fmt_args)*))),
-                }
-            );
-            ($try:expr; $err_msg:expr) => (
-                match $try {
-                    Ok(ok) => ok,
-                    Err(err) => return Err(IronError::new(err, $err_msg)),
                 }
             );
             ($try:expr) => (
