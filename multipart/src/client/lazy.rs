@@ -244,6 +244,7 @@ pub struct PreparedFields<'d> {
     // NOTE: the order of these fields have been reversed so fields can be popped one-by-one from
     // the end.
     fields: Vec<PreparedField<'d>>,
+    #[cfg_attr(not(feature = "hyper"), allow(dead_code))]
     boundary: String,
     content_len: Option<u64>,
 }
@@ -340,6 +341,7 @@ impl<'d> PreparedFields<'d> {
         self.content_len
     }
 
+    #[cfg_attr(not(feature = "hyper"), allow(dead_code))]
     fn boundary(&self) -> &str {
         &self.boundary
     } 

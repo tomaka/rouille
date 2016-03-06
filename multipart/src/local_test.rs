@@ -88,15 +88,15 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
     // Intersperse file fields amongst text fields
     for (name, text) in &test_fields.texts {
         if let Some((file_name, file)) = test_files.next() {
-            multipart.write_stream(file_name, &mut &**file, None, None);
+            multipart.write_stream(file_name, &mut &**file, None, None).unwrap();
         }
 
-        multipart.write_text(name, text);    
+        multipart.write_text(name, text).unwrap();    
     }
 
     // Write remaining files
     for (file_name, file) in test_files {
-       multipart.write_stream(file_name, &mut &**file, None, None);
+       multipart.write_stream(file_name, &mut &**file, None, None).unwrap();
     }
 
 

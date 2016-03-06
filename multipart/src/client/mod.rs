@@ -28,17 +28,25 @@ pub use self::sized::SizedRequest;
 
 const BOUNDARY_LEN: usize = 16;
 
+macro_rules! map_self {
+    ($selff:expr, $try:expr) => (
+        match $try {
+            Ok(_) => Ok($selff),
+            Err(err) => Err(err.into()),
+        }
+    )
+}
+
 /// The entry point of the client-side multipart API.
 ///
 /// Though they perform I/O, the `.write_*()` methods do not return `io::Result<_>` in order to
 /// facilitate method chaining. Upon the first error, all subsequent API calls will be no-ops until
 /// `.send()` is called, at which point the error will be reported.
-pub struct Multipart<S: HttpStream> {
+pub struct Multipart<S> {
     writer: MultipartWriter<'static, S>,
-    last_err: Option<S::Error>,
 }
 
-impl Multipart<io::Sink> {
+impl Multipart<()> {
     /// Create a new `Multipart` to wrap a request.
     ///
     /// ## Returns Error
@@ -48,38 +56,18 @@ impl Multipart<io::Sink> {
 
         Ok(Multipart {
             writer: MultipartWriter::new(stream, boundary),
-            last_err: None,
         })
     }
 }
 
-impl<S: HttpStream> Multipart<S> {
-    /// Get a reference to the last error returned from writing to the HTTP stream, if any.
-    pub fn last_err(&self) -> Option<&S::Error> {
-        self.last_err.as_ref()
-    }
-
-    /// Remove and return the last error to occur, allowing subsequent API calls to proceed
-    /// normally.
-    ///
-    /// ##Warning
-    /// If an error occurred during a write, the request body may be corrupt.
-    pub fn take_err(&mut self) -> Option<S::Error> {
-        self.last_err.take()
-    }
-
+impl<S: HttpStream> Multipart<S> { 
     /// Write a text field to this multipart request.
     /// `name` and `val` can be either owned `String` or `&str`.
     ///
     /// ##Errors
     /// If something went wrong with the HTTP stream.
-    pub fn write_text<N: AsRef<str>, V: AsRef<str>>(&mut self, name: N, val: V) -> &mut Self {
-        if self.last_err.is_none() {
-            self.last_err = self.writer.write_text(name.as_ref(), val.as_ref())
-                .err().map(|err| err.into())
-        }
-
-        self
+    pub fn write_text<N: AsRef<str>, V: AsRef<str>>(&mut self, name: N, val: V) -> Result<&mut Self, S::Error> {
+        map_self!(self, self.writer.write_text(name.as_ref(), val.as_ref()))
     }
     
     /// Open a file pointed to by `path` and write its contents to the multipart request, 
@@ -93,16 +81,11 @@ impl<S: HttpStream> Multipart<S> {
     /// ##Errors
     /// If there was a problem opening the file (was a directory or didn't exist),
     /// or if something went wrong with the HTTP stream.
-    pub fn write_file<N: AsRef<str>, P: AsRef<Path>>(&mut self, name: N, path: P) -> &mut Self {
-        if self.last_err.is_none() {    
-            let name = name.as_ref();
-            let path = path.as_ref();
+    pub fn write_file<N: AsRef<str>, P: AsRef<Path>>(&mut self, name: N, path: P) -> Result<&mut Self, S::Error> {
+        let name = name.as_ref();
+        let path = path.as_ref();
 
-            self.last_err = self.writer.write_file(name, path).err()
-                .map(|err| err.into());
-        }
-
-        self
+        map_self!(self, self.writer.write_file(name, path))
     }
 
     /// Write a byte stream to the multipart request as a file field, supplying `filename` if given,
@@ -127,25 +110,15 @@ impl<S: HttpStream> Multipart<S> {
     // RFC: How to format this declaration?
     pub fn write_stream<N: AsRef<str>, St: Read>(
         &mut self, name: N, stream: &mut St, filename: Option<&str>, content_type: Option<Mime>
-    ) -> &mut Self {
-        if self.last_err.is_none() {
-            let name = name.as_ref();
+    ) -> Result<&mut Self, S::Error> {
+        let name = name.as_ref();
 
-            self.last_err = self.writer.write_stream(stream, name, filename, content_type)
-                .err().map(|err| err.into());
-        }
-
-        self
+        map_self!(self, self.writer.write_stream(stream, name, filename, content_type))
     } 
 
     /// Finalize the request and return the response from the server, or the last error if set.
     pub fn send(self) -> Result<S::Response, S::Error> {
-        match self.last_err {
-            None => {                
-                try!(self.writer.finish()).finish()
-            },
-            Some(err) => Err(err),
-        }
+        self.writer.finish().map_err(io::Error::into).and_then(|body| body.finish())
     }    
 }
 
