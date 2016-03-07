@@ -24,6 +24,8 @@ extern crate mime;
 extern crate mime_guess;
 extern crate rand;
 
+extern crate tempdir;
+
 #[cfg(feature = "hyper")]
 extern crate hyper;
 
@@ -35,12 +37,10 @@ extern crate tiny_http;
 
 use rand::Rng;
 
-use std::path::PathBuf;
-
 macro_rules! chain_result {
     ($first_expr:expr, $($try_expr:expr),*) => (
         $first_expr $(.and_then(|_| $try_expr))*
-    );
+    ); 
 }
 
 #[cfg(feature = "client")]
@@ -50,12 +50,6 @@ pub mod server;
 
 #[cfg(all(test, feature = "client", feature = "server"))]
 mod local_test;
-
-const DIRNAME_LEN: usize = 12;
-
-fn temp_dir() -> PathBuf {
-    random_alphanumeric(DIRNAME_LEN).into()
-}
 
 fn random_alphanumeric(len: usize) -> String {
     rand::thread_rng().gen_ascii_chars().take(len).collect()

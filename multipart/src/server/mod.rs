@@ -13,22 +13,16 @@
 //! See the `Multipart` struct for more info.
 use mime::Mime;
 
+use tempdir::TempDir;
+
 use std::borrow::Borrow;
-
 use std::collections::HashMap;
-
 use std::fs::{self, File};
-use std::io;
 use std::io::prelude::*;
-
 use std::path::{Path, PathBuf};
+use std::{fmt, io, mem, ptr};
 
 pub use self::boundary::BoundaryReader;
-
-mod boundary;
-
-#[cfg(feature = "hyper")]
-pub mod hyper;
 
 macro_rules! try_opt (
     ($expr:expr) => (
@@ -39,51 +33,49 @@ macro_rules! try_opt (
     )
 );
 
+mod boundary;
+
+#[cfg(feature = "hyper")]
+pub mod hyper;
+
+#[cfg(feature = "iron")]
+pub mod iron;
+
+const RANDOM_FILENAME_LEN: usize = 12;
+
 /// The server-side implementation of `multipart/form-data` requests.
 ///
-/// Implements `Borrow<R>` to allow access to the request object.
+/// Implements `Borrow<R>` to allow access to the request body, if desired.
 pub struct Multipart<B> {
     source: BoundaryReader<B>,
-    line_buf: String,
-    /// The directory for saving files in this request.
-    /// By default, this is set to a subdirectory of `std::env::temp_dir()` with a 
-    /// random alphanumeric name.
-    pub save_dir: PathBuf,
+    line_buf: String, 
 }
-
 
 impl Multipart<()> {
     /// If the given `R: HttpRequest` is a POST request of `Content-Type: multipart/form-data`,
     /// return the wrapped request as `Ok(Multipart<R::Body>)`, otherwise `Err(R)`.
     pub fn from_request<R: HttpRequest>(req: R) -> Result<Multipart<R::Body>, R> {
         //FIXME: move `map` expr to `Some` arm when nonlexical borrow scopes land.
-        let boundary = match req.multipart_boundary().map(|b| format!("--{}", b)){
+        let boundary = match req.multipart_boundary().map(String::from) {
             Some(boundary) => boundary,
             None => return Err(req),
         };
 
-        debug!("Boundary: {}", boundary);
-
-        Ok(
-            Multipart { 
-                source: BoundaryReader::from_reader(req.body(), boundary),
-                line_buf: String::new(),
-                save_dir: ::temp_dir(),
-            }
-        )        
+        Ok(Multipart::with_body(req.body(), boundary))        
     }   
 }
 
 impl<B: Read> Multipart<B> {
-    pub fn with_body(body: B, boundary: &str) -> Self {
-        let boundary = format!("--{}", boundary);
+    /// Construct a new `Multipart` with the given body reader and boundary.
+    /// This will prepend the requisite `"--"` to the boundary.
+    pub fn with_body<Bnd: Into<String>>(body: B, boundary: Bnd) -> Self {
+        let boundary = prepend_str("--", boundary.into());
 
         debug!("Boundary: {}", boundary);
 
         Multipart { 
             source: BoundaryReader::from_reader(body, boundary),
             line_buf: String::new(),
-            save_dir: ::temp_dir(),
         }
     }
 
@@ -128,29 +120,54 @@ impl<B: Read> Multipart<B> {
         Ok(ContentType::read_from(line))
     }
 
-    /// Read the request fully, parsing all fields and saving all files in `self.save_dir`. 
+    /// Read the request fully, parsing all fields and saving all files in a new temporary
+    /// directory. 
     ///
     /// If there is an error in reading the request, returns the partial result along with the
-    /// error.
-    pub fn save_all(&mut self) -> (Entries, Option<io::Error>) {
-        let mut entries = Entries::with_path(self.save_dir.clone());
+    /// error. See [`SaveResult`](../enum.saveresult.html) for more information.
+    pub fn save_all(&mut self) -> SaveResult {
+        let mut entries = match Entries::new_tempdir() {
+            Ok(entries) => entries,
+            Err(err) => return SaveResult::Error(err),
+        };
+ 
+        match self.read_to_entries(&mut entries) {
+            Ok(()) => SaveResult::Full(entries),
+            Err(err) => SaveResult::Partial(entries, err),
+        }
+    }
 
-        loop {
-            match self.read_entry() {
-                Ok(Some(field)) => match field.data {
-                    MultipartData::File(mut file) => {
-                        entries.files.insert(field.name, file.save());
-                    },
-                    MultipartData::Text(text) => {
-                        entries.fields.insert(field.name, text.into());
-                    },
+    /// Read the request fully, parsing all fields and saving all files in a new temporary
+    /// directory under `dir`. 
+    ///
+    /// If there is an error in reading the request, returns the partial result along with the
+    /// error. See [`SaveResult`](../enum.saveresult.html) for more information.
+    pub fn save_all_under<P: AsRef<Path>>(&mut self, dir: P) -> SaveResult {
+        let mut entries = match Entries::new_tempdir_in(dir) {
+            Ok(entries) => entries,
+            Err(err) => return SaveResult::Error(err),
+        };
+
+        match self.read_to_entries(&mut entries) {
+            Ok(()) => SaveResult::Full(entries),
+            Err(err) => SaveResult::Partial(entries, err),
+        }
+    }
+
+    fn read_to_entries(&mut self, entries: &mut Entries) -> io::Result<()> {
+        while let Some(field) = try!(self.read_entry()) {
+            match field.data {
+                MultipartData::File(mut file) => {
+                    let file = try!(file.save_in(&entries.dir));
+                    entries.files.insert(field.name, file);
                 },
-                Ok(None) => break,
-                Err(err) => return (entries, Some(err)),
+                MultipartData::Text(text) => {
+                    entries.fields.insert(field.name, text.into());
+                },
             }
         }
 
-        (entries, None)
+        Ok(())
     }
 
     fn read_line(&mut self) -> io::Result<&str> {
@@ -192,6 +209,53 @@ impl<B: Read> Multipart<B> {
 impl<B> Borrow<B> for Multipart<B> {
     fn borrow(&self) -> &B {
         self.source.borrow()
+    }
+}
+
+/// The result of [`Multipart::save_all()`](../struct.multipart.html#method.save_all).
+#[derive(Debug)]
+pub enum SaveResult {
+    /// The operation was a total success. Contained are all entries of the request.
+    Full(Entries),
+    /// The operation errored partway through. Contained are the entries gathered thus far,
+    /// as well as the error that ended the process.
+    Partial(Entries, io::Error),
+    /// The `TempDir` for `Entries` could not be constructed. Contained is the error detailing the
+    /// problem.
+    Error(io::Error),
+}
+
+impl SaveResult {
+    /// Take the `Entries` from `self`, if applicable, and discarding
+    /// the error, if any.
+    pub fn to_entries(self) -> Option<Entries> {
+        use self::SaveResult::*;
+
+        match self {
+            Full(entries) | Partial(entries, _) => Some(entries),
+            Error(_) => None,
+        }
+    }
+
+    /// Decompose `self` to `(Option<Entries>, Option<io::Error>)`
+    pub fn to_opt(self) -> (Option<Entries>, Option<io::Error>) {
+        use self::SaveResult::*;
+
+        match self {
+            Full(entries) => (Some(entries), None),
+            Partial(entries, error) => (Some(entries), Some(error)),
+            Error(error) => (None, Some(error)),
+        }
+    }
+
+    /// Map `self` to an `io::Result`, discarding the error in the `Partial` case.
+    pub fn to_result(self) -> io::Result<Entries> {
+        use self::SaveResult::*;
+
+        match self {
+            Full(entries) | Partial(entries, _) => Ok(entries),
+            Error(error) => Err(error),
+        }
     }
 }
 
@@ -282,6 +346,9 @@ fn get_remainder_after<'a>(needle: &str, haystack: &'a str) -> Option<(&'a str)>
 }
 
 /// A server-side HTTP request that may or may not be multipart.
+///
+/// May be implemented by mutable references if providing the request or body by-value is
+/// undesirable.
 pub trait HttpRequest {
     /// The body of this request.
     type Body: Read;
@@ -289,10 +356,10 @@ pub trait HttpRequest {
     /// with the `Content-Type` header set to `multipart/form-data`.
     ///
     /// The boundary string should be supplied as an extra value of the `Content-Type` header, e.g.
-    /// `Content-Type: multipart/form-data; boundary=myboundary`.
+    /// `Content-Type: multipart/form-data; boundary={boundary}`.
     fn multipart_boundary(&self) -> Option<&str>;
 
-    /// Return a mutable reference to the request body for reading.
+    /// Return the request body for reading.
     fn body(self) -> Self::Body;
 }
 
@@ -320,18 +387,14 @@ impl<'a, B: Read + 'a> MultipartField<'a, B> {
                     MultipartFile::from_stream(
                         cont_disp.filename, 
                         content_type.val,
-                        &multipart.save_dir,
                         &mut multipart.source,
                     )
                  )
             },
             None => {
                 // Empty line consumed by read_content_type()
-                let text = try!(multipart.read_to_string());
-                // The last two characters are "\r\n".
-                // We can't do a simple trim because the content might be terminated
-                // with line separators we want to preserve.
-                MultipartData::Text(&text[..text.len()])
+                let text = try!(multipart.read_to_string()); 
+                MultipartData::Text(&text)
             },
         };
 
@@ -386,64 +449,102 @@ impl<'a, B> MultipartData<'a, B> {
 pub struct MultipartFile<'a, B: 'a> {
     filename: Option<String>,
     content_type: Mime,
-    save_dir: &'a Path,
     stream: &'a mut BoundaryReader<B>,
 }
 
 impl<'a, B: Read> MultipartFile<'a, B> {
     fn from_stream(filename: Option<String>, 
                    content_type: Mime, 
-                   save_dir: &'a Path,
                    stream: &'a mut BoundaryReader<B>) -> MultipartFile<'a, B> {
         MultipartFile {
             filename: filename,
             content_type: content_type,
-            save_dir: save_dir,
             stream: stream,
         }    
     }
 
-    /// Save this file to `path`.
+    /// Save this file to the given output stream.
     ///
-    /// Returns the number of bytes written on success, or any errors otherwise.
+    /// If successful, returns the number of bytes written.
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    pub fn save_as(&mut self, path: &Path) -> io::Result<u64> {
-        let mut file = try!(File::create(path));
-        retry_on_interrupt(|| io::copy(self.stream, &mut file))    
+    pub fn save_to<W: Write>(&mut self, mut out: W) -> io::Result<u64> {
+        retry_on_interrupt(|| io::copy(self.stream, &mut out))
+    }
+
+    /// Save this file to the given output stream, truncated to `limit` 
+    /// (no more than `limit` bytes will be written out).
+    ///
+    /// If successful, returns the number of bytes written.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save_to_limited<W: Write>(&mut self, mut out: W, limit: u64) -> io::Result<u64> {
+        retry_on_interrupt(|| io::copy(&mut self.stream.take(limit), &mut out))
+    }
+
+    /// Save this file to `path`.
+    ///
+    /// Returns the saved file info on success, or any errors otherwise.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save_as<P: Into<PathBuf>>(&mut self, path: P) -> io::Result<SavedFile> {
+        let path = path.into();
+        let file = try!(create_full_path(&path)); 
+        let size = try!(self.save_to(file));
+
+        Ok(SavedFile {
+            path: path,
+            filename: self.filename.clone(),
+            size: size,
+        })
     }
 
     /// Save this file in the directory pointed at by `dir`,
-    /// using `self.filename()` if present, or a random alphanumeric string otherwise.
+    /// using a random alphanumeric string as the filename.
     ///
     /// Any missing directories in the `dir` path will be created.
     ///
-    /// `self.filename()` is sanitized of all file separators before being appended to `dir`.
-    ///
-    /// Returns the created file's path on success, or any errors otherwise.
+    /// Returns the saved file's info on success, or any errors otherwise.
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    pub fn save_in(&mut self, dir: &Path) -> io::Result<PathBuf> {
-        try!(fs::create_dir_all(dir));
-        let path = self.gen_safe_file_path(dir);
-        self.save_as(&path).map(move |_| path)
+    pub fn save_in<P: AsRef<Path>>(&mut self, dir: P) -> io::Result<SavedFile> {
+        let path = dir.as_ref().join(::random_alphanumeric(RANDOM_FILENAME_LEN));
+        self.save_as(path)
     }
 
-    /// Save this file in the directory pointed at by `self.save_dir`,
-    /// using `self.filename()` if present, or a random alphanumeric string otherwise.
+    /// Save this file to `path`, truncated to `limit` (no more than `limit` bytes will be written out).
     ///
-    /// Any missing directories in the `self.save_dir` path will be created.
+    /// Any missing directories in the `dir` path will be created.
     ///
-    /// `self.filename()` is sanitized of all file separators before being appended to `self.save_dir`.
-    ///
-    /// Returns the created file's path on success, or any errors otherwise.
+    /// Returns the saved file's info on success, or any errors otherwise.
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    pub fn save(&mut self) -> io::Result<PathBuf> {
-        try!(fs::create_dir_all(self.save_dir));
-        let path = self.gen_safe_file_path(self.save_dir);
-        self.save_as(&path).map(move |_| path)
+    pub fn save_as_limited<P: Into<PathBuf>>(&mut self, path: P, limit: u64) -> io::Result<SavedFile> {
+        let path = path.into();
+        let file = try!(create_full_path(&path));
+        let size = try!(self.save_to_limited(file, limit));
+        
+        Ok(SavedFile {
+            path: path,
+            filename: self.filename.clone(),
+            size: size,
+        })
     }
+    
+    /// Save this file in the directory pointed at by `dir`,
+    /// using a random alphanumeric string as the filename.
+    ///
+    /// Truncates file to `limit` (no more than `limit` bytes will be written out).
+    ///
+    /// Any missing directories in the `dir` path will be created.
+    ///
+    /// Returns the saved file's info on success, or any errors otherwise.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save_in_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> io::Result<SavedFile> {
+        let path = dir.as_ref().join(::random_alphanumeric(RANDOM_FILENAME_LEN));
+        self.save_as_limited(path, limit)
+    } 
 
     /// Get the filename of this entry, if supplied.
     ///
@@ -457,23 +558,8 @@ impl<'a, B: Read> MultipartFile<'a, B> {
 
     /// Get the MIME type (`Content-Type` value) of this file, if supplied by the client, 
     /// or `"applicaton/octet-stream"` otherwise.
-    pub fn content_type(&self) -> Mime {
-        self.content_type.clone()    
-    }
-
-    /// The save directory assigned to this file field by the `Multipart` instance it was read
-    /// from.
-    pub fn save_dir(&self) -> &Path {
-        self.save_dir
-    }
-
-    fn gen_safe_file_path(&self, dir: &Path) -> PathBuf { 
-        self.filename().map(Path::new)
-            .and_then(Path::file_name) //Make sure there's no path separators in the filename
-            .map_or_else(
-                || dir.join(::random_alphanumeric(8)), 
-                |filename| dir.join(filename),
-            )
+    pub fn content_type(&self) -> &Mime {
+        &self.content_type    
     }
 }
 
@@ -494,23 +580,128 @@ impl<'a, B: Read> BufRead for MultipartFile<'a, B> {
 }
 
 /// A result of `Multipart::save_all()`.
+#[derive(Debug)]
 pub struct Entries {
-    /// The text fields of the multipart request.
+    /// The text fields of the multipart request, mapped by field name -> value.
     pub fields: HashMap<String, String>,
-    /// A map of file field names to their save results.
-    pub files: HashMap<String, io::Result<PathBuf>>,
-    /// The directory the files were saved under.
-    pub dir: PathBuf,
+    /// A map of file field names to their contents saved on the filesystem.
+    pub files: HashMap<String, SavedFile>,
+    /// The directory the files in this request were saved under; may be temporary or permanent.
+    pub dir: SaveDir,
 }
 
 impl Entries {
-    fn with_path<P: Into<PathBuf>>(path: P) -> Entries {
+    fn new_tempdir_in<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        TempDir::new_in(path, "multipart").map(Self::with_tempdir)
+    }
+
+    fn new_tempdir() -> io::Result<Self> {
+        TempDir::new("multipart").map(Self::with_tempdir)
+    }
+
+    fn with_tempdir(tempdir: TempDir) -> Entries {
         Entries {
             fields: HashMap::new(),
             files: HashMap::new(),
-            dir: path.into(),
+            dir: SaveDir::Temp(tempdir),
         }
     }
+}
+
+/// The save directory for `Entries`. May be temporary (delete-on-drop) or permanent.
+pub enum SaveDir {
+    /// This directory is temporary and will be deleted, along with its contents, when dropped.
+    Temp(TempDir),
+    /// This directory is permanent and will be left on the filesystem.
+    Perm(PathBuf),
+}
+
+impl SaveDir {
+    /// Get the path of this directory, either temporary or permanent.
+    pub fn as_path(&self) -> &Path {
+        use self::SaveDir::*;
+        match *self {
+            Temp(ref tempdir) => tempdir.path(),
+            Perm(ref pathbuf) => &*pathbuf,
+        }
+    }
+
+    /// Returns `true` if this is a temporary directory which will be deleted on-drop.
+    pub fn is_temporary(&self) -> bool {
+        use self::SaveDir::*;
+        match *self {
+            Temp(_) => true,
+            Perm(_) => false,
+        }
+    }
+
+    /// If this `SaveDir` is temporary, convert it to permanent.
+    /// This is a no-op if it already is permanent.
+    ///
+    /// ##Note
+    /// Even though this will prevent deletion on-drop, the temporary folder on most OSes
+    /// (where this directory is created by default) can be automatically cleared by the OS at any
+    /// time, usually on reboot or when free space is low.
+    pub fn keep(&mut self) {
+        use self::SaveDir::*;
+        *self = match mem::replace(self, Perm(PathBuf::new())) {
+            Temp(tempdir) => Perm(tempdir.into_path()),
+            old_self => old_self,
+        };
+    }
+
+    /// Delete this directory and its contents, regardless of its permanence.
+    ///
+    /// ###Warning
+    /// This is very likely irreversible, depending on the OS implementation.
+    ///
+    /// Files deleted programmatically are deleted directly from disk, as compared to most file
+    /// manager applications which use a staging area from which deleted files can be safely
+    /// recovered (i.e. Windows' Recycle Bin, OS X's Trash Can, etc.).
+    pub fn delete(self) -> io::Result<()> {
+        use self::SaveDir::*;
+        match self {
+            Temp(tempdir) => tempdir.close(),
+            Perm(pathbuf) => fs::remove_dir_all(&pathbuf),
+        }
+    }
+}
+
+impl AsRef<Path> for SaveDir {
+    fn as_ref(&self) -> &Path {
+        self.as_path()
+    }
+}
+
+// grrr, no Debug impl for TempDir, can't derive
+// FIXME when this lands: https://github.com/rust-lang-nursery/tempdir/pull/9
+impl fmt::Debug for SaveDir {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::SaveDir::*;
+
+        match *self {
+            Temp(ref tempdir) => write!(f, "SaveDir::Temp({:?})", tempdir.path()),
+            Perm(ref path) => write!(f, "SaveDir::Perm({:?})", path),
+        }
+    }
+}
+
+/// A file saved to the local filesystem from a multipart request.
+#[derive(Debug)]
+pub struct SavedFile {
+    /// The complete path this file was saved at.
+    pub path: PathBuf,
+
+    /// The original filename of this file, if one was provided in the request.
+    ///
+    /// ##Warning
+    /// You should treat this value as untrustworthy because it is an arbitrary string provided by
+    /// the client. You should *not* blindly append it to a directory path and save the file there, 
+    /// as such behavior could easily be exploited by a malicious client.
+    pub filename: Option<String>,
+
+    /// The number of bytes written to the disk; may be truncated.
+    pub size: u64,
 }
 
 fn retry_on_interrupt<F, T>(mut do_fn: F) -> io::Result<T> where F: FnMut() -> io::Result<T> {
@@ -524,3 +715,32 @@ fn retry_on_interrupt<F, T>(mut do_fn: F) -> io::Result<T> where F: FnMut() -> i
     }
 } 
 
+fn prepend_str(prefix: &str, mut string: String) -> String {
+    string.reserve(prefix.len());
+
+    unsafe {
+        let bytes = string.as_mut_vec();
+
+        // This addition is safe because it was already done in `String::reserve()`
+        // which would have panicked if it overflowed.
+        let old_len = bytes.len();
+        let new_len = bytes.len() + prefix.len();
+        bytes.set_len(new_len);
+
+        ptr::copy(bytes.as_ptr(), bytes[prefix.len()..].as_mut_ptr(), old_len);
+        ptr::copy(prefix.as_ptr(), bytes.as_mut_ptr(), prefix.len());
+    }
+
+    string
+}
+
+fn create_full_path(path: &Path) -> io::Result<File> {
+    if let Some(parent) = path.parent() {
+        try!(fs::create_dir_all(parent));
+    } else {
+        // RFC: return an error instead?
+        warn!("Attempting to save file in what looks like a root directory. File path: {:?}", path);
+    }
+
+    File::create(&path)
+}

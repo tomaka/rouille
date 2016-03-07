@@ -25,6 +25,7 @@ env_logger = "0.3"
 mime = "0.1"
 mime_guess = "1.4"
 rand = "0.3"
+tempdir = "0.3"
 
 [dependencies.hyper]
 version = "0.7"
