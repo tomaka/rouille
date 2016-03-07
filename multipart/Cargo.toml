@@ -9,7 +9,7 @@ description = "A backend-agnostic extension for HTTP libraries that provides sup
 
 documentation = "http://rust-ci.org/cybergeek94/multipart/doc/multipart/"
 
-keywords = ["form-data", "hyper", "iron", "http", "post", "upload"]
+keywords = ["form-data", "hyper", "iron", "http", "upload"]
 
 repository = "http://github.com/cybergeek94/multipart"
 
