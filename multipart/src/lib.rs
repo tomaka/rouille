@@ -32,6 +32,9 @@ extern crate hyper;
 #[cfg(feature = "iron")]
 extern crate iron;
 
+#[cfg(feature = "nickel")]
+extern crate nickel;
+
 #[cfg(feature = "tiny_http")]
 extern crate tiny_http;
 

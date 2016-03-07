@@ -41,6 +41,14 @@ pub mod hyper;
 #[cfg(feature = "iron")]
 pub mod iron;
 
+#[cfg(feature = "nickel2")]
+pub mod nickel;
+
+/* FIXME: when tiny_http gains proper header parsing. 
+#[cfg(feature = "tiny_http")]
+pub mod tiny_http;
+*/
+
 const RANDOM_FILENAME_LEN: usize = 12;
 
 /// The server-side implementation of `multipart/form-data` requests.
