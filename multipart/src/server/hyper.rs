@@ -96,7 +96,41 @@ impl<'a, 'b> HttpRequest for Request<'a, 'b> {
         })
     }
 
-    fn body(&mut self) -> &mut Self {
+    fn body(self) -> Self {
+        self
+    }
+}
+
+impl<'r, 'a, 'b> HttpRequest for &'r mut Request<'a, 'b> {
+    type Body = &'r mut Request<'a, 'b>;
+
+    fn multipart_boundary(&self) -> Option<&str> {
+        if self.method != Method::Post {
+            return None;
+        }
+
+        self.headers.get::<ContentType>().and_then(|ct| {
+            let ContentType(ref mime) = *ct;
+            let params = match *mime {
+                Mime(TopLevel::Multipart, SubLevel::FormData, ref params) => params,
+                _ => return None,
+            };
+
+            params.iter().find(|&&(ref name, _)|
+                match *name {
+                    Attr::Boundary => true,
+                    _ => false,
+                }
+            ).and_then(|&(_, ref val)|
+                match *val {
+                    Value::Ext(ref val) => Some(&**val),
+                    _ => None,
+                }
+            )
+        })
+    }
+
+    fn body(self) -> Self::Body {
         self
     }
 }
