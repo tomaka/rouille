@@ -42,8 +42,8 @@ macro_rules! try_opt (
 /// The server-side implementation of `multipart/form-data` requests.
 ///
 /// Implements `Borrow<R>` to allow access to the request object.
-pub struct Multipart<R> {
-    source: BoundaryReader<R>,
+pub struct Multipart<B> {
+    source: BoundaryReader<B>,
     line_buf: String,
     /// The directory for saving files in this request.
     /// By default, this is set to a subdirectory of `std::env::temp_dir()` with a 
@@ -51,25 +51,40 @@ pub struct Multipart<R> {
     pub save_dir: PathBuf,
 }
 
-impl<R> Multipart<R> where R: HttpRequest {
-    /// If the given `R: HttpRequest` is a POST request of `Content-Type: multipart/form-data`,
-    /// return the wrapped request as `Ok(Multipart<R>)`, otherwise `Err(R)`.
-    pub fn from_request(req: R) -> Result<Multipart<R>, R> {
-        if req.multipart_boundary().is_none() {
-            return Err(req);     
-        }
 
-        let boundary = format!("--{}", req.multipart_boundary().unwrap());
+impl Multipart<()> {
+    /// If the given `R: HttpRequest` is a POST request of `Content-Type: multipart/form-data`,
+    /// return the wrapped request as `Ok(Multipart<R::Body>)`, otherwise `Err(R)`.
+    pub fn from_request<R: HttpRequest>(req: R) -> Result<Multipart<R::Body>, R> {
+        //FIXME: move `map` expr to `Some` arm when nonlexical borrow scopes land.
+        let boundary = match req.multipart_boundary().map(|b| format!("--{}", b)){
+            Some(boundary) => boundary,
+            None => return Err(req),
+        };
 
         debug!("Boundary: {}", boundary);
 
         Ok(
             Multipart { 
-                source: BoundaryReader::from_reader(req, boundary),
+                source: BoundaryReader::from_reader(req.body(), boundary),
                 line_buf: String::new(),
                 save_dir: ::temp_dir(),
             }
-        )
+        )        
+    }   
+}
+
+impl<B: Read> Multipart<B> {
+    pub fn with_body(body: B, boundary: &str) -> Self {
+        let boundary = format!("--{}", boundary);
+
+        debug!("Boundary: {}", boundary);
+
+        Multipart { 
+            source: BoundaryReader::from_reader(body, boundary),
+            line_buf: String::new(),
+            save_dir: ::temp_dir(),
+        }
     }
 
     /// Read the next entry from this multipart request, returning a struct with the field's name and
@@ -78,7 +93,7 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// ##Warning: Risk of Data Loss
     /// If the previously returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry.
-    pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<R>>> {
+    pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<B>>> {
         if !try!(self.consume_boundary()) {
             return Ok(None);
         }
@@ -97,7 +112,7 @@ impl<R> Multipart<R> where R: HttpRequest {
     /// from `next()` borrows the iterator for a bound lifetime).
     ///
     /// Returns `Ok(())` when all fields have been read, or the first error.
-    pub fn foreach_entry<F>(&mut self, mut foreach: F) -> io::Result<()> where F: FnMut(MultipartField<R>) {
+    pub fn foreach_entry<F>(&mut self, mut foreach: F) -> io::Result<()> where F: FnMut(MultipartField<B>) {
         loop {
             match self.read_entry() {
                 Ok(Some(field)) => foreach(field),
@@ -174,8 +189,8 @@ impl<R> Multipart<R> where R: HttpRequest {
     }
 }
 
-impl<R> Borrow<R> for Multipart<R> where R: HttpRequest {
-    fn borrow(&self) -> &R {
+impl<B> Borrow<B> for Multipart<B> {
+    fn borrow(&self) -> &B {
         self.source.borrow()
     }
 }
@@ -267,26 +282,31 @@ fn get_remainder_after<'a>(needle: &str, haystack: &'a str) -> Option<(&'a str)>
 }
 
 /// A server-side HTTP request that may or may not be multipart.
-pub trait HttpRequest: Read {
+pub trait HttpRequest {
+    /// The body of this request.
+    type Body: Read;
     /// Get the boundary string of this request if it is a POST request
     /// with the `Content-Type` header set to `multipart/form-data`.
     ///
     /// The boundary string should be supplied as an extra value of the `Content-Type` header, e.g.
     /// `Content-Type: multipart/form-data; boundary=myboundary`.
     fn multipart_boundary(&self) -> Option<&str>;
+
+    /// Return a mutable reference to the request body for reading.
+    fn body(self) -> Self::Body;
 }
 
 /// A field in a multipart request. May be either text or a binary stream (file).
 #[derive(Debug)]
-pub struct MultipartField<'a, R: 'a> {
+pub struct MultipartField<'a, B: 'a> {
     /// The field's name from the form
     pub name: String,
     /// The data of the field. Can be text or binary.
-    pub data: MultipartData<'a, R>,
+    pub data: MultipartData<'a, B>,
 }
 
-impl<'a, R: HttpRequest + 'a> MultipartField<'a, R> {
-    fn read_from(multipart: &'a mut Multipart<R>) -> io::Result<Option<MultipartField<'a, R>>> {
+impl<'a, B: Read + 'a> MultipartField<'a, B> {
+    fn read_from(multipart: &'a mut Multipart<B>) -> io::Result<Option<MultipartField<'a, B>>> {
         let cont_disp = match multipart.read_content_disposition() {
             Ok(Some(cont_disp)) => cont_disp,
             Ok(None) => return Ok(None),
@@ -326,16 +346,16 @@ impl<'a, R: HttpRequest + 'a> MultipartField<'a, R> {
 
 /// The data of a field in a `multipart/form-data` request.
 #[derive(Debug)]
-pub enum MultipartData<'a, R: 'a> {
+pub enum MultipartData<'a, B: 'a> {
     /// The field's payload is a text string.
     Text(&'a str),
     /// The field's payload is a binary stream (file).
-    File(MultipartFile<'a, R>),
+    File(MultipartFile<'a, B>),
     // TODO: Support multiple files per field (nested boundaries)
     // MultiFiles(Vec<MultipartFile>),
 }
 
-impl<'a, R> MultipartData<'a, R> {
+impl<'a, B> MultipartData<'a, B> {
     /// Borrow this payload as a text field, if possible.
     pub fn as_text(&self) -> Option<&str> {
         match *self {
@@ -346,7 +366,7 @@ impl<'a, R> MultipartData<'a, R> {
 
     /// Borrow this payload as a file field, if possible.
     /// Mutably borrows so the contents can be read.
-    pub fn as_file(&mut self) -> Option<&mut MultipartFile<'a, R>> {
+    pub fn as_file(&mut self) -> Option<&mut MultipartFile<'a, B>> {
         match *self {
             MultipartData::File(ref mut file) => Some(file),
             _ => None,
@@ -363,18 +383,18 @@ impl<'a, R> MultipartData<'a, R> {
 /// You can read it to EOF, or use one of the `save_*()` methods here 
 /// to save it to disk.
 #[derive(Debug)]
-pub struct MultipartFile<'a, R: 'a> {
+pub struct MultipartFile<'a, B: 'a> {
     filename: Option<String>,
     content_type: Mime,
     save_dir: &'a Path,
-    stream: &'a mut BoundaryReader<R>,
+    stream: &'a mut BoundaryReader<B>,
 }
 
-impl<'a, R: Read> MultipartFile<'a, R> {
+impl<'a, B: Read> MultipartFile<'a, B> {
     fn from_stream(filename: Option<String>, 
                    content_type: Mime, 
                    save_dir: &'a Path,
-                   stream: &'a mut BoundaryReader<R>) -> MultipartFile<'a, R> {
+                   stream: &'a mut BoundaryReader<B>) -> MultipartFile<'a, B> {
         MultipartFile {
             filename: filename,
             content_type: content_type,
@@ -457,13 +477,13 @@ impl<'a, R: Read> MultipartFile<'a, R> {
     }
 }
 
-impl<'a, R: Read> Read for MultipartFile<'a, R> {
+impl<'a, B: Read> Read for MultipartFile<'a, B> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
         self.stream.read(buf)
     }
 }
 
-impl<'a, R: Read> BufRead for MultipartFile<'a, R> {
+impl<'a, B: Read> BufRead for MultipartFile<'a, B> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.stream.fill_buf()
     }

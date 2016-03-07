@@ -68,6 +68,8 @@ where F: Fn(Multipart<Request>, Response<Fresh>), F: Send + Sync {
 }
 
 impl<'a, 'b> HttpRequest for Request<'a, 'b> {
+    type Body = Self;
+
     fn multipart_boundary(&self) -> Option<&str> {
         if self.method != Method::Post {
             return None;
@@ -92,6 +94,10 @@ impl<'a, 'b> HttpRequest for Request<'a, 'b> {
                 }
             )
         })
+    }
+
+    fn body(&mut self) -> &mut Self {
+        self
     }
 }
 
