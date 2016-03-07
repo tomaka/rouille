@@ -27,6 +27,12 @@ extern crate rand;
 #[cfg(feature = "hyper")]
 extern crate hyper;
 
+#[cfg(feature = "iron")]
+extern crate iron;
+
+#[cfg(feature = "tiny_http")]
+extern crate tiny_http;
+
 use rand::Rng;
 
 use std::path::PathBuf;

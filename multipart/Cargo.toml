@@ -12,7 +12,7 @@ documentation = "http://rust-ci.org/cybergeek94/multipart/doc/multipart/"
 
 license = "MIT OR Apache-2.0"
 
-keywords = ["form-data", "hyper", "http", "post", "upload"]
+keywords = ["form-data", "hyper", "iron", "http", "post", "upload"]
 
 [features]
 server = ["buf_redux", "memchr"]
@@ -28,6 +28,10 @@ rand = "0.3"
 
 [dependencies.hyper]
 version = "0.7"
+optional = true
+
+[dependencies.iron]
+version = "0.2"
 optional = true
 
 [dependencies.buf_redux]
