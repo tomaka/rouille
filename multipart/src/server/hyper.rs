@@ -6,10 +6,15 @@
 // copied, modified, or distributed except according to those terms.
 //! Server-side integration with [Hyper](https://github.com/hyperium/hyper).
 //! Enabled with the `hyper` feature (on by default).
+//!
+//! Also contains an implementation of [`HttpRequest`](../trait.HttpRequest.html)`
+//! for `hyper::server::Request` and `&mut hyper::server::Request`.
 use hyper::net::Fresh;
 use hyper::header::ContentType;
 use hyper::method::Method;
 use hyper::server::{Handler, Request, Response};
+
+pub use hyper::server::Request as HyperRequest;
 
 use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
@@ -67,7 +72,9 @@ where F: Fn(Multipart<Request>, Response<Fresh>), F: Send + Sync {
     }
 }
 
-impl<'a, 'b> HttpRequest for Request<'a, 'b> {
+impl<'a, 'b> HttpRequest for HyperRequest<'a, 'b> {
+    type Body = Self;
+
     fn multipart_boundary(&self) -> Option<&str> {
         if self.method != Method::Post {
             return None;
@@ -92,6 +99,44 @@ impl<'a, 'b> HttpRequest for Request<'a, 'b> {
                 }
             )
         })
+    }
+
+    fn body(self) -> Self {
+        self
+    }
+}
+
+impl<'r, 'a, 'b> HttpRequest for &'r mut HyperRequest<'a, 'b> {
+    type Body = Self;
+
+    fn multipart_boundary(&self) -> Option<&str> {
+        if self.method != Method::Post {
+            return None;
+        }
+
+        self.headers.get::<ContentType>().and_then(|ct| {
+            let ContentType(ref mime) = *ct;
+            let params = match *mime {
+                Mime(TopLevel::Multipart, SubLevel::FormData, ref params) => params,
+                _ => return None,
+            };
+
+            params.iter().find(|&&(ref name, _)|
+                match *name {
+                    Attr::Boundary => true,
+                    _ => false,
+                }
+            ).and_then(|&(_, ref val)|
+                match *val {
+                    Value::Ext(ref val) => Some(&**val),
+                    _ => None,
+                }
+            )
+        })
+    }
+
+    fn body(self) -> Self::Body {
+        self
     }
 }
 

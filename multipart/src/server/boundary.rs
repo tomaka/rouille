@@ -136,7 +136,7 @@ impl<R> BoundaryReader<R> where R: Read {
     }
 }
 
-impl<R: Read> Borrow<R> for BoundaryReader<R> {
+impl<R> Borrow<R> for BoundaryReader<R> {
     fn borrow(&self) -> &R {
         self.buf.get_ref() 
     }

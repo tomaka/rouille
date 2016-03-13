@@ -1,39 +1,55 @@
 [package]
-
 name = "multipart"
-version = "0.4.1"
+
+version = "0.5.0-alpha.1"
+
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
 description = "A backend-agnostic extension for HTTP libraries that provides support for POST multipart/form-data requests on for both client and server."
 
-repository = "http://github.com/cybergeek94/multipart"
-
 documentation = "http://rust-ci.org/cybergeek94/multipart/doc/multipart/"
+
+keywords = ["form-data", "hyper", "iron", "http", "upload"]
+
+repository = "http://github.com/cybergeek94/multipart"
 
 license = "MIT OR Apache-2.0"
 
-keywords = ["form-data", "hyper", "http", "post", "upload"]
-
-[features]
-server = ["buf_redux", "memchr"]
-client = []
-default = ["hyper", "server", "client"]
-
 [dependencies]
-log = "0.3"
 env_logger = "0.3"
+log = "0.3"
 mime = "0.1"
 mime_guess = "1.4"
 rand = "0.3"
-
-[dependencies.hyper]
-version = "0.7"
-optional = true
+tempdir = "0.3"
 
 [dependencies.buf_redux]
-version = "0.1"
 optional = true
+version = "0.1"
+
+[dependencies.hyper]
+optional = true
+version = "0.7"
+
+[dependencies.iron]
+optional = true
+version = "0.2"
 
 [dependencies.memchr]
-version = "0.1"
 optional = true
+version = "0.1"
+
+[dependencies.nickel]
+optional = true
+version = "0.7"
+
+[dependencies.tiny_http]
+optional = true
+version = "0.5"
+
+[features]
+client = []
+default = ["hyper", "server", "client"]
+server = ["buf_redux", "memchr"]
+#Disabled until Nickel upgrades to Hyper 0.7
+#nickel2 = ["hyper", "nickel"]

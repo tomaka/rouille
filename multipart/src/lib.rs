@@ -24,16 +24,54 @@ extern crate mime;
 extern crate mime_guess;
 extern crate rand;
 
+extern crate tempdir;
+
 #[cfg(feature = "hyper")]
 extern crate hyper;
 
+#[cfg(feature = "iron")]
+extern crate iron;
+
+#[cfg(feature = "nickel")]
+extern crate nickel;
+
+#[cfg(feature = "tiny_http")]
+extern crate tiny_http;
+
 use rand::Rng;
 
-use std::path::PathBuf;
-
+/// Chain a series of results together, with or without previous results.
+///
+/// ```
+/// #[macro_use] extern crate multipart;
+///
+/// fn try_add_one(val: u32) -> Result<u32, u32> {
+///     if val < 5 {
+///         Ok(val + 1)
+///     } else {
+///         Err(val)
+///     }
+/// }
+/// 
+/// fn main() {
+///     let res = chain_result! {
+///         try_add_one(1),
+///         prev -> try_add_one(prev),
+///         prev -> try_add_one(prev),
+///         prev -> try_add_one(prev)
+///     };
+///
+///     println!("{:?}", res);
+/// }
+///
+/// ```
+#[macro_export]
 macro_rules! chain_result {
     ($first_expr:expr, $($try_expr:expr),*) => (
         $first_expr $(.and_then(|_| $try_expr))*
+    );
+    ($first_expr:expr, $($($arg:ident),+ -> $try_expr:expr),*) => (
+        $first_expr $(.and_then(|$($arg),+| $try_expr))*
     );
 }
 
@@ -44,12 +82,6 @@ pub mod server;
 
 #[cfg(all(test, feature = "client", feature = "server"))]
 mod local_test;
-
-const DIRNAME_LEN: usize = 12;
-
-fn temp_dir() -> PathBuf {
-    random_alphanumeric(DIRNAME_LEN).into()
-}
 
 fn random_alphanumeric(len: usize) -> String {
     rand::thread_rng().gen_ascii_chars().take(len).collect()
