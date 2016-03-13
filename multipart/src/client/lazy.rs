@@ -238,7 +238,7 @@ struct Stream<'n, 'd> {
     stream: Box<Read + 'd>,
 }
 
-/// The result of [`Multipart::prepare()`](../Multipart.html#method.prepare) or
+/// The result of [`Multipart::prepare()`](struct.Multipart.html#method.prepare) or
 /// `Multipart::prepare_threshold()`. Implements `Read`, contains the entire request body.
 pub struct PreparedFields<'d> {
     // NOTE: the order of these fields have been reversed so fields can be popped one-by-one from

@@ -16,6 +16,12 @@
 //!
 //! * `hyper` (default): Enable integration with the [Hyper](https:://github.com/hyperium/hyper) HTTP library 
 //! for client and/or server depending on which other feature flags are set.
+//!
+//! * `iron`: Enable integration with the [Iron](http://ironframework.io) web application
+//! framework. See the [`server::iron`](server/iron/index.html) module for more information.
+//!
+//! * `tiny_http`: Enable integration with the [`tiny_http`](https://github.com/frewsxcv/tiny-http)
+//! crate. See the [`server::tiny_http`](server/tiny_http/index.html) module for more information.
 #![warn(missing_docs)]
 #[macro_use] extern crate log;
 extern crate env_logger;

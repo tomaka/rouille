@@ -7,11 +7,11 @@ authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
 description = "A backend-agnostic extension for HTTP libraries that provides support for POST multipart/form-data requests on for both client and server."
 
-documentation = "http://rust-ci.org/cybergeek94/multipart/doc/multipart/"
-
 keywords = ["form-data", "hyper", "iron", "http", "upload"]
 
 repository = "http://github.com/cybergeek94/multipart"
+
+documentation = "http://cybergeek94.github.io/multipart/doc/multipart/index.html"
 
 license = "MIT OR Apache-2.0"
 

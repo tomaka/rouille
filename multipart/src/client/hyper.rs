@@ -9,11 +9,9 @@
 //!
 //! Contains `impl HttpRequest for Request<Fresh>` and `impl HttpStream for Request<Streaming>`.
 //!
-//! Also see: [`lazy::Multipart::client_request()`][lazy-multi-creq]
-//! and [`lazy::Multipart::client_request_mut()`][lazy-multi-creq-mut]
+//! Also see: [`lazy::Multipart::client_request()`](../lazy/struct.Multipart.html#method.client_request)
+//! and [`lazy::Multipart::client_request_mut()`](../lazy/struct.Multipart.html#method.client_request_mut)
 //! (adaptors for `hyper::client::RequestBuilder`).
-//! [lazy-multipart-creq]: ../lazy/struct.Multipart.html#method.client_request
-//! [lazy-mutlipart-creq-mut]: ../lazy/struct.Multipart.html#method.client_request_mut
 use hyper::client::request::Request;
 use hyper::client::response::Response;
 use hyper::header::{ContentType, ContentLength};

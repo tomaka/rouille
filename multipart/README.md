@@ -5,11 +5,11 @@ Client- and server-side abstractions for HTTP file uploads (POST requests with  
 
 Supports several different HTTP crates.
 
-####[Documentation](http://cybergeek94.github.io/multipart/)
+###[Documentation](http://cybergeek94.github.io/multipart/doc/multipart/index.html)
 
-###Integrations
+##Integrations
 
-#####[Hyper](http://hyper.rs) 
+####[Hyper](http://hyper.rs) 
 via the `hyper` feature (enabled by default). 
 
 Client integration includes support for regular `hyper::client::Request` objects via `multipart::client::Multipart`, as well
@@ -17,13 +17,13 @@ as integration with the new `hyper::Client` API via `multipart::client::lazy::Mu
 
 Server integration for `hyper::server::Request` via `multipart::server::Multipart`.
 
-#####[Iron](http://ironframework.io) 
+####[Iron](http://ironframework.io) 
 via the `iron` feature (new in 0.5).
 
 Provides regular server-side integration with `iron::Request` via `multipart::server::Multipart`, 
 as well as a convenient `BeforeMiddleware` implementation in `multipart::server::iron::Intercept`.
 
-#####[tiny\_http](https://crates.io/crates/tiny_http/)
+####[tiny\_http](https://crates.io/crates/tiny_http/)
 via the `tiny_http` feature (new in 0.5).
 
 Provides server-side integration with `tiny_http::Request` via `multipart::server::Multipart`.
