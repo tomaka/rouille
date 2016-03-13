@@ -14,6 +14,7 @@ git config user.email "nobody@example.com"
 git branch -df gh-pages
 git checkout --orphan gh-pages
 
+git reset
 git clean -d -x -f -e target/doc
 
 cp -R target/doc .
