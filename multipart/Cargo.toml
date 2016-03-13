@@ -10,7 +10,7 @@ repository = "http://github.com/cybergeek94/multipart"
 
 documentation = "http://rust-ci.org/cybergeek94/multipart/doc/multipart/"
 
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 keywords = ["form-data", "hyper", "http", "post", "upload"]
 
