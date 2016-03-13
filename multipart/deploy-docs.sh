@@ -20,4 +20,5 @@ rm -rf target
 git add -A
 
 git commit -qm "Documentation for ${TRAVIS_TAG}"
+git remote set-url origin git@github.com:cybergeek94/multipart.git
 git push -f origin gh-pages
