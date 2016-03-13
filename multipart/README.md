@@ -1,77 +1,32 @@
-Multipart + Hyper [![Build Status](https://travis-ci.org/cybergeek94/multipart.svg?branch=master)](https://travis-ci.org/cybergeek94/multipart) [![On Crates.io](https://img.shields.io/crates/v/multipart.svg)](https://crates.io/crates/multipart)
+Multipart [![Build Status](https://travis-ci.org/cybergeek94/multipart.svg?branch=master)](https://travis-ci.org/cybergeek94/multipart) [![On Crates.io](https://img.shields.io/crates/v/multipart.svg)](https://crates.io/crates/multipart)
 =========
 
 Client- and server-side abstractions for HTTP file uploads (POST requests with  `Content-Type: multipart/form-data`).
 
-Provides integration with [Hyper](https://github.com/hyperium/hyper) via the `hyper` feature. More to come!
+Supports several different HTTP crates.
 
-####[Documentation](http://rust-ci.org/cybergeek94/multipart/doc/multipart/)
+####[Documentation](http://cybergeek94.github.io/multipart/)
 
-Usage
------
+###Integrations
 
-In your `Cargo.toml`:
-```toml
-# Currently only useful with `hyper` and `url` crates:
-[dependencies]
-hyper = "*"
-url = "*"
+#####[Hyper](http://hyper.rs) 
+via the `hyper` feature (enabled by default). 
 
-[dependencies.multipart]
-version = "*" # Or use the version in the Crates.io badge above.
-# You can also select which features to compile:
-# default-features = false
-# features = ["hyper", "server", "client"]
-```
+Client integration includes support for regular `hyper::client::Request` objects via `multipart::client::Multipart`, as well
+as integration with the new `hyper::Client` API via `multipart::client::lazy::Mulitpart` (new in 0.5).
 
-Client-side example using Hyper (`features = ["hyper", "client"]` or default):
-```rust
-extern crate hyper;
-extern crate multipart;
-extern crate url;
+Server integration for `hyper::server::Request` via `multipart::server::Multipart`.
 
-use hyper::client::request::Request;
-use hyper::method::Method;
+#####[Iron](http://ironframework.io) 
+via the `iron` feature (new in 0.5).
 
-use multipart::client::Multipart;
+Provides regular server-side integration with `iron::Request` via `multipart::server::Multipart`, 
+as well as a convenient `BeforeMiddleware` implementation in `multipart::server::iron::Intercept`.
 
-use url::Url;
+#####[tiny\_http](https://crates.io/crates/tiny_http/)
+via the `tiny_http` feature (new in 0.5).
 
-fn main() {
-    let url = Url::parse("127.0.0.1").unwrap();
-    let request = Request::new(Method::Post, url).unwrap();
-    
-    let mut response = Multipart::from_request(request).unwrap()
-        .write_text("hello", "world")
-        .write_file("my_file", "my_text_data.txt")
-        .send().unwrap();
-        
-    // Read response...
-}
-```
-
-Server-side example using Hyper (`features = ["hyper", "server"]` or default):
-```rust
-use hyper::net::Fresh;
-use hyper::server::{Server, Request, Response};
-
-use multipart::server::Multipart;
-use multipart::server::hyper::Switch;
-
-fn handle_regular<'a, 'k>(req: Request<'a, 'k>, res: Response<'a, Fresh>) {
-    // handle things here
-}
-
-fn handle_multipart<'a, 'k>(mut multi: Multipart<Request<'a, 'k>>, res: Response<'a, Fresh>) {
-    multi.foreach_entry(|entry| println!("Multipart entry: {:?}", entry)).unwrap();
-}
-
-fn main() {
-    Server::http("0.0.0.0:0").unwrap()
-      .handle(Switch::new(handle_regular, handle_multipart))
-      .unwrap();
-}
-```
+Provides server-side integration with `tiny_http::Request` via `multipart::server::Multipart`.
 
 License
 -------
