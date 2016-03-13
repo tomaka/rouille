@@ -8,10 +8,15 @@ os:
   - osx
 env:
   global:
-    - secure: UrIkXI/5PqRVn9GeCAtadkvIcnGY9+uMKfz50099M+ncf7/ZAwL5T6AjMmV9FqgvRShpW7px8Aj7uEGwbNgUGIuiYENWeoAi7LAh5OatUHBMVNFLnCLxHtnmj8G3RgNAql5wiEvvnaWvb+joi8zNJ4lJ5m6kkrAPxwx1Uj6uYmw=
+    - FEATURES="iron tiny_http"
+script:
+  - cargo build -v --features ${FEATURES}
+  - cargo test -v --features ${FEATURES}
+  - cargo doc -v --no-deps --features ${FEATURES}
 after_success:
     - |
         test ${TRAVIS_PULL_REQUEST} == "false" && \
         test ${TRAVIS_BRANCH} == "master" && \
         test "${TRAVIS_BUILD_NUMBER}.1" == "${TRAVIS_JOB_NUMBER}" && \
+        test -n ${TRAVIS_TAG} && \
         bash deploy-docs.sh
