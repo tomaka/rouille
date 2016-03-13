@@ -3,7 +3,7 @@
 
 #Decrypt RSA key
 mkdir -p ~/.ssh
-openssl aes-256-cbc -K $encrypted_9e7566e23d77_key -iv $encrypted_9e7566e23d77_iv -in id_rsa.enc -out id_rsa -d
+openssl aes-256-cbc -K $encrypted_67079d13adee_key -iv $encrypted_67079d13adee_iv -in id_rsa.enc -out id_rsa -d
 chmod 600 ~/.ssh/id_rsa
 
 git config user.name "multipart doc upload"
