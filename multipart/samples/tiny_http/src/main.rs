@@ -13,7 +13,11 @@ fn main() {
 
         // Answering with an HTTP OK and a string
         let response_string = "Multipart data is received!".as_bytes();
-        let response = Response::new(StatusCode(200), vec![], response_string, Some(response_string.len()), None);
+        let response = Response::new(StatusCode(200),
+                                     vec![],
+                                     response_string,
+                                     Some(response_string.len()),
+                                     None);
         request.respond(response).unwrap();
     }
 }
@@ -27,8 +31,8 @@ fn process_multipart(request: &mut Request) -> Result<(), Error> {
         SaveResult::Partial(entries, error) => {
             try!(process_entries(entries));
             Err(error)
-        },
-        SaveResult::Error(error) => Err(error)
+        }
+        SaveResult::Error(error) => Err(error),
     }
 }
 use std::fs::File;
@@ -41,7 +45,7 @@ fn process_entries(entries: Entries) -> Result<(), Error> {
     for (name, savedfile) in entries.files {
         let filename = match savedfile.filename {
             Some(s) => s,
-            None => "None".into()
+            None => "None".into(),
         };
         let mut file = try!(File::open(savedfile.path));
         let mut contents = String::new();
