@@ -3,12 +3,15 @@ extern crate multipart;
 
 use multipart::server::{Multipart, Entries, SaveResult};
 fn main() {
+    // Starting a server on `localhost:80`
     let server = tiny_http::Server::http("localhost:80").unwrap();
     loop {
-        // blocks until the next request is received
+        // This blocks until the next request is received
         let mut request = server.recv().unwrap();
 
+        // Getting a multipart reader wrapper
         let mut multipart = Multipart::from_request(&mut request).unwrap();
+        // Fetching all data and processing it
         match multipart.save_all() {
             SaveResult::Full(entries) => process_entries(entries).unwrap(),
             SaveResult::Partial(entries, error) => {
@@ -33,12 +36,12 @@ fn process_entries(entries: Entries) -> Result<(), Error> {
             Some(s) => s,
             None => "None".into()
         };
-        let mut f = try!(File::open(savedfile.path));
+        let mut file = try!(File::open(savedfile.path));
+        let mut contents = String::new();
+        try!(file.read_to_string(&mut contents));
 
-        let mut s = String::new();
-        try!(f.read_to_string(&mut s));
         println!(r#"Field "{}" is file "{}":"#, name, filename);
-        println!("{}", s);
+        println!("{}", contents);
     }
     Ok(())
 }
