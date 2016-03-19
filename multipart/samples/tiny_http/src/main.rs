@@ -23,9 +23,8 @@ fn main() {
     }
 }
 
-use std::io::prelude::*;
 use std::fs::File;
-use std::io::Error;
+use std::io::{Error, Read};
 fn process_entries(entries: Entries) -> Result<(), Error> {
     for (name, field) in entries.fields {
         println!(r#"Field "{}": "{}""#, name, field);
