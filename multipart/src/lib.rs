@@ -14,7 +14,7 @@
 //! * `server` (default): Enable the server-side abstractions for multipart requests. If the
 //! `hyper` feature is also set, enables integration with the Hyper HTTP server API.
 //!
-//! * `hyper` (default): Enable integration with the [Hyper](https:://github.com/hyperium/hyper) HTTP library 
+//! * `hyper` (default): Enable integration with the [Hyper](https://github.com/hyperium/hyper) HTTP library 
 //! for client and/or server depending on which other feature flags are set.
 //!
 //! * `iron`: Enable integration with the [Iron](http://ironframework.io) web application
