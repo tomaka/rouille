@@ -15,6 +15,7 @@ pub use self::post::get_post_input;
 pub use self::session::{SessionsManager, Session, generate_session_id};
 
 pub mod json;
+pub mod multipart;
 pub mod post;
 
 mod session;
