@@ -47,11 +47,23 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
 {
     let path = path.as_ref();
 
-    // FIXME (SECURITY): check with `relative_from` that we're still in `path`
-    //                   once the function is stable
+    // The potential location of the file on the disk.
     // TODO: remove GET parameters from URL
     let potential_file = path.join(&request.url()[1..]);        // TODO: handle the leading `/` more cleanly
 
+    // We try to canonicalize the file. If this fails, then the file doesn't exist.
+    let potential_file = match potential_file.canonicalize() {
+        Ok(f) => f,
+        Err(_) => return Err(RouteError::NoRouteFound)
+    };
+
+    // Check that we're still within `path`. This should eliminate security issues with
+    // requests like `GET /../private_file`.
+    if !potential_file.starts_with(path) {
+        return Err(RouteError::NoRouteFound);
+    }
+
+    // Check that it's a file and not a directory.
     match fs::metadata(&potential_file) {
         Ok(ref m) if m.is_file() => (),
         _ => return Err(RouteError::NoRouteFound)
