@@ -35,6 +35,7 @@ impl From<MultipartError> for RouteError {
     }
 }
 
+/// Attempts to decode the content of the request as `multipart/form-data` data.
 pub fn get_multipart_input(request: &Request) -> Result<Multipart, MultipartError> {
     let boundary = match multipart_boundary(request) {
         Some(b) => b,
@@ -46,11 +47,7 @@ pub fn get_multipart_input(request: &Request) -> Result<Multipart, MultipartErro
     })
 }
 
-///
-/// # Warning
-///
-/// If the previously returned entry had contents of type MultipartField::File, calling this again
-/// will discard any unread contents of that entry.
+/// Allows you to inspect the content of the multipart input of a request.
 pub struct Multipart {
     inner: InnerMultipart<Cursor<Vec<u8>>>
 }
