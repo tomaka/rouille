@@ -1,0 +1,12 @@
+[package]
+name = "iron"
+version = "0.1.0"
+authors = ["White-Oak <lpzhelud@gmail.com>"]
+
+[dependencies]
+iron = "0.2"
+
+[dependencies.multipart]
+version = "0.5.1"
+default-features = false
+features = ["server", "iron"]
