@@ -2,12 +2,12 @@ extern crate multipart;
 extern crate iron;
 
 use std::fs::File;
-use std::io::{Read};
+use std::io::Read;
 use multipart::server::{Multipart, Entries, SaveResult};
 use iron::prelude::*;
 use iron::status;
 
-fn main(){
+fn main() {
     Iron::new(process_request).http("localhost:80").expect("Could not bind localhost:80");
 }
 
@@ -28,7 +28,10 @@ fn process_request(request: &mut Request) -> IronResult<Response> {
                 SaveResult::Error(error) => Err(IronError::new(error, status::InternalServerError)),
             }
         }
-        Err(_) => Ok(Response::with((status::BadRequest, (status::BadRequest, "The request is not multipart")))),
+        Err(_) => {
+            Ok(Response::with((status::BadRequest,
+                               (status::BadRequest, "The request is not multipart"))))
+        }
     }
 }
 
@@ -46,11 +49,15 @@ fn process_entries(entries: Entries) -> IronResult<Response> {
         };
         let mut file = match File::open(savedfile.path) {
             Ok(file) => file,
-            Err(error) => return Err(IronError::new(error, (status::InternalServerError, "Server couldn't save file")))
+            Err(error) => {
+                return Err(IronError::new(error,
+                                          (status::InternalServerError,
+                                           "Server couldn't save file")))
+            }
         };
         let mut contents = String::new();
         if let Err(error) = file.read_to_string(&mut contents) {
-            return Err(IronError::new(error, (status::BadRequest, "The file was not a text")))
+            return Err(IronError::new(error, (status::BadRequest, "The file was not a text")));
         }
 
         println!(r#"Field "{}" is file "{}":"#, name, filename);
