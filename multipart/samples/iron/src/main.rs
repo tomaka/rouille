@@ -29,8 +29,7 @@ fn process_request(request: &mut Request) -> IronResult<Response> {
             }
         }
         Err(_) => {
-            Ok(Response::with((status::BadRequest,
-                               (status::BadRequest, "The request is not multipart"))))
+            Ok(Response::with((status::BadRequest, "The request is not multipart")))
         }
     }
 }
