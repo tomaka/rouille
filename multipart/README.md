@@ -9,6 +9,8 @@ Supports several different HTTP crates.
 
 ##Integrations
 
+Sample projects demonstrating how to use `multipart` with these crates are available under [`samples/`](samples).
+
 ####[Hyper](http://hyper.rs) 
 via the `hyper` feature (enabled by default). 
 
