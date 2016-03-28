@@ -7,7 +7,7 @@ These projects carry the same licenses as [`multipart` itself](https://github.co
 
 More sample projects are underway and volunteers to create them are still needed. See [this issue](https://github.com/cybergeek94/multipart/issues/29) for more information.
 
-[`iron`](samples/iron)
+[`iron`](iron)
 -----
 Author: [White-Oak][white-oak]
 
@@ -15,7 +15,7 @@ This sample project shows how to use `multipart` with the [Iron web application 
 for the `iron::Request` type.
 
 
-[`tiny_http`](samples/tiny_http)
+[`tiny_http`](tiny_http)
 ----------
 Author: [White-Oak](white-oak)
 
