@@ -46,6 +46,7 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
                                where P: AsRef<Path>
 {
     let path = path.as_ref();
+    let path = try!(path.canonicalize().map_err(|_| RouteError::NoRouteFound));
 
     // The potential location of the file on the disk.
     // TODO: remove GET parameters from URL
