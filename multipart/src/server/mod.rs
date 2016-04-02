@@ -202,13 +202,13 @@ impl<B: Read> Multipart<B> {
         let _ = try!(self.source.read(&mut out));
 
         if *b"\r\n" == out {
-            return Ok(true);
+            Ok(true)
         } else {
             if *b"--" != out {
                 warn!("Unexpected 2-bytes after boundary: {:?}", out);
             }
 
-            return Ok(false);
+            Ok(false)
         }
     }
 }

@@ -251,7 +251,7 @@ pub struct PreparedFields<'d> {
 
 impl<'d> PreparedFields<'d> {
     fn from_fields<'n>(fields: &mut Vec<Field<'n, 'd>>, boundary: String, buffer_threshold: Option<u64>) -> Result<Self, LazyIoError<'n>> {
-        let buffer_threshold = buffer_threshold.unwrap_or(u64::max_value());
+        let buffer_threshold = buffer_threshold.unwrap_or(::std::u64::MAX);
 
         let mut prep_fields = Vec::with_capacity(fields.len());
 
