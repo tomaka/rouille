@@ -1,7 +1,7 @@
 [package]
 name = "multipart"
 
-version = "0.5.1"
+version = "0.6.0-alpha"
 
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
@@ -18,8 +18,8 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 env_logger = "0.3"
 log = "0.3"
-mime = "0.1"
-mime_guess = "=1.5"
+mime = "0.2"
+mime_guess = "1.6"
 rand = "0.3"
 tempdir = "0.3"
 
@@ -29,19 +29,20 @@ version = "0.1"
 
 [dependencies.hyper]
 optional = true
-version = "0.7"
+version = "0.8"
 
 [dependencies.iron]
 optional = true
-version = "0.2"
+version = "0.3"
 
 [dependencies.memchr]
 optional = true
 version = "0.1"
 
+# NOTE: use `nickel_` feature, as `hyper` feature is required.
 [dependencies.nickel]
 optional = true
-version = "0.7"
+version = "0.8"
 
 [dependencies.tiny_http]
 optional = true
@@ -51,5 +52,5 @@ version = "0.5"
 client = []
 default = ["hyper", "server", "client"]
 server = ["buf_redux", "memchr"]
-#Disabled until Nickel upgrades to Hyper 0.7
-#nickel2 = ["hyper", "nickel"]
+nickel_ = ["nickel", "hyper"]
+all = ["iron", "nickel_", "tiny_http"]

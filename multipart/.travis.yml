@@ -6,13 +6,10 @@ rust:
 os:
   - linux
   - osx
-env:
-  global:
-    - FEATURES="iron tiny_http"
 script:
-  - cargo build -v --features "$FEATURES"
-  - cargo test -v --features "$FEATURES"
-  - cargo doc -v --no-deps --features "$FEATURES"
+  - cargo build -v --features all
+  - cargo test -v --features all
+  - cargo doc -v --no-deps --features all
 after_success:
     - |
         test ${TRAVIS_PULL_REQUEST} == "false" && \
