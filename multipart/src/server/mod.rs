@@ -138,7 +138,7 @@ impl<B: Read> Multipart<B> {
             Err(err) => return SaveResult::Error(err),
         };
  
-        match self.read_to_entries(&mut entries) {
+        match self.read_to_entries(&mut entries, None) {
             Ok(()) => SaveResult::Full(entries),
             Err(err) => SaveResult::Partial(entries, err),
         }
@@ -155,17 +155,60 @@ impl<B: Read> Multipart<B> {
             Err(err) => return SaveResult::Error(err),
         };
 
-        match self.read_to_entries(&mut entries) {
+        match self.read_to_entries(&mut entries, None) {
             Ok(()) => SaveResult::Full(entries),
             Err(err) => SaveResult::Partial(entries, err),
         }
     }
 
-    fn read_to_entries(&mut self, entries: &mut Entries) -> io::Result<()> {
+    /// Read the request fully, parsing all fields and saving all fields in a new temporary
+    /// directory under the OS temporary directory.
+    ///
+    /// Files larger than `limit` will be truncated to `limit`.
+    ///
+    /// If there is an error in reading the request, returns the partial result along with the
+    /// error. See [`SaveResult`](enum.saveresult.html) for more information.
+    pub fn save_all_limited(&mut self, limit: u64) -> SaveResult {
+        let mut entries = match Entries::new_tempdir() {
+            Ok(entries) => entries,
+            Err(err) => return SaveResult::Error(err),
+        };
+
+        match self.read_to_entries(&mut entries, Some(limit)) {
+            Ok(()) => SaveResult::Full(entries),
+            Err(err) => SaveResult::Partial(entries, err),
+        }
+    }
+
+    /// Read the request fully, parsing all fields and saving all files in a new temporary
+    /// directory under `dir`. 
+    ///
+    /// Files larger than `limit` will be truncated to `limit`.
+    ///
+    /// If there is an error in reading the request, returns the partial result along with the
+    /// error. See [`SaveResult`](enum.saveresult.html) for more information.
+    pub fn save_all_under_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> SaveResult {
+        let mut entries = match Entries::new_tempdir_in(dir) {
+            Ok(entries) => entries,
+            Err(err) => return SaveResult::Error(err),
+        };
+
+        match self.read_to_entries(&mut entries, Some(limit)) {
+            Ok(()) => SaveResult::Full(entries),
+            Err(err) => SaveResult::Partial(entries, err),
+        }
+    }
+
+    fn read_to_entries(&mut self, entries: &mut Entries, limit: Option<u64>) -> io::Result<()> {
         while let Some(field) = try!(self.read_entry()) {
             match field.data {
                 MultipartData::File(mut file) => {
-                    let file = try!(file.save_in(&entries.dir));
+                    let file = if let Some(limit) = limit {
+                        try!(file.save_in_limited(&entries.dir, limit))
+                    } else {
+                        try!(file.save_in(&entries.dir))
+                    };
+
                     entries.files.insert(field.name, file);
                 },
                 MultipartData::Text(text) => {
@@ -175,7 +218,7 @@ impl<B: Read> Multipart<B> {
         }
 
         Ok(())
-    }
+    } 
 
     fn read_line(&mut self) -> io::Result<&str> {
         self.line_buf.clear();
