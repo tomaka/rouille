@@ -39,9 +39,10 @@ version = "0.3"
 optional = true
 version = "0.1"
 
+# NOTE: use `nickel_` feature, as `hyper` feature is required.
 [dependencies.nickel]
 optional = true
-version = "0.7"
+version = "0.8"
 
 [dependencies.tiny_http]
 optional = true
@@ -51,5 +52,5 @@ version = "0.5"
 client = []
 default = ["hyper", "server", "client"]
 server = ["buf_redux", "memchr"]
-#Disabled until Nickel upgrades to Hyper 0.7
-#nickel2 = ["hyper", "nickel"]
+nickel_ = ["nickel", "hyper"]
+all = ["iron", "nickel_", "tiny_http"]

@@ -6,7 +6,7 @@ use hyper::server::Request as HyperRequest;
 
 use super::HttpRequest;
 
-impl<'r, 'mw, 'server, D: 'mw> HttpRequest for &'r Request<'mw, 'server, D> {
+impl<'r, 'mw, 'server, D: 'mw> HttpRequest for &'r mut Request<'mw, 'server, D> {
     type Body = &'r mut HyperRequest<'mw, 'server>;
 
     fn multipart_boundary(&self) -> Option<&str> {
