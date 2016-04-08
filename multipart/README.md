@@ -20,15 +20,20 @@ as integration with the new `hyper::Client` API via `multipart::client::lazy::Mu
 Server integration for `hyper::server::Request` via `multipart::server::Multipart`.
 
 ####[Iron](http://ironframework.io) 
-via the `iron` feature (new in 0.5).
+via the `iron` feature.
 
 Provides regular server-side integration with `iron::Request` via `multipart::server::Multipart`, 
 as well as a convenient `BeforeMiddleware` implementation in `multipart::server::iron::Intercept`.
 
 ####[tiny\_http](https://crates.io/crates/tiny_http/)
-via the `tiny_http` feature (new in 0.5).
+via the `tiny_http` feature.
 
 Provides server-side integration with `tiny_http::Request` via `multipart::server::Multipart`.
+
+####[Nickel](http://http://nickel.rs/) ^((New!))
+via the `nickel_` feature
+
+Provides server-side integration with `&mut nickel::Request` via `multipart::server::Multipart`. 
 
 License
 -------
