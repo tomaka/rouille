@@ -22,6 +22,10 @@
 //!
 //! * `tiny_http`: Enable integration with the [`tiny_http`](https://github.com/frewsxcv/tiny-http)
 //! crate. See the [`server::tiny_http`](server/tiny_http/index.html) module for more information.
+//!
+//! * `nickel_`: Enable integration with the [Nickel](http://nickel.rs) web application framework.
+//! See the [`server::nickel`](server/nickel/index.html) module for more information. Enables the `hyper`
+//! feature.
 #![warn(missing_docs)]
 #[macro_use] extern crate log;
 extern crate env_logger;

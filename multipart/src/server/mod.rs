@@ -42,7 +42,7 @@ pub mod hyper;
 pub mod iron;
 
 #[cfg(feature = "nickel")]
-mod nickel;
+pub mod nickel;
 
 #[cfg(feature = "tiny_http")]
 pub mod tiny_http;
