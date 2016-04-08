@@ -30,7 +30,7 @@ via the `tiny_http` feature.
 
 Provides server-side integration with `tiny_http::Request` via `multipart::server::Multipart`.
 
-####[Nickel](http://http://nickel.rs/) <sup>New!</sup>
+####[Nickel](http://http://nickel.rs/) <sup>(New in 0.6!)</sup>
 via the `nickel_` feature
 
 Provides server-side integration with `&mut nickel::Request` via `multipart::server::Multipart`. 
