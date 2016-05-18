@@ -93,14 +93,18 @@ impl From<num::ParseFloatError> for PostError {
 /// ```
 ///
 pub fn get_post_input<T>(request: &Request) -> Result<T, PostError> where T: Decodable {
+    let data = try!(get_raw_post_input(request));
+    let mut decoder = PostDecoder::Start(data);
+    T::decode(&mut decoder)
+}
+
+pub fn get_raw_post_input(request: &Request) -> Result<Vec<(String, String)>, PostError> {
     // TODO: slow
     if request.header("Content-Type") != Some("application/x-www-form-urlencoded".to_owned()) {
         return Err(PostError::WrongContentType);
     }
 
-    let data = form_urlencoded::parse(&request.data());
-    let mut decoder = PostDecoder::Start(data);
-    T::decode(&mut decoder)
+    Ok(form_urlencoded::parse(&request.data()))
 }
 
 enum PostDecoder {
