@@ -8,7 +8,7 @@ extern crate rouille;
 use rouille::Response;
 
 fn main() {
-    rouille::start_server("locahost:8000", move |request| {
+    rouille::start_server("localhost:8000", move |request| {
         Response::text("hello world")
     })
 }
@@ -35,7 +35,7 @@ extern crate rouille;
 use rouille::Response;
 
 fn main() {
-    rouille::start_server("locahost:8000", move |request| {
+    rouille::start_server("localhost:8000", move |request| {
         // dispatching depending on the URL and method
         router!(request,
             (GET) (/) => {

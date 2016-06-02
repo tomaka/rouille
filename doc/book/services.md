@@ -18,7 +18,7 @@ Accessing local variables created outside of the request-handling closure is eas
 ```rust
 let some_text = "hello world";
 
-rouille::start_server("locahost:8000", move |request| {
+rouille::start_server("localhost:8000", move |request| {
     Response::text(some_text)
 })
 ```
@@ -41,7 +41,7 @@ For example, let's try to implement a requests counter:
 ```rust
 let mut counter = 0;
 
-rouille::start_server("locahost:8000", move |request| {
+rouille::start_server("localhost:8000", move |request| {
     counter += 1;       // compilation error!
     Response::text(format!("Request n#{}", counter))
 })
@@ -57,7 +57,7 @@ use std::sync::Mutex;
 
 let counter = Mutex::new(0);
 
-rouille::start_server("locahost:8000", move |request| {
+rouille::start_server("localhost:8000", move |request| {
     let mut counter = counter.lock().unwrap();
     // we now have an exclusive access to `counter`
 
@@ -80,7 +80,7 @@ use std::sync::Mutex;
 // this variable contains a cache of all the database connections
 let connections = Mutex::new(Vec::new());
 
-rouille::start_server("locahost:8000", move |request| {
+rouille::start_server("localhost:8000", move |request| {
     // obtaining a connection from the connections list, or creating a new one if necessary
     let connection = {
         let mut connections = connections.lock().unwrap();
