@@ -80,13 +80,12 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
         Err(_) => return Err(RouteError::NoRouteFound)
     };
 
-    let etag: u64 = fs::metadata(&potential_file)
+    let etag: String = (fs::metadata(&potential_file)
         .map(|meta| filetime::FileTime::from_last_modification_time(&meta).seconds_relative_to_1970())
         .unwrap_or(time::now().tm_nsec as u64)
-        ^ 0xd3f40305c9f8e911u64;
+        ^ 0xd3f40305c9f8e911u64).to_string();
 
     let not_modified: bool = request.header("If-None-Match")
-        .and_then(|t| t.parse::<u64>().ok())
         .map(|req_etag| req_etag == etag)
         .unwrap_or(false);
 
@@ -95,7 +94,7 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
             status_code: 304,
             headers: vec![
                 ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
-                ("etag".to_owned(), etag.to_string())
+                ("ETag".to_owned(), etag.to_string())
             ],
             data: ResponseBody::empty()
         })
@@ -106,7 +105,7 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
         headers: vec![
             ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
             ("Content-Type".to_owned(), extension_to_mime(extension).to_owned()),
-            ("etag".to_owned(), etag.to_string())
+            ("ETag".to_owned(), etag.to_string())
         ],
         data: ResponseBody::from_file(file),
     })
