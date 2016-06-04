@@ -9,6 +9,7 @@
 
 #![deny(unsafe_code)]
 
+extern crate filetime;
 extern crate multipart;
 extern crate rand;
 extern crate rustc_serialize;

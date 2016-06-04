@@ -7,11 +7,11 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-extern crate filetime;
-extern crate time;
-
 use std::fs;
 use std::path::Path;
+
+use filetime;
+use time;
 
 use Request;
 use Response;
