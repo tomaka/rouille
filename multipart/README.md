@@ -15,7 +15,7 @@ Sample projects demonstrating how to use `multipart` with these crates are avail
 via the `hyper` feature (enabled by default). 
 
 Client integration includes support for regular `hyper::client::Request` objects via `multipart::client::Multipart`, as well
-as integration with the new `hyper::Client` API via `multipart::client::lazy::Mulitpart` (new in 0.5).
+as integration with the new `hyper::Client` API via `multipart::client::lazy::Multipart` (new in 0.5).
 
 Server integration for `hyper::server::Request` via `multipart::server::Multipart`.
 
