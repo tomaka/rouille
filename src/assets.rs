@@ -10,6 +10,9 @@
 use std::fs;
 use std::path::Path;
 
+use filetime;
+use time;
+
 use Request;
 use Response;
 use ResponseBody;
@@ -77,11 +80,32 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
         Err(_) => return Err(RouteError::NoRouteFound)
     };
 
+    let etag: String = (fs::metadata(&potential_file)
+        .map(|meta| filetime::FileTime::from_last_modification_time(&meta).seconds_relative_to_1970())
+        .unwrap_or(time::now().tm_nsec as u64)
+        ^ 0xd3f40305c9f8e911u64).to_string();
+
+    let not_modified: bool = request.header("If-None-Match")
+        .map(|req_etag| req_etag == etag)
+        .unwrap_or(false);
+
+    if not_modified {
+        return Ok(Response {
+            status_code: 304,
+            headers: vec![
+                ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
+                ("ETag".to_owned(), etag.to_string())
+            ],
+            data: ResponseBody::empty()
+        })
+    }
+
     Ok(Response {
         status_code: 200,
         headers: vec![
             ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
-            ("Content-Type".to_owned(), extension_to_mime(extension).to_owned())
+            ("Content-Type".to_owned(), extension_to_mime(extension).to_owned()),
+            ("ETag".to_owned(), etag.to_string())
         ],
         data: ResponseBody::from_file(file),
     })
