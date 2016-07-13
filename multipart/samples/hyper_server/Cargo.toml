@@ -1,0 +1,8 @@
+[package]
+name = "hyper_server"
+version = "0.1.0"
+authors = ["Michael <michaelp193@gmail.com>"]
+
+[dependencies]
+hyper = "0.8"
+multipart = "0.5.1"

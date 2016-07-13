@@ -21,5 +21,12 @@ Author: [White-Oak](white-oak)
 
 This sample project shows how to use `multipart` with the [`tiny_http` crate](https://crates.io/crates/tiny_http), via `multipart`'s support for the `tiny_http::Request` type.
 
+[`hyper_server`](hyper_server)
+-----------------------------
+Author: [Puhrez](puhrez)
 
+This sample project shows how to use `multipart` with a [`hyper::Server`] (http://hyper.rs/)  to intercept multipart requests.
+
+
+[puhrez]: https://github.com/puhrez
 [white-oak]: https://github.com/white-oak
