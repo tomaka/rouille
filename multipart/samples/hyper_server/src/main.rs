@@ -3,7 +3,8 @@ extern crate multipart;
 
 use hyper::server::{Handler, Server, Request, Response};
 use hyper::status::StatusCode::ImATeapot;
-use multipart::server::hyper::{Switch, MultipartHandler};
+use hyper::server::response::Response as HyperResponse;
+use multipart::server::hyper::{Switch, MultipartHandler, HyperRequest};
 use multipart::server::{Multipart, Entries};
 
 struct NonMultipart;
@@ -16,7 +17,7 @@ impl Handler for NonMultipart {
 
 struct EchoMultipart;
 impl MultipartHandler for EchoMultipart {
-    fn handle_multipart(&self, multipart: Multipart<Request>, res: Response) {
+    fn handle_multipart(&self, multipart: Multipart<HyperRequest>, res: HyperResponse) {
         res.send(b"Thanks for the multipart req :)\n").unwrap();
     }
 }
