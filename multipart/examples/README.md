@@ -14,6 +14,12 @@ Author: [White-Oak][white-oak]
 This sample project shows how to use `multipart` with the [Iron web application framework](http://ironframework.io/), via `multipart`'s support
 for the `iron::Request` type.
 
+To run:
+
+```
+$ cargo run --features "iron" --example iron
+```
+
 
 [`tiny_http`](tiny_http)
 ----------
@@ -21,11 +27,20 @@ Author: [White-Oak](white-oak)
 
 This sample project shows how to use `multipart` with the [`tiny_http` crate](https://crates.io/crates/tiny_http), via `multipart`'s support for the `tiny_http::Request` type.
 
+
+```
+$ cargo run --features "tiny_http" --example tiny_http
+```
+
 [`hyper_server`](hyper_server)
 -----------------------------
 Author: [Puhrez](puhrez)
 
 This sample project shows how to use `multipart` with a [`hyper::Server`] (http://hyper.rs/)  to intercept multipart requests.
+
+```
+$ cargo run --example hyper_server
+```
 
 
 [puhrez]: https://github.com/puhrez
