@@ -35,6 +35,11 @@
 /// }
 ///
 /// # let request = unsafe { ::std::mem::uninitialized() };
+/// // First calls `handle_request_a`. If it returns anything else than `NoRouteFound`, then the
+/// // `response` will contain the return value.
+/// //
+/// // Instead if `handle_request_a` returned `NoRouteFound`, then `handle_request_b` is tried.
+/// // If `handle_request_b` also returns `NoRouteFound`, then `handle_request_c` is tried.
 /// let response = find_route!(
 ///     handle_request_a(request),
 ///     handle_request_b(request),
