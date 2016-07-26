@@ -56,10 +56,14 @@ rouille::start_server(..., move |request| {
 The state of async I/O, green threads, coroutines, etc. in Rust is still blurry.
 
 The rouille library just ignores this optimization and focuses on providing an easy-to-use
-API instead.
+synchronous API instead, where each request is handled in its own dedicated thread.
 
-Once async I/O has been figured out, rouille will be updated to take this into account. For the
-moment it favors usability over performances.
+Even if rouille itself was asynchronous, you would need asynchronous database clients and
+asynchronous file loading in order to take advantage of it. There are currently no such libraries
+in the Rust ecosystem.
+
+Once async I/O has been figured out, rouille will be (hopefully transparently) updated to take it
+into account.
 
 ### Are there plugins for features such as database connection, templating, etc.
 
