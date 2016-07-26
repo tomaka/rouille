@@ -9,8 +9,8 @@
 
 use std::io::Write;
 use std::thread;
-
-use time;
+use std::time::Duration;
+use std::time::Instant;
 
 use Request;
 
@@ -31,7 +31,7 @@ use Request;
 pub struct LogEntry<W> where W: Write {
     line: String,
     output: W,
-    start_time: u64,
+    start_time: Instant,
 }
 
 impl<'a, W> LogEntry<W> where W: Write {
@@ -40,7 +40,7 @@ impl<'a, W> LogEntry<W> where W: Write {
         LogEntry {
             line: format!("{} {}", rq.method(), rq.raw_url()),
             output: output,
-            start_time: time::precise_time_ns(),
+            start_time: Instant::now(),
         }
     }
 }
@@ -53,22 +53,31 @@ impl<W> Drop for LogEntry<W> where W: Write {
             write!(self.output, " - PANIC!").unwrap();
 
         } else {
-            let elapsed = time::precise_time_ns() - self.start_time;
-            format_time(self.output.by_ref(), elapsed);
+            format_time(self.output.by_ref(), self.start_time.elapsed());
         }
 
         writeln!(self.output, "").unwrap();
     }
 }
 
-fn format_time<W>(mut out: W, time: u64) where W: Write {
-    if time < 1_000 {
-        write!(out, "{}ns", time).unwrap()
-    } else if time < 1_000_000 {
-        write!(out, "{:.1}us", time as f64 / 1_000.0).unwrap()
-    } else if time < 1_000_000_000 {
-        write!(out, "{:.1}ms", time as f64 / 1_000_000.0).unwrap()
+fn format_time<W>(mut out: W, duration: Duration) where W: Write {
+    let secs_part = match duration.as_secs().checked_mul(1_000_000_000) {
+        Some(v) => v,
+        None => {
+            write!(out, "{}s", duration.as_secs() as f64).unwrap();
+            return;
+        }
+    };
+
+    let duration_in_ns = secs_part + duration.subsec_nanos() as u64;
+
+    if duration_in_ns < 1_000 {
+        write!(out, "{}ns", duration_in_ns).unwrap()
+    } else if duration_in_ns < 1_000_000 {
+        write!(out, "{:.1}us", duration_in_ns as f64 / 1_000.0).unwrap()
+    } else if duration_in_ns < 1_000_000_000 {
+        write!(out, "{:.1}ms", duration_in_ns as f64 / 1_000_000.0).unwrap()
     } else {
-        write!(out, "{:.1}s", time as f64 / 1_000_000_000.0).unwrap()
+        write!(out, "{:.1}s", duration_in_ns as f64 / 1_000_000_000.0).unwrap()
     }
 }
