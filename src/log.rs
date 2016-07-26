@@ -25,7 +25,8 @@ use Request;
 ///     // process the request here
 ///
 /// # panic!()
-/// }); // <-- the log entry is written at the end of this block
+///     // <-- the log entry is automatically written at the end of the handler
+/// });
 /// ```
 ///
 pub struct LogEntry<W> where W: Write {
