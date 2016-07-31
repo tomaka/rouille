@@ -396,8 +396,20 @@ pub trait IntoCowPath<'a> {
     fn into_cow_path(self) -> Cow<'a, Path>;
 }
 
+impl<'a> IntoCowPath<'a> for Cow<'a, Path> {
+    fn into_cow_path(self) -> Cow<'a, Path> {
+        self
+    }
+}
+
 impl IntoCowPath<'static> for PathBuf {
     fn into_cow_path(self) -> Cow<'static, Path> {
+        self.into()
+    }
+}
+
+impl<'a> IntoCowPath<'a> for &'a Path {
+    fn into_cow_path(self) -> Cow<'a, Path> {
         self.into()
     }
 }
@@ -405,12 +417,6 @@ impl IntoCowPath<'static> for PathBuf {
 impl IntoCowPath<'static> for String {
     fn into_cow_path(self) -> Cow<'static, Path> {
         PathBuf::from(self).into()
-    }
-}
-
-impl<'a> IntoCowPath<'a> for &'a Path {
-    fn into_cow_path(self) -> Cow<'a, Path> {
-        self.into()
     }
 }
 
