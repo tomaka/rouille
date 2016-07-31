@@ -5,7 +5,7 @@ use mime::Mime;
 use std::borrow::Cow;
 use std::error::Error;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use std::io::prelude::*;
 use std::{fmt, io, mem};
@@ -131,11 +131,11 @@ impl<'n, 'd> Multipart<'n, 'd> {
     ///
     /// ### Note
     /// Does not check if `path` exists.
-    pub fn add_file<N, P>(&mut self, name: N, path: P) -> &mut Self where N: Into<Cow<'n, str>>, P: Into<Cow<'d, Path>> {
+    pub fn add_file<N, P>(&mut self, name: N, path: P) -> &mut Self where N: Into<Cow<'n, str>>, P: IntoCowPath<'d> {
         self.fields.push(
             Field {
                 name: name.into(),
-                data: Data::File(path.into()),
+                data: Data::File(path.into_cow_path()),
             }
         );
 
@@ -386,6 +386,37 @@ struct CowStrAsRef<'d>(Cow<'d, str>);
 impl<'d> AsRef<[u8]> for CowStrAsRef<'d> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
+    }
+}
+
+/// Conversion trait necessary for `Multipart::add_file()` to accept borrowed or owned strings
+/// and borrowed or owned paths
+pub trait IntoCowPath<'a> {
+    /// Self-explanatory, hopefully
+    fn into_cow_path(self) -> Cow<'a, Path>;
+}
+
+impl IntoCowPath<'static> for PathBuf {
+    fn into_cow_path(self) -> Cow<'static, Path> {
+        self.into()
+    }
+}
+
+impl IntoCowPath<'static> for String {
+    fn into_cow_path(self) -> Cow<'static, Path> {
+        PathBuf::from(self).into()
+    }
+}
+
+impl<'a> IntoCowPath<'a> for &'a Path {
+    fn into_cow_path(self) -> Cow<'a, Path> {
+        self.into()
+    }
+}
+
+impl<'a> IntoCowPath<'a> for &'a str {
+    fn into_cow_path(self) -> Cow<'a, Path> {
+        Path::new(self).into()
     }
 }
 
