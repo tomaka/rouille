@@ -659,6 +659,7 @@ impl Entries {
 }
 
 /// The save directory for `Entries`. May be temporary (delete-on-drop) or permanent.
+#[derive(Debug)]
 pub enum SaveDir {
     /// This directory is temporary and will be deleted, along with its contents, when this wrapper
     /// is dropped.
@@ -735,19 +736,6 @@ impl SaveDir {
 impl AsRef<Path> for SaveDir {
     fn as_ref(&self) -> &Path {
         self.as_path()
-    }
-}
-
-// grrr, no Debug impl for TempDir, can't derive
-// FIXME when tempdir > 0.3.4 is released (Debug PR landed 3/3/2016) 
-impl fmt::Debug for SaveDir {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::SaveDir::*;
-
-        match *self {
-            Temp(ref tempdir) => write!(f, "SaveDir::Temp({:?})", tempdir.path()),
-            Perm(ref path) => write!(f, "SaveDir::Perm({:?})", path),
-        }
     }
 }
 
