@@ -71,5 +71,13 @@ fn main() {
 
     srv.post("/multipart_upload/", handle_multipart);
 
+    // Start this example via:
+    //
+    // `cargo run --example nickel --features nickel`
+    //
+    // And - if you are in the root of this repository - do an example
+    // upload via:
+    //
+    // `curl -F file=@LICENSE 'http://localhost:6868/multipart_upload/'`
     srv.listen("127.0.0.1:6868");
 }
