@@ -38,6 +38,72 @@ mod log;
 mod response;
 mod router;
 
+/// This macro assumes that the current function returns a `Result<_, RouteError>` and takes
+/// a `Result`. If the expression you pass to the macro is an error, then a
+/// `RouteError::WrongInput` is returned.
+///
+/// # Example
+///
+/// ```
+/// # #[macro_use] extern crate rouille;
+/// # extern crate rustc_serialize;
+/// # fn main() {
+/// use rouille::Request;
+/// use rouille::RouteError;
+///
+/// fn handle_something(request: &Request) -> Result<(), RouteError> {
+///     #[derive(RustcDecodable)]
+///     struct FormData {
+///         field1: u32,
+///         field2: String,
+///     }
+///
+///     let _data: FormData = try_or_400!(rouille::input::get_post_input(request));
+///     Ok(())
+/// }
+/// # }
+/// ```
+#[macro_export]
+macro_rules! try_or_400 {
+    ($result:expr) => (
+        try!($result.map_err(|_| $crate::RouteError::WrongInput))
+    );
+}
+
+/// This macro assumes that the current function returns a `Result<_, RouteError>`. If the
+/// condition you pass to the macro is false, then a `RouteError::WrongInput` is returned.
+///
+/// # Example
+///
+/// ```
+/// # #[macro_use] extern crate rouille;
+/// # extern crate rustc_serialize;
+/// # fn main() {
+/// use rouille::Request;
+/// use rouille::RouteError;
+///
+/// fn handle_something(request: &Request) -> Result<(), RouteError> {
+///     #[derive(RustcDecodable)]
+///     struct FormData {
+///         field1: u32,
+///         field2: String,
+///     }
+///
+///     let data: FormData = try_or_400!(rouille::input::get_post_input(request));
+///     assert_or_400!(data.field1 >= 2);
+///     Ok(())
+/// }
+/// # }
+/// ```
+#[macro_export]
+macro_rules! assert_or_400 {
+    ($cond:expr) => (
+        if !$cond {
+            return Err($crate::RouteError::WrongInput);
+        } 
+    );
+}
+
 /// An error that one of your routes can return.
 ///
 /// This is just a convenience enum and you don't need to use it in your project
