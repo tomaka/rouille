@@ -1,6 +1,8 @@
 # Rouille, Rust web server middleware
 
-## [Documentation](http://tomaka.github.io/rouille/rouille/index.html)
+## [Documentation](https://docs.rs/rouille)
+
+[![](https://docs.rs/rouille/badge.svg)](https://docs.rs/rouille)
 
 ## [Link to WIP book](http://tomaka.github.io/rouille/book/)
 
