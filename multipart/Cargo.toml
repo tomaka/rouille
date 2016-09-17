@@ -33,7 +33,7 @@ version = "0.8"
 
 [dependencies.iron]
 optional = true
-version = "0.3"
+version = "0.4"
 
 [dependencies.memchr]
 optional = true
