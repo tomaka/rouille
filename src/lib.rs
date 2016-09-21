@@ -7,6 +7,36 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+//! The rouille library is very easy to get started with.
+//!
+//! Listening to a port is done by calling the [`start_server`](fn.start_server.html) function:
+//!
+//! ```no_run
+//! use rouille::Request;
+//! use rouille::Response;
+//!
+//! rouille::start_server("0.0.0.0:1234", move |request| {
+//!     Response::text("hello world")
+//! });
+//! ```
+//!
+//! Whenever an HTTP request is received on the address passed as first parameter, the closure
+//! passed as second parameter is called. This closure must then return a
+//! [`Response`](struct.Response.html) that will be sent back to the client.
+//!
+//! # Handling the request
+//! 
+//! The parameter that the closure receives is a [`Request`](struct.Request.html) object that
+//! represents the request made by the client.
+//! 
+//! The `Request` object itself provides some getters, but most advanced functionnalities are
+//! provided by other modules of this crate.
+//! 
+//! - In order to dispatch between various code depending on the URL, you can use the `router!`
+//!   macro.
+//! - In order to serve static files, use the `match_assets` function.
+//! - ... TODO: write the rest
+
 #![deny(unsafe_code)]
 
 extern crate filetime;
