@@ -30,6 +30,7 @@ use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::thread;
 
+pub mod cgi;
 pub mod input;
 
 mod assets;
@@ -335,8 +336,8 @@ impl Request {
         &self.method
     }
 
-    /// Returns the URL requested by the client. It is not decoded and thus can contain strings
-    /// such as `%20`.
+    /// Returns the raw URL requested by the client. It is not decoded and thus can contain strings
+    /// such as `%20`, and the query parameters such as `?p=hello`.
     ///
     /// See also `url()`.
     #[inline]
@@ -344,12 +345,32 @@ impl Request {
         &self.url
     }
 
+    /// Returns the raw query string requested by the client. In other words, everything after the
+    /// first `?` in the raw url.
+    ///
+    /// Returns the empty string if no query string.
+    #[inline]
+    pub fn raw_query_string(&self) -> &str {
+        if let Some(pos) = self.url.bytes().position(|c| c == b'?') {
+            self.url.split_at(pos + 1).1
+        } else {
+            ""
+        }
+    }
+
     /// Returns the URL requested by the client.
     ///
     /// Contrary to `raw_url`, special characters have been decoded.
     /// If there is any non-unicode character in the URL, it will be replaced with `U+FFFD`.
     pub fn url(&self) -> String {
-        url::percent_encoding::lossy_utf8_percent_decode(self.url.as_bytes())
+        let url = self.url.as_bytes();
+        let url = if let Some(pos) = url.iter().position(|&c| c == b'?') {
+            &url[..pos]
+        } else {
+            url
+        };
+
+        url::percent_encoding::lossy_utf8_percent_decode(url)
     }
 
     /// Returns the value of a GET parameter.
