@@ -29,6 +29,7 @@ use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::thread;
+use std::ascii::AsciiExt;
 
 pub mod input;
 
@@ -377,7 +378,7 @@ impl Request {
     /// Returns `None` if no such header could be found.
     #[inline]
     pub fn header(&self, key: &str) -> Option<String> {
-        self.headers.iter().find(|&&(ref k, _)| k == key).map(|&(_, ref v)| v.clone())
+        self.headers.iter().find(|&&(ref k, _)| k.eq_ignore_ascii_case(key)).map(|&(_, ref v)| v.clone())
     }
 
     /// UNSTABLE. Returns the body of the request.
@@ -391,5 +392,17 @@ impl Request {
     #[inline]
     pub fn remote_addr(&self) -> &SocketAddr {
         &self.remote_addr
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::Request;
+    #[test]
+    fn header() {
+        let request = Request::fake_http("GET", "/", vec![("Host".to_owned(), "localhost".to_owned())], vec![]);
+        assert_eq!(request.header("Host"), Some("localhost".to_owned()));
+        assert_eq!(request.header("host"), Some("localhost".to_owned()));
     }
 }
