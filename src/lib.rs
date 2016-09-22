@@ -354,6 +354,40 @@ impl Request {
         }
     }
 
+    /// If the decoded URL of the request starts with `prefix`, builds a new `Request` that is
+    /// the same as the original but without that prefix.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use rouille::Request;
+    /// # use rouille::Response;
+    /// fn handle(request: &Request) -> Response {
+    ///     if let Some(request) = request.remove_prefix("/static") {
+    ///         if let Ok(r) = rouille::match_assets(&request, "/static") { return r; }
+    ///     }
+    ///
+    ///     // ...
+    ///     # panic!()
+    /// }
+    /// ```
+    pub fn remove_prefix(&self, prefix: &str) -> Option<Request> {
+        if !self.url().starts_with(prefix) {
+            return None;
+        }
+    
+        // TODO: url-encoded characters in the prefix are not implemented
+        assert!(self.url.starts_with(prefix));
+        Some(Request {
+            method: self.method.clone(),
+            url: self.url[prefix.len() ..].to_owned(),
+            headers: self.headers.clone(),      // TODO: expensive
+            https: self.https.clone(),
+            data: self.data.clone(),            // TODO: expensive
+            remote_addr: self.remote_addr.clone(),
+        })
+    }
+
     /// Returns `true` if the request uses HTTPS instead of HTTP.
     #[inline]
     pub fn secure(&self) -> bool {

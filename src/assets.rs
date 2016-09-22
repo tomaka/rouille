@@ -24,10 +24,22 @@ use RouteError;
 /// The value of the `Content-Type` header of the response is guessed based on the file's
 /// extension.
 ///
-/// # Todo
+/// # Example
 ///
-/// Prefix system, so that `/prefix/file.png` can match `file.png` even if you don't put it
-/// in a directory named `prefix`.
+/// In this example, a request made for example to `/test.txt` will return the file
+/// `public/test.txt` (relative to the current working directory, which is usually the location
+/// of the `Cargo.toml`) if it exists.
+///
+/// ```no_run
+/// rouille::start_server("localhost:8000", move |request| {
+///     if let Ok(r) = rouille::match_assets(&request, "public") {
+///         return r;
+///     }
+///
+///     // ...
+///     # panic!()
+/// });
+/// ```
 ///
 /// # Security
 ///
@@ -45,6 +57,27 @@ use RouteError;
 /// black list of forbidden files. Files can potentially be accessed from multiple different URLs
 /// and a black list may not cover everything.
 ///
+/// # Example with prefix
+///
+/// Sometimes you want to add a prefix to the URL of your static files. To do that, you can use
+/// the `remove_prefix` method on `Request`.
+///
+/// ```no_run
+/// rouille::start_server("localhost:8000", move |request| {
+///     if let Some(request) = request.remove_prefix("/static") {
+///         if let Ok(r) = rouille::match_assets(&request, "public") {
+///             return r;
+///         }
+///     }
+///
+///     // ...
+///     # panic!()
+/// });
+/// ```
+///
+/// In this example, a request made to `/static/test.txt` will return the file
+/// `public/test.txt` if it exists.
+
 pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, RouteError>
                                where P: AsRef<Path>
 {

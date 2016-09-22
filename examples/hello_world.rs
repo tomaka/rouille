@@ -7,8 +7,10 @@ fn main() {
     rouille::start_server("localhost:8000", move |request| {
         let _entry = rouille::LogEntry::start(io::stdout(), request);
 
-        if let Ok(r) = rouille::match_assets(request, "examples") {
-            return r;
+        if let Some(request) = request.remove_prefix("/examples") {
+            if let Ok(r) = rouille::match_assets(&request, "examples") {
+                return r;
+            }
         }
 
         let response = router!(request,
