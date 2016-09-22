@@ -16,24 +16,23 @@ documentation = "http://cybergeek94.github.io/multipart/doc/multipart/index.html
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-env_logger = "0.3"
 log = "0.3"
 mime = "0.2"
-mime_guess = "1.6"
+mime_guess = "1.8"
 rand = "0.3"
 tempdir = ">=0.3.4"
 
 [dependencies.buf_redux]
 optional = true
-version = "0.1"
+version = "0.3"
 
 [dependencies.hyper]
 optional = true
-version = "0.8"
+version = "0.9"
 
 [dependencies.iron]
 optional = true
-version = "0.3"
+version = "0.4"
 
 [dependencies.memchr]
 optional = true
@@ -42,11 +41,14 @@ version = "0.1"
 # NOTE: use `nickel_` feature, as `hyper` feature is required.
 [dependencies.nickel]
 optional = true
-version = "0.8"
+version = "0.9"
 
 [dependencies.tiny_http]
 optional = true
 version = "0.5"
+
+[dev-dependencies]
+env_logger = "0.3"
 
 [features]
 client = []
