@@ -79,6 +79,28 @@ This example shows how to use `multipart` with the [`tiny_http` crate](https://c
 $ cargo run --features tiny_http --example tiny_http
 ```
 
+[`hyper_server`](hyper_server.rs)
+---------------------------------
+Author: [Puhrez][puhrez]
+
+This sample project shows how to use `multipart` with a [`hyper::Server`] (http://hyper.rs/) to intercept multipart requests.
+
+```
+$ cargo run --example hyper_server
+```
+
+[`nickel`](nickel.rs)
+---------------------------------
+Author: [iamsebastian][iamsebastian]
+
+How you could use this multipart crate to handle multipart uploads in [nickel.rs](https://nickel.rs).
+
+```
+$ cargo run --example nickel --features nickel
+```
+
+
+[iamsebastian]: https://github.com/iamsebastian
 [puhrez]: https://github.com/puhrez
 [white-oak]: https://github.com/white-oak
 [cybergeek94]: https://github.com/cybergeek94
