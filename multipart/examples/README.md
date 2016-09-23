@@ -5,8 +5,6 @@ These example files show how to use `multipart` with the various crates it integ
 
 These files carry the same licenses as [`multipart` itself](https://github.com/abonander/multipart#license), though this may be lightened to a copyright-free license in the near future.
 
-More examples are underway and volunteers to create them are still needed. See [this issue](https://github.com/abonander/multipart/issues/29) for more information.
-
 ##Client
 
 Examples for the client-side integrations of `multipart`'s API.
@@ -31,7 +29,6 @@ via the lazy-writing capabilities of `multipart::client::lazy`.
 ```
 $ cargo run --example hyper_reqbuilder
 ```
-
 
 ##Server
 
@@ -83,7 +80,7 @@ $ cargo run --features tiny_http --example tiny_http
 ---------------------------------
 Author: [Puhrez][puhrez]
 
-This sample project shows how to use `multipart` with a [`hyper::Server`] (http://hyper.rs/) to intercept multipart requests.
+This example shows how to use `multipart` with a [`hyper::Server`] (http://hyper.rs/) to intercept multipart requests.
 
 ```
 $ cargo run --example hyper_server
@@ -93,7 +90,7 @@ $ cargo run --example hyper_server
 ---------------------------------
 Author: [iamsebastian][iamsebastian]
 
-How you could use this multipart crate to handle multipart uploads in [nickel.rs](https://nickel.rs).
+This example shows how to use `multipart` to handle multipart uploads in [nickel.rs](https://nickel.rs).
 
 ```
 $ cargo run --example nickel --features nickel
