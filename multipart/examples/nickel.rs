@@ -79,5 +79,5 @@ fn main() {
     // upload via:
     //
     // `curl -F file=@LICENSE 'http://localhost:6868/multipart_upload/'`
-    srv.listen("127.0.0.1:6868");
+    srv.listen("127.0.0.1:6868").expect("Failed to bind server");
 }
