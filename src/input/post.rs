@@ -77,19 +77,22 @@ impl From<num::ParseFloatError> for PostError {
 ///
 /// # Example
 ///
-/// ```no_run
-/// # extern crate rustc_serialize;
-/// # extern crate rouille;
-/// # fn main() {
-/// # let request: rouille::Request = unsafe { std::mem::uninitialized() };
-/// #[derive(RustcDecodable)]
-/// struct FormData {
-///     field1: u32,
-///     field2: String,
-/// }
+/// ```
+/// extern crate rustc_serialize;
+/// # #[macro_use] extern crate rouille;
+/// # use rouille::{Request, Response, RouteError};
+/// # fn main() {}
 ///
-/// let data: FormData = rouille::input::get_post_input(&request).unwrap();
-/// # }
+/// fn route_handler(request: &Request) -> Result<Response, RouteError> {
+///     #[derive(RustcDecodable)]
+///     struct FormData {
+///         field1: u32,
+///         field2: String,
+///     }
+///
+///     let data: FormData = try_or_400!(rouille::input::get_post_input(&request));
+///     Ok(Response::text(format!("field1's value is {}", data.field1)))
+/// }
 /// ```
 ///
 pub fn get_post_input<T>(request: &Request) -> Result<T, PostError> where T: Decodable {
@@ -98,6 +101,12 @@ pub fn get_post_input<T>(request: &Request) -> Result<T, PostError> where T: Dec
     T::decode(&mut decoder)
 }
 
+/// Attempts to decode the `POST` data received by the request.
+///
+/// If successful, returns a list of fields and values.
+///
+/// Returns an error if the request's content-type is not related to POST data.
+// TODO: handle multipart here as well
 pub fn get_raw_post_input(request: &Request) -> Result<Vec<(String, String)>, PostError> {
     // TODO: slow
     if request.header("Content-Type") != Some("application/x-www-form-urlencoded".to_owned()) {

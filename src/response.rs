@@ -60,7 +60,7 @@ impl Response {
         }
     }
 
-    /// Builds a `Response` that redirects the user to another URL.
+    /// Builds a `Response` that redirects the user to another URL with a 303 status code.
     #[inline]
     pub fn redirect(target: &str) -> Response {
         Response {

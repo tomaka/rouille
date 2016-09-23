@@ -20,6 +20,11 @@
 ///         12
 ///     },
 ///
+///     // second route
+///     (GET) (/hello) => {
+///         43 * 7
+///     },
+///
 ///     // ... other routes here ...
 ///
 ///     // default route
@@ -29,8 +34,8 @@
 /// ```
 ///
 /// The macro will take each route one by one and execute the first one that matches, similar to a
-/// `match` language construct. The whole `router!` expression then returns what the closure
-/// returns, therefore they must all return the same type.
+/// `match` language construct. The whole `router!` expression then returns what the body
+/// returns, therefore all the bodies must return the same type of data.
 ///
 /// You can use parameters by putting them inside `{}`:
 ///
@@ -40,8 +45,8 @@
 /// },
 /// ```
 ///
-/// If you use parameters inside `{}`, then a field with the same name must exist in the closure's
-/// parameters list. The parameters do not need be in the same order.
+/// If you use parameters inside `{}`, then a variable with the same name will be available in the
+/// code in the body.
 ///
 /// Each parameter gets parsed through the `FromStr` trait. If the parsing fails, the route is
 /// ignored. If you get an error because the type of the parameter couldn't be inferred, you can

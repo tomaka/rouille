@@ -22,7 +22,8 @@ use RouteError;
 /// returns a `Response` that would serve this file if returned.
 ///
 /// The value of the `Content-Type` header of the response is guessed based on the file's
-/// extension.
+/// extension. If you wish so, you can modify that `Content-Type` by modifying the `Response`
+/// object returned by this function.
 ///
 /// # Example
 ///
@@ -77,7 +78,7 @@ use RouteError;
 ///
 /// In this example, a request made to `/static/test.txt` will return the file
 /// `public/test.txt` if it exists.
-
+///
 pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, RouteError>
                                where P: AsRef<Path>
 {
@@ -146,8 +147,8 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
 
 /// Returns the mime type of a file based on its extension.
 fn extension_to_mime(extension: Option<&str>) -> &'static str {
-    // list taken from https://github.com/cybergeek94/mime_guess/blob/master/src/mime_types.rs
-    // itself taken from a dead link
+    // List taken from https://github.com/cybergeek94/mime_guess/blob/master/src/mime_types.rs,
+    // itself taken from a dead link.
     match extension {
         Some("323") => "text/h323; charset=utf8",
         Some("3g2") => "video/3gpp2",

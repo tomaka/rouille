@@ -37,9 +37,33 @@ impl From<json::DecoderError> for JsonError {
     }
 }
 
+/// Attempts to parse the request's body as JSON.
+///
+/// Returns an error if the content-type of the request is not JSON, or if the JSON is malformed.
+///
+/// # Example
+///
+/// ```
+/// extern crate rustc_serialize;
+/// # #[macro_use] extern crate rouille;
+/// # use rouille::{Request, Response, RouteError};
+/// # fn main() {}
+///
+/// fn route_handler(request: &Request) -> Result<Response, RouteError> {
+///     #[derive(RustcDecodable)]
+///     struct Json {
+///         field1: String,
+///         field2: i32,
+///     }
+/// 
+///     let json: Json = try_or_400!(rouille::input::get_json_input(request));
+///     Ok(Response::text(format!("field1's value is {}", json.field1)))
+/// }
+/// ```
+///
 pub fn get_json_input<O>(request: &Request) -> Result<O, JsonError> where O: Decodable {
     // TODO: slow
-    if let Some(header) = request.header("Content-Type"){
+    if let Some(header) = request.header("Content-Type") {
         if !header.starts_with("application/json") {
             return Err(JsonError::WrongContentType);
         }

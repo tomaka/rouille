@@ -24,18 +24,29 @@
 //! passed as second parameter is called. This closure must then return a
 //! [`Response`](struct.Response.html) that will be sent back to the client.
 //!
-//! # Handling the request
-//! 
+//! See the documentation of [`start_server`](fn.start_server.html) for more details.
+//!
+//! # Analyzing the request
+//!
 //! The parameter that the closure receives is a [`Request`](struct.Request.html) object that
 //! represents the request made by the client.
-//! 
+//!
 //! The `Request` object itself provides some getters, but most advanced functionnalities are
 //! provided by other modules of this crate.
-//! 
+//!
 //! - In order to dispatch between various code depending on the URL, you can use the `router!`
 //!   macro.
 //! - In order to serve static files, use the `match_assets` function.
 //! - ... TODO: write the rest
+//!
+//! # Returning a response
+//! 
+//! Once you analyzed the request, it is time to return a response by returning a
+//! [`Response`](struct.Response.html) object.
+//! 
+//! All the members of `Response` are public, so you can customize it as you want. There are also
+//! several constructors that you build a basic `Response` which can then modify.
+//! 
 
 #![deny(unsafe_code)]
 
@@ -389,7 +400,7 @@ impl Request {
         })
     }
 
-    /// Returns `true` if the request uses HTTPS instead of HTTP.
+    /// Returns `true` if the request uses HTTPS, and `false` if it uses HTTP.
     #[inline]
     pub fn secure(&self) -> bool {
         self.https
@@ -425,7 +436,9 @@ impl Request {
 
     /// Returns the URL requested by the client.
     ///
-    /// Contrary to `raw_url`, special characters have been decoded.
+    /// Contrary to `raw_url`, special characters have been decoded and the query string
+    /// (eg `?p=hello`) has been removed.
+    ///
     /// If there is any non-unicode character in the URL, it will be replaced with `U+FFFD`.
     pub fn url(&self) -> String {
         let url = self.url.as_bytes();
@@ -441,7 +454,7 @@ impl Request {
     /// Returns the value of a GET parameter.
     /// TODO: clumbsy
     pub fn get_param(&self, param_name: &str) -> Option<String> {
-        let get_params = &self.raw_url()[self.raw_url().bytes().position(|c| c == b'?').unwrap_or(0) ..];
+        let get_params = self.raw_query_string();
 
         // TODO: `hello=5` will be matched for param name `lo`
 
@@ -483,11 +496,18 @@ impl Request {
 
 #[cfg(test)]
 mod tests {
-    use super::Request;
+    use Request;
+
     #[test]
     fn header() {
         let request = Request::fake_http("GET", "/", vec![("Host".to_owned(), "localhost".to_owned())], vec![]);
         assert_eq!(request.header("Host"), Some("localhost".to_owned()));
         assert_eq!(request.header("host"), Some("localhost".to_owned()));
+    }
+
+    #[test]
+    fn get_param() {
+        let request = Request::fake_http("GET", "/?p=hello", vec![], vec![]);
+        assert_eq!(request.get_param("p"), Some("hello".to_owned()));
     }
 }

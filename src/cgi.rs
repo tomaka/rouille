@@ -7,6 +7,36 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+//! Allows you to let an external process handle the request through CGI.
+//! 
+//! This module provides a trait named `CgiRun` which is implemented on `std::process::Command`.
+//! In order to dispatch a request, simply start building a `Command` object and call `start_cgi`
+//! on it.
+//! 
+//! ## Example
+//! 
+//! ```no_run
+//! use std::process::Command;
+//! use rouille::cgi::CgiRun;
+//! 
+//! rouille::start_server("localhost:8080", move |request| {
+//!     Command::new("php-cgi").start_cgi(request).unwrap()
+//! });
+//! ```
+//!
+//! # About the Result returned by start_cgi
+//!
+//! The `start_cgi` method returns a `Result<Response, std::io::Error>`. This object will contain
+//! an error if and only if there was a problem executing the command (for example if it fails to
+//! start, or starts then crashes, ...).
+//!
+//! If the process returns an error 400 or an error 404 for example, then the result will contain
+//! `Ok`.
+//!
+//! It is therefore appropriate to simply call `.unwrap()` on that result. Any panic will be turned
+//! into an error 500 and add an entry to the logs, which is probably what you want when your
+//! server is misconfigured.
+
 use std::io;
 use std::io::BufRead;
 use std::io::Read;
@@ -18,6 +48,16 @@ use Response;
 use ResponseBody;
 
 pub trait CgiRun {
+    /// Dispatches a request to the process.
+    ///
+    /// This function modifies the `Command` to add all the required environment variables
+    /// and the request's body, then executes the command and waits until the child process has
+    /// returned all the headers of the response. Once the headers have been sent back, this
+    /// function returns.
+    ///
+    /// The body of the returned `Response` will hold a handle to the child's stdout output. This
+    /// means that the child can continue running in the background and send data to the client,
+    /// even after you have finished handling the request.
     fn start_cgi(self, request: &Request) -> Result<Response, io::Error>;
 }
 
