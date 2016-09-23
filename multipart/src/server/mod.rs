@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
-use std::{fmt, io, mem, ptr};
+use std::{io, mem, ptr};
 
 use self::boundary::BoundaryReader;
 
