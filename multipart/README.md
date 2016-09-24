@@ -5,7 +5,7 @@ Client- and server-side abstractions for HTTP file uploads (POST requests with  
 
 Supports several different HTTP crates.
 
-###[Documentation](http://abonander.github.io/multipart/doc/multipart/index.html)
+###[Documentation](http://docs.rs/multipart/)
 
 ##Integrations
 

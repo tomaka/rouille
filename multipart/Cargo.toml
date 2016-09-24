@@ -11,7 +11,7 @@ keywords = ["form-data", "hyper", "iron", "http", "upload"]
 
 repository = "http://github.com/abonander/multipart"
 
-documentation = "http://abonander.github.io/multipart/doc/multipart/index.html"
+documentation = "http://docs.rs/multipart/"
 
 license = "MIT OR Apache-2.0"
 
