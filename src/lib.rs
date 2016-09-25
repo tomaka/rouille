@@ -482,7 +482,7 @@ impl<'a> Request<'a> {
 
     /// UNSTABLE. Returns the body of the request.
     ///
-    /// Will eventually return an object that implements `Read` instead of a `Vec<u8>`.
+    /// Will eventually return an object that implements `Read` instead of a `&[u8]`.
     pub fn data(&self) -> &[u8] {
         &self.data
     }
