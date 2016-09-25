@@ -43,7 +43,7 @@ pub fn get_multipart_input(request: &Request) -> Result<Multipart, MultipartErro
     };
 
     Ok(Multipart {
-        inner: InnerMultipart::with_body(Cursor::new(request.data()), boundary)
+        inner: InnerMultipart::with_body(Cursor::new(request.data().to_vec()), boundary)
     })
 }
 
@@ -77,4 +77,3 @@ fn multipart_boundary(request: &Request) -> Option<String> {
     let end = content_type[start..].find(';').map_or(content_type.len(), |end| start + end);
     Some(content_type[start .. end].to_owned())
 }
-

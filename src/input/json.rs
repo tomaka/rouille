@@ -71,7 +71,7 @@ pub fn get_json_input<O>(request: &Request) -> Result<O, JsonError> where O: Dec
         return Err(JsonError::WrongContentType);
     }
 
-    let content = try!(String::from_utf8(request.data()));
+    let content = try!(String::from_utf8(request.data().to_vec()));
     let data = try!(json::decode(&content));
     Ok(data)
 }
