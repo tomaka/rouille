@@ -40,13 +40,13 @@
 //! - ... TODO: write the rest
 //!
 //! # Returning a response
-//! 
+//!
 //! Once you analyzed the request, it is time to return a response by returning a
 //! [`Response`](struct.Response.html) object.
-//! 
+//!
 //! All the members of `Response` are public, so you can customize it as you want. There are also
 //! several constructors that you build a basic `Response` which can then modify.
-//! 
+//!
 
 #![deny(unsafe_code)]
 
@@ -71,6 +71,7 @@ use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::thread;
 use std::ascii::AsciiExt;
+use std::borrow::Cow;
 
 pub mod cgi;
 pub mod input;
@@ -143,7 +144,7 @@ macro_rules! assert_or_400 {
     ($cond:expr) => (
         if !$cond {
             return Err($crate::RouteError::WrongInput);
-        } 
+        }
     );
 }
 
@@ -261,7 +262,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                 method: request.method().as_str().to_owned(),
                 headers: request.headers().iter().map(|h| (h.field.to_string(), h.value.clone().into())).collect(),
                 https: false,
-                data: data,
+                data: Cow::Owned(data),
                 remote_addr: request.remote_addr().clone(),
             };
 
@@ -292,28 +293,28 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
 ///
 /// This can be either a real request (received by the HTTP server) or a mock object created with
 /// one of the `fake_*` constructors.
-pub struct Request {
+pub struct Request<'a> {
     method: String,
     url: String,
     headers: Vec<(String, String)>,
     https: bool,
-    data: Vec<u8>,
+    data: Cow<'a, [u8]>,
     remote_addr: SocketAddr,
 }
 
-impl Request {
+impl<'a> Request<'a> {
     /// Builds a fake HTTP request to be used during tests.
     ///
     /// The remote address of the client will be `127.0.0.1:12345`. Use `fake_http_from` to
     /// specify what the client's address should be.
     pub fn fake_http<U, M>(method: M, url: U, headers: Vec<(String, String)>, data: Vec<u8>)
-                           -> Request where U: Into<String>, M: Into<String>
+                           -> Request<'a> where U: Into<String>, M: Into<String>
     {
         Request {
             url: url.into(),
             method: method.into(),
             https: false,
-            data: data,
+            data: Cow::Owned(data),
             headers: headers,
             remote_addr: "127.0.0.1:12345".parse().unwrap(),
         }
@@ -322,13 +323,13 @@ impl Request {
     /// Builds a fake HTTP request to be used during tests.
     pub fn fake_http_from<U, M>(from: SocketAddr, method: M, url: U,
                                 headers: Vec<(String, String)>, data: Vec<u8>)
-                                -> Request where U: Into<String>, M: Into<String>
+                                -> Request<'a> where U: Into<String>, M: Into<String>
     {
         Request {
             url: url.into(),
             method: method.into(),
             https: false,
-            data: data,
+            data: Cow::Owned(data),
             headers: headers,
             remote_addr: from,
         }
@@ -339,13 +340,13 @@ impl Request {
     /// The remote address of the client will be `127.0.0.1:12345`. Use `fake_https_from` to
     /// specify what the client's address should be.
     pub fn fake_https<U, M>(method: M, url: U, headers: Vec<(String, String)>, data: Vec<u8>)
-                            -> Request where U: Into<String>, M: Into<String>
+                            -> Request<'a> where U: Into<String>, M: Into<String>
     {
         Request {
             url: url.into(),
             method: method.into(),
             https: true,
-            data: data,
+            data: Cow::Owned(data),
             headers: headers,
             remote_addr: "127.0.0.1:12345".parse().unwrap(),
         }
@@ -354,13 +355,13 @@ impl Request {
     /// Builds a fake HTTPS request to be used during tests.
     pub fn fake_https_from<U, M>(from: SocketAddr, method: M, url: U,
                                  headers: Vec<(String, String)>, data: Vec<u8>)
-                                 -> Request where U: Into<String>, M: Into<String>
+                                 -> Request<'a> where U: Into<String>, M: Into<String>
     {
         Request {
             url: url.into(),
             method: method.into(),
             https: true,
-            data: data,
+            data: Cow::Owned(data),
             headers: headers,
             remote_addr: from,
         }
@@ -387,7 +388,7 @@ impl Request {
         if !self.url().starts_with(prefix) {
             return None;
         }
-    
+
         // TODO: url-encoded characters in the prefix are not implemented
         assert!(self.url.starts_with(prefix));
         Some(Request {
@@ -395,7 +396,7 @@ impl Request {
             url: self.url[prefix.len() ..].to_owned(),
             headers: self.headers.clone(),      // TODO: expensive
             https: self.https.clone(),
-            data: self.data.clone(),            // TODO: expensive
+            data: Cow::Borrowed(&self.data),
             remote_addr: self.remote_addr.clone(),
         })
     }
@@ -482,8 +483,8 @@ impl Request {
     /// UNSTABLE. Returns the body of the request.
     ///
     /// Will eventually return an object that implements `Read` instead of a `Vec<u8>`.
-    pub fn data(&self) -> Vec<u8> {
-        self.data.clone()
+    pub fn data(&self) -> &[u8] {
+        &self.data
     }
 
     /// Returns the address of the client that made this request.
