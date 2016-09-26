@@ -13,8 +13,6 @@ use std::io::Read;
 use std::fs::File;
 use rustc_serialize;
 
-use RouteError;
-
 /// Contains a prototype of a response.
 /// The response is only sent when you call `Request::respond`.
 pub struct Response {
@@ -33,31 +31,18 @@ pub struct Response {
 }
 
 impl Response {
-    /// UNSTABLE. Builds a default response to handle the given route error.
+    /// Returns true if the status code of this `Response` indicates success.
     ///
-    /// Important: don't use this in a real website. This function is just a convenience when
-    /// prototyping.
-    ///
-    /// For authentication-related errors, you are strongly encouraged to handle them yourself.
+    /// This is the range [200-399].
     #[inline]
-    pub fn from_error(err: &RouteError) -> Response {
-        match err {
-            &RouteError::NoRouteFound => Response {
-                status_code: 404, headers: vec![], data: ResponseBody::empty()
-            },
-            &RouteError::WrongInput => Response {
-                status_code: 400, headers: vec![], data: ResponseBody::empty()
-            },
-            &RouteError::LoginRequired => Response {
-                status_code: 401, headers: vec![], data: ResponseBody::empty()
-            },     // TODO: www-auth header?
-            &RouteError::WrongLoginPassword => Response {
-                status_code: 401, headers: vec![], data: ResponseBody::empty()
-            },     // TODO: www-auth header?
-            &RouteError::NotAuthorized => Response {
-                status_code: 403, headers: vec![], data: ResponseBody::empty()
-            },
-        }
+    pub fn success(&self) -> bool {
+        self.status_code >= 200 && self.status_code < 400
+    }
+
+    /// Shortcut for `!response.success()`.
+    #[inline]
+    pub fn error(&self) -> bool {
+        !self.success()
     }
 
     /// Builds a `Response` that redirects the user to another URL with a 303 status code.
@@ -111,6 +96,26 @@ impl Response {
             status_code: 401,
             headers: vec![("WWW-Authenticate".to_owned(), format!("Basic realm=\"{}\"", realm))],
             data: ResponseBody::empty(),
+        }
+    }
+
+    /// Builds an empty `Response` with a 400 status code.
+    #[inline]
+    pub fn empty_400() -> Response {
+        Response {
+            status_code: 400,
+            headers: vec![],
+            data: ResponseBody::empty()
+        }
+    }
+
+    /// Builds an empty `Response` with a 404 status code.
+    #[inline]
+    pub fn empty_404() -> Response {
+        Response {
+            status_code: 404,
+            headers: vec![],
+            data: ResponseBody::empty()
         }
     }
 

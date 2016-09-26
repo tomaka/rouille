@@ -11,7 +11,6 @@ use rustc_serialize::Decoder;
 use rustc_serialize::Decodable;
 
 use Request;
-use RouteError;
 
 use std::mem;
 use std::num;
@@ -38,13 +37,6 @@ pub enum PostError {
 
     /// Failed to parse a string field.
     NotUtf8(String),
-}
-
-impl From<PostError> for RouteError {
-    #[inline]
-    fn from(err: PostError) -> RouteError {
-        RouteError::WrongInput
-    }
 }
 
 impl From<ParseBoolError> for PostError {
@@ -80,10 +72,10 @@ impl From<num::ParseFloatError> for PostError {
 /// ```
 /// extern crate rustc_serialize;
 /// # #[macro_use] extern crate rouille;
-/// # use rouille::{Request, Response, RouteError};
+/// # use rouille::{Request, Response};
 /// # fn main() {}
 ///
-/// fn route_handler(request: &Request) -> Result<Response, RouteError> {
+/// fn route_handler(request: &Request) -> Response {
 ///     #[derive(RustcDecodable)]
 ///     struct FormData {
 ///         field1: u32,
@@ -91,7 +83,7 @@ impl From<num::ParseFloatError> for PostError {
 ///     }
 ///
 ///     let data: FormData = try_or_400!(rouille::input::get_post_input(&request));
-///     Ok(Response::text(format!("field1's value is {}", data.field1)))
+///     Response::text(format!("field1's value is {}", data.field1))
 /// }
 /// ```
 ///

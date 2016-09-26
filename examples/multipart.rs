@@ -9,9 +9,9 @@ fn main() {
     rouille::start_server("localhost:8001", move |request| {
         let _entry = rouille::LogEntry::start(io::stdout(), request);
 
-        let response = (|| router!(request,
+        router!(request,
             (GET) (/) => {
-                Ok(rouille::Response::html(FORM))
+                rouille::Response::html(FORM)
             },
 
             (POST) (/submit) => {
@@ -31,13 +31,11 @@ fn main() {
                     }
                 }
 
-                Ok(rouille::Response::html(FORM))
+                rouille::Response::html(FORM)
             },
 
-            _ => Err(rouille::RouteError::NoRouteFound)
-        ))();
-
-        response.unwrap_or_else(|err| rouille::Response::from_error(&err))
+            _ => rouille::Response::empty_404()
+        )
     });
 }
 

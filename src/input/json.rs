@@ -46,10 +46,10 @@ impl From<json::DecoderError> for JsonError {
 /// ```
 /// extern crate rustc_serialize;
 /// # #[macro_use] extern crate rouille;
-/// # use rouille::{Request, Response, RouteError};
+/// # use rouille::{Request, Response};
 /// # fn main() {}
 ///
-/// fn route_handler(request: &Request) -> Result<Response, RouteError> {
+/// fn route_handler(request: &Request) -> Response {
 ///     #[derive(RustcDecodable)]
 ///     struct Json {
 ///         field1: String,
@@ -57,7 +57,7 @@ impl From<json::DecoderError> for JsonError {
 ///     }
 /// 
 ///     let json: Json = try_or_400!(rouille::input::get_json_input(request));
-///     Ok(Response::text(format!("field1's value is {}", json.field1)))
+///     Response::text(format!("field1's value is {}", json.field1))
 /// }
 /// ```
 ///

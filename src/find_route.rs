@@ -8,38 +8,38 @@
 // according to those terms.
 
 /// Evaluates each parameter until one of them evaluates to something else
-/// than `Err(RouteError::NoRouteFound)`.
+/// than a 404 error code.
 ///
-/// This macro supposes that each route returns a `Result<_, RouteError>`.
+/// This macro supposes that each route returns a `Response`.
 ///
 /// # Example
 ///
 /// ```no_run
 /// # #[macro_use] extern crate rouille;
 /// # fn main() {
-/// use rouille::{Request, Response, RouteError};
+/// use rouille::{Request, Response};
 ///
-/// fn handle_request_a(_: &Request) -> Result<Response, RouteError> {
+/// fn handle_request_a(_: &Request) -> Response {
 /// # panic!()
 ///    // ...
 /// }
 ///
-/// fn handle_request_b(_: &Request) -> Result<Response, RouteError> {
+/// fn handle_request_b(_: &Request) -> Response {
 /// # panic!()
 ///    // ...
 /// }
 ///
-/// fn handle_request_c(_: &Request) -> Result<Response, RouteError> {
+/// fn handle_request_c(_: &Request) -> Response {
 /// # panic!()
 ///    // ...
 /// }
 ///
 /// # let request = unsafe { ::std::mem::uninitialized() };
-/// // First calls `handle_request_a`. If it returns anything else than `NoRouteFound`, then the
+/// // First calls `handle_request_a`. If it returns anything else than a 404 error, then the
 /// // `response` will contain the return value.
 /// //
-/// // Instead if `handle_request_a` returned `NoRouteFound`, then `handle_request_b` is tried.
-/// // If `handle_request_b` also returns `NoRouteFound`, then `handle_request_c` is tried.
+/// // Instead if `handle_request_a` returned a 404 error, then `handle_request_b` is tried.
+/// // If `handle_request_b` also returns a 404 error, then `handle_request_c` is tried.
 /// let response = find_route!(
 ///     handle_request_a(request),
 ///     handle_request_b(request),
@@ -51,9 +51,9 @@
 #[macro_export]
 macro_rules! find_route {
     ($($handler:expr),+) => ({
-        let mut response = Err($crate::RouteError::NoRouteFound);
+        let mut response = $crate::Response::empty_404();
         $(
-            if let Err($crate::RouteError::NoRouteFound) = response {
+            if response.status_code == 404 {
                 response = $handler;
             }
         )+
