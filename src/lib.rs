@@ -81,9 +81,8 @@ mod log;
 mod response;
 mod router;
 
-/// This macro assumes that the current function returns a `Result<_, RouteError>` and takes
-/// a `Result`. If the expression you pass to the macro is an error, then a
-/// `RouteError::WrongInput` is returned.
+/// This macro assumes that the current function returns a `Response` and takes a `Result`.
+/// If the expression you pass to the macro is an error, then a 400 response is returned.
 ///
 /// # Example
 ///
@@ -92,9 +91,9 @@ mod router;
 /// # extern crate rustc_serialize;
 /// # fn main() {
 /// use rouille::Request;
-/// use rouille::RouteError;
+/// use rouille::Response;
 ///
-/// fn handle_something(request: &Request) -> Result<(), RouteError> {
+/// fn handle_something(request: &Request) -> Response {
 ///     #[derive(RustcDecodable)]
 ///     struct FormData {
 ///         field1: u32,
@@ -102,19 +101,34 @@ mod router;
 ///     }
 ///
 ///     let _data: FormData = try_or_400!(rouille::input::get_post_input(request));
-///     Ok(())
+///     Response::text("hello")
 /// }
 /// # }
 /// ```
 #[macro_export]
 macro_rules! try_or_400 {
     ($result:expr) => (
-        try!($result.map_err(|_| $crate::RouteError::WrongInput))
+        match $result {
+            Ok(r) => r,
+            Err(_) => return $crate::Response::empty_400(),
+        }
     );
 }
 
-/// This macro assumes that the current function returns a `Result<_, RouteError>`. If the
-/// condition you pass to the macro is false, then a `RouteError::WrongInput` is returned.
+/// This macro assumes that the current function returns a `Response` and takes a `Result`.
+/// If the expression you pass to the macro is an error, then a 404 response is returned.
+#[macro_export]
+macro_rules! try_or_404 {
+    ($result:expr) => (
+        match $result {
+            Ok(r) => r,
+            Err(_) => return $crate::Response::empty_404(),
+        }
+    );
+}
+
+/// This macro assumes that the current function returns a `Response`. If the condition you pass
+/// to the macro is false, then a 400 response is returned.
 ///
 /// # Example
 ///
@@ -123,9 +137,9 @@ macro_rules! try_or_400 {
 /// # extern crate rustc_serialize;
 /// # fn main() {
 /// use rouille::Request;
-/// use rouille::RouteError;
+/// use rouille::Response;
 ///
-/// fn handle_something(request: &Request) -> Result<(), RouteError> {
+/// fn handle_something(request: &Request) -> Response {
 ///     #[derive(RustcDecodable)]
 ///     struct FormData {
 ///         field1: u32,
@@ -134,7 +148,7 @@ macro_rules! try_or_400 {
 ///
 ///     let data: FormData = try_or_400!(rouille::input::get_post_input(request));
 ///     assert_or_400!(data.field1 >= 2);
-///     Ok(())
+///     Response::text("hello")
 /// }
 /// # }
 /// ```
@@ -142,59 +156,9 @@ macro_rules! try_or_400 {
 macro_rules! assert_or_400 {
     ($cond:expr) => (
         if !$cond {
-            return Err($crate::RouteError::WrongInput);
+            return $crate::Response::empty_400();
         } 
     );
-}
-
-/// An error that one of your routes can return.
-///
-/// This is just a convenience enum and you don't need to use it in your project
-/// if you don't want to.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum RouteError {
-    /// Couldn't find a way to handle this request.
-    NoRouteFound,
-
-    /// The user input is wrong.
-    WrongInput,
-
-    /// The user must be logged in.
-    LoginRequired,
-
-    /// The user entered a wrong login or password.
-    WrongLoginPassword,
-
-    /// The user is logged in but shouldn't be there.
-    NotAuthorized,
-}
-
-impl error::Error for RouteError {
-    fn description(&self) -> &str {
-        match self {
-            &RouteError::NoRouteFound => {
-                "Couldn't find a way to handle this request."
-            },
-            &RouteError::WrongInput => {
-                "The body of the request is malformed or missing something."
-            },
-            &RouteError::LoginRequired => {
-                "The client must be logged in before this request can be answered."
-            },
-            &RouteError::WrongLoginPassword => {
-                "The client attempted to login but entered a wrong login or password."
-            },
-            &RouteError::NotAuthorized => {
-                "The client is logged in but doesn't have the permission to access this resource."
-            },
-        }
-    }
-}
-
-impl fmt::Display for RouteError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
-    }
 }
 
 /// Starts a server and uses the given requests handler.
@@ -376,7 +340,7 @@ impl Request {
     /// # use rouille::Response;
     /// fn handle(request: &Request) -> Response {
     ///     if let Some(request) = request.remove_prefix("/static") {
-    ///         if let Ok(r) = rouille::match_assets(&request, "/static") { return r; }
+    ///         return rouille::match_assets(&request, "/static");
     ///     }
     ///
     ///     // ...

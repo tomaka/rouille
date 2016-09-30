@@ -16,10 +16,10 @@ use time;
 use Request;
 use Response;
 use ResponseBody;
-use RouteError;
 
 /// Searches inside `path` for a file that matches the given request. If a file is found,
-/// returns a `Response` that would serve this file if returned.
+/// returns a `Response` that would serve this file if returned. If no file is found, a 404
+/// response is returned instead.
 ///
 /// The value of the `Content-Type` header of the response is guessed based on the file's
 /// extension. If you wish so, you can modify that `Content-Type` by modifying the `Response`
@@ -33,8 +33,9 @@ use RouteError;
 ///
 /// ```no_run
 /// rouille::start_server("localhost:8000", move |request| {
-///     if let Ok(r) = rouille::match_assets(&request, "public") {
-///         return r;
+///     let response = rouille::match_assets(&request, "public");
+///     if response.success() {
+///         return response;
 ///     }
 ///
 ///     // ...
@@ -66,9 +67,7 @@ use RouteError;
 /// ```no_run
 /// rouille::start_server("localhost:8000", move |request| {
 ///     if let Some(request) = request.remove_prefix("/static") {
-///         if let Ok(r) = rouille::match_assets(&request, "public") {
-///             return r;
-///         }
+///         return rouille::match_assets(&request, "public");
 ///     }
 ///
 ///     // ...
@@ -79,11 +78,14 @@ use RouteError;
 /// In this example, a request made to `/static/test.txt` will return the file
 /// `public/test.txt` if it exists.
 ///
-pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, RouteError>
-                               where P: AsRef<Path>
+pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
+    where P: AsRef<Path>
 {
     let path = path.as_ref();
-    let path = try!(path.canonicalize().map_err(|_| RouteError::NoRouteFound));
+    let path = match path.canonicalize() {
+        Ok(p) => p,
+        Err(_) => return Response::empty_404(),
+    };
 
     // The potential location of the file on the disk.
     // TODO: remove GET parameters from URL
@@ -92,26 +94,26 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
     // We try to canonicalize the file. If this fails, then the file doesn't exist.
     let potential_file = match potential_file.canonicalize() {
         Ok(f) => f,
-        Err(_) => return Err(RouteError::NoRouteFound)
+        Err(_) => return Response::empty_404(),
     };
 
     // Check that we're still within `path`. This should eliminate security issues with
     // requests like `GET /../private_file`.
     if !potential_file.starts_with(path) {
-        return Err(RouteError::NoRouteFound);
+        return Response::empty_404();
     }
 
     // Check that it's a file and not a directory.
     match fs::metadata(&potential_file) {
         Ok(ref m) if m.is_file() => (),
-        _ => return Err(RouteError::NoRouteFound)
+        _ => return Response::empty_404(),
     };
 
     let extension = potential_file.extension().and_then(|s| s.to_str());
 
     let file = match fs::File::open(&potential_file) {
         Ok(f) => f,
-        Err(_) => return Err(RouteError::NoRouteFound)
+        Err(_) => return Response::empty_404(),
     };
 
     let etag: String = (fs::metadata(&potential_file)
@@ -124,17 +126,17 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
         .unwrap_or(false);
 
     if not_modified {
-        return Ok(Response {
+        return Response {
             status_code: 304,
             headers: vec![
                 ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
                 ("ETag".to_owned(), etag.to_string())
             ],
             data: ResponseBody::empty()
-        })
+        };
     }
 
-    Ok(Response {
+    Response {
         status_code: 200,
         headers: vec![
             ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
@@ -142,7 +144,7 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Result<Response, 
             ("ETag".to_owned(), etag.to_string())
         ],
         data: ResponseBody::from_file(file),
-    })
+    }
 }
 
 /// Returns the mime type of a file based on its extension.

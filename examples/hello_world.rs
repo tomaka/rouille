@@ -8,24 +8,25 @@ fn main() {
         let _entry = rouille::LogEntry::start(io::stdout(), request);
 
         if let Some(request) = request.remove_prefix("/examples") {
-            if let Ok(r) = rouille::match_assets(&request, "examples") {
-                return r;
+            let response = rouille::match_assets(&request, "examples");
+            if response.success() {
+                return response;
             }
         }
 
-        let response = router!(request,
+        router!(request,
             (GET) (/) => {
-                Ok(rouille::Response::redirect("/hello/world"))
+                rouille::Response::redirect("/hello/world")
             },
 
             (GET) (/hello/world) => {
                 println!("hello world");
-                Ok(rouille::Response::text("hello world"))
+                rouille::Response::text("hello world")
             },
 
             (GET) (/hello-world) => {
                 println!("hello-world");
-                Ok(rouille::Response::text("hello world"))
+                rouille::Response::text("hello world")
             },
 
             (GET) (/panic) => {
@@ -34,17 +35,15 @@ fn main() {
 
             (GET) (/{id: u32}) => {
                 println!("u32 {:?}", id);
-                Err(rouille::RouteError::WrongInput)
+                rouille::Response::empty_400()
             },
 
             (GET) (/{id: String}) => {
                 println!("String {:?}", id);
-                Ok(rouille::Response::text(format!("hello, {}", id)))
+                rouille::Response::text(format!("hello, {}", id))
             },
 
-            _ => Err(rouille::RouteError::NoRouteFound)
-        );
-
-        response.unwrap_or_else(|err| rouille::Response::from_error(&err))
+            _ => rouille::Response::empty_404()
+        )
     });
 }

@@ -8,7 +8,6 @@
 // according to those terms.
 
 use Request;
-use RouteError;
 
 use std::io::Cursor;
 use std::mem;
@@ -26,13 +25,6 @@ pub enum MultipartError {
     /// The `Content-Type` header of the request indicates that it doesn't contain multipart data
     /// or is invalid.
     WrongContentType,
-}
-
-impl From<MultipartError> for RouteError {
-    #[inline]
-    fn from(err: MultipartError) -> RouteError {
-        RouteError::WrongInput
-    }
 }
 
 /// Attempts to decode the content of the request as `multipart/form-data` data.
