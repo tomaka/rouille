@@ -63,12 +63,16 @@ pub use log::LogEntry;
 pub use input::{SessionsManager, Session, generate_session_id};
 pub use response::{Response, ResponseBody};
 
+use std::io::Cursor;
+use std::io::Result as IoResult;
 use std::io::Read;
 use std::error;
 use std::fmt;
+use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::thread;
 use std::ascii::AsciiExt;
 
@@ -215,18 +219,34 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
         // we spawn a thread in order to avoid crashing the server in case of a panic
         let handler = handler.clone();
         thread::spawn(move || {
-            // TODO: don't read the body in memory immediately
-            let mut data = Vec::with_capacity(request.body_length().unwrap_or(0));
-            request.as_reader().read_to_end(&mut data);     // TODO: handle error
+            // Small helper struct that makes it possible to put
+            // a `tiny_http::Request` inside a `Box<Read>`.
+            struct RequestRead(Arc<Mutex<Option<tiny_http::Request>>>);
+            impl Read for RequestRead {
+                #[inline]
+                fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+                    self.0.lock().unwrap().as_mut().unwrap().as_reader().read(buf)
+                }
+            }
 
-            // building the `Request` object
-            let rouille_request = Request {
-                url: request.url().to_owned(),
-                method: request.method().as_str().to_owned(),
-                headers: request.headers().iter().map(|h| (h.field.to_string(), h.value.clone().into())).collect(),
-                https: false,
-                data: data,
-                remote_addr: request.remote_addr().clone(),
+            // Building the `Request` object.
+            let tiny_http_request;
+            let rouille_request = {
+                let url = request.url().to_owned();
+                let method = request.method().as_str().to_owned();
+                let headers = request.headers().iter().map(|h| (h.field.to_string(), h.value.clone().into())).collect();
+                let remote_addr = request.remote_addr().clone();
+
+                tiny_http_request = Arc::new(Mutex::new(Some(request)));
+
+                Request {
+                    url: url,
+                    method: method,
+                    headers: headers,
+                    https: false,
+                    data: Arc::new(Mutex::new(Some(Box::new(RequestRead(tiny_http_request.clone())) as Box<_>))),
+                    remote_addr: remote_addr,
+                }
             };
 
             // calling the handler ; this most likely takes a lot of time
@@ -245,7 +265,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                 }
             }
 
-            request.respond(response);
+            tiny_http_request.lock().unwrap().take().unwrap().respond(response);
         });
     }
 
@@ -261,7 +281,7 @@ pub struct Request {
     url: String,
     headers: Vec<(String, String)>,
     https: bool,
-    data: Vec<u8>,
+    data: Arc<Mutex<Option<Box<Read>>>>,
     remote_addr: SocketAddr,
 }
 
@@ -277,7 +297,7 @@ impl Request {
             url: url.into(),
             method: method.into(),
             https: false,
-            data: data,
+            data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
             headers: headers,
             remote_addr: "127.0.0.1:12345".parse().unwrap(),
         }
@@ -292,7 +312,7 @@ impl Request {
             url: url.into(),
             method: method.into(),
             https: false,
-            data: data,
+            data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
             headers: headers,
             remote_addr: from,
         }
@@ -309,7 +329,7 @@ impl Request {
             url: url.into(),
             method: method.into(),
             https: true,
-            data: data,
+            data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
             headers: headers,
             remote_addr: "127.0.0.1:12345".parse().unwrap(),
         }
@@ -324,7 +344,7 @@ impl Request {
             url: url.into(),
             method: method.into(),
             https: true,
-            data: data,
+            data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
             headers: headers,
             remote_addr: from,
         }
@@ -359,7 +379,7 @@ impl Request {
             url: self.url[prefix.len() ..].to_owned(),
             headers: self.headers.clone(),      // TODO: expensive
             https: self.https.clone(),
-            data: self.data.clone(),            // TODO: expensive
+            data: self.data.clone(),
             remote_addr: self.remote_addr.clone(),
         })
     }
@@ -443,11 +463,13 @@ impl Request {
         self.headers.iter().find(|&&(ref k, _)| k.eq_ignore_ascii_case(key)).map(|&(_, ref v)| v.clone())
     }
 
-    /// UNSTABLE. Returns the body of the request.
+    /// Returns the body of the request.
     ///
-    /// Will eventually return an object that implements `Read` instead of a `Vec<u8>`.
-    pub fn data(&self) -> Vec<u8> {
-        self.data.clone()
+    /// The body can only be retrieved once. Returns `None` is the body has already been retreived
+    /// before.
+    pub fn data(&self) -> Option<RequestBody> {
+        let reader = self.data.lock().unwrap().take();
+        reader.map(|r| RequestBody { body: r, marker: PhantomData })
     }
 
     /// Returns the address of the client that made this request.
@@ -457,6 +479,17 @@ impl Request {
     }
 }
 
+pub struct RequestBody<'a> {
+    body: Box<Read>,
+    marker: PhantomData<&'a ()>,
+}
+
+impl<'a> Read for RequestBody<'a> {
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+        self.body.read(buf)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -473,5 +506,12 @@ mod tests {
     fn get_param() {
         let request = Request::fake_http("GET", "/?p=hello", vec![], vec![]);
         assert_eq!(request.get_param("p"), Some("hello".to_owned()));
+    }
+
+    #[test]
+    fn body_twice() {
+        let request = Request::fake_http("GET", "/", vec![], vec![62, 62, 62]);
+        assert!(request.data().is_some());
+        assert!(request.data().is_none());
     }
 }

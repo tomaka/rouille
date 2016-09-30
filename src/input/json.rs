@@ -9,25 +9,29 @@
 
 use rustc_serialize::Decodable;
 use rustc_serialize::json;
-use std::string::FromUtf8Error;
+use std::io::Error as IoError;
+use std::io::Read;
 use Request;
 
 /// Error that can happen when parsing the JSON input.
 #[derive(Debug)]
 pub enum JsonError {
+    /// Can't parse the body of the request because it was already extracted.
+    BodyAlreadyExtracted,
+
     /// Wrong content type.
     WrongContentType,
 
-    /// The request's body was not UTF8.
-    NotUtf8(FromUtf8Error),
+    /// Could not read the body from the request. Also happens if the body is not valid UTF-8.
+    IoError(IoError),
 
     /// Error while parsing.
     ParseError(json::DecoderError),
 }
 
-impl From<FromUtf8Error> for JsonError {
-    fn from(err: FromUtf8Error) -> JsonError {
-        JsonError::NotUtf8(err)
+impl From<IoError> for JsonError {
+    fn from(err: IoError) -> JsonError {
+        JsonError::IoError(err)
     }
 }
 
@@ -71,7 +75,16 @@ pub fn get_json_input<O>(request: &Request) -> Result<O, JsonError> where O: Dec
         return Err(JsonError::WrongContentType);
     }
 
-    let content = try!(String::from_utf8(request.data()));
+    let content = {
+        let mut out = String::new();
+        if let Some(mut b) = request.data() {
+            try!(b.read_to_string(&mut out));
+        } else {
+            return Err(JsonError::BodyAlreadyExtracted);
+        };
+        out
+    };
+
     let data = try!(json::decode(&content));
     Ok(data)
 }

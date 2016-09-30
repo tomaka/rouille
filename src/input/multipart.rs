@@ -8,8 +8,8 @@
 // according to those terms.
 
 use Request;
+use RequestBody;
 
-use std::io::Cursor;
 use std::mem;
 
 use multipart::server::Multipart as InnerMultipart;
@@ -25,6 +25,9 @@ pub enum MultipartError {
     /// The `Content-Type` header of the request indicates that it doesn't contain multipart data
     /// or is invalid.
     WrongContentType,
+
+    /// Can't parse the body of the request because it was already extracted.
+    BodyAlreadyExtracted,
 }
 
 /// Attempts to decode the content of the request as `multipart/form-data` data.
@@ -34,18 +37,24 @@ pub fn get_multipart_input(request: &Request) -> Result<Multipart, MultipartErro
         None => return Err(MultipartError::WrongContentType)
     };
 
+    let request_body = if let Some(body) = request.data() {
+        body
+    } else {
+        return Err(MultipartError::BodyAlreadyExtracted);
+    };
+
     Ok(Multipart {
-        inner: InnerMultipart::with_body(Cursor::new(request.data()), boundary)
+        inner: InnerMultipart::with_body(request_body, boundary)
     })
 }
 
 /// Allows you to inspect the content of the multipart input of a request.
-pub struct Multipart {
-    inner: InnerMultipart<Cursor<Vec<u8>>>
+pub struct Multipart<'a> {
+    inner: InnerMultipart<RequestBody<'a>>
 }
 
-impl Multipart {
-    pub fn next(&mut self) -> Option<MultipartField<Cursor<Vec<u8>>>> {
+impl<'a> Multipart<'a> {
+    pub fn next(&mut self) -> Option<MultipartField<RequestBody<'a>>> {
         match self.inner.read_entry() {
             Ok(e) => e,
             _ => return None
