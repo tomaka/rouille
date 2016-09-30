@@ -10,16 +10,19 @@
 #[macro_use]
 extern crate rouille;
 
+use std::io;
 use std::env;
 use std::process::Command;
 use rouille::cgi::CgiRun;
 
 fn main() {
     rouille::start_server("localhost:8080", move |request| {
-        let mut cmd = Command::new("git");
-        cmd.arg("http-backend");
-        cmd.env("GIT_PROJECT_ROOT", env::current_dir().unwrap().to_str().unwrap());
-        cmd.env("GIT_HTTP_EXPORT_ALL", "");
-        cmd.start_cgi(&request).unwrap()
+        rouille::log(&request, io::stdout(), || {
+            let mut cmd = Command::new("git");
+            cmd.arg("http-backend");
+            cmd.env("GIT_PROJECT_ROOT", env::current_dir().unwrap().to_str().unwrap());
+            cmd.env("GIT_HTTP_EXPORT_ALL", "");
+            cmd.start_cgi(&request).unwrap()
+        })
     });
 }
