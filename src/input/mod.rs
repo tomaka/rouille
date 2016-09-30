@@ -20,15 +20,43 @@ pub mod post;
 
 mod session;
 
+/// Credentials returned by `get_basic_http_auth`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HttpAuthCredentials {
+    /// Login provided by the client.
     pub login: String,
+    /// Password provided by the client.
     pub password: String,
 }
 
 /// Attempts to parse a `Authorization` header with basic HTTP auth.
 ///
-/// If such a header is present a valid, a `HttpAuthCredentials` is returned.
+/// If such a header is present and valid, a `HttpAuthCredentials` is returned.
+///
+/// # Example
+///
+/// ```
+/// use rouille::input;
+/// use rouille::Request;
+/// use rouille::Response;
+///
+/// fn handle(request: &Request) -> Response {
+///     let auth = match input::get_basic_http_auth(request) {
+///         Some(a) => a,
+///         None => return Response::basic_http_auth_login_required("realm")
+///     };
+///
+///     if auth.login == "admin" && auth.password == "GT5GeKyLvKLxuc7mjF5h" {
+///         handle_after_login(request)
+///     } else {
+///         Response::text("Bad login/password").with_status_code(403)
+///     }
+/// }
+///
+/// fn handle_after_login(request: &Request) -> Response {
+///     Response::text("You are in a secret area")
+/// }
+/// ```
 pub fn get_basic_http_auth(request: &Request) -> Option<HttpAuthCredentials> {
     let header = match request.header("Authorization") {
         None => return None,
