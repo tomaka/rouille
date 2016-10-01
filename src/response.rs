@@ -118,9 +118,11 @@ impl Response {
     ///
     /// # Example
     ///
-    /// ```ignore       // TODO: unignore after https://github.com/rust-lang/rust/issues/36863
+    /// ```
     /// extern crate rustc_serialize;
+    /// # #[macro_use] extern crate rouille;
     /// use rouille::Response;
+    /// # fn main() {
     ///
     /// #[derive(RustcEncodable)]
     /// struct MyStruct {
@@ -128,8 +130,9 @@ impl Response {
     ///     field2: i32,
     /// }
     ///
-    /// let response = Response::json(MyStruct { field1: "hello".to_owned(), field2: 5 });
+    /// let response = Response::json(&MyStruct { field1: "hello".to_owned(), field2: 5 });
     /// // The Response will contain something like `{ field1: "hello", field2: 5 }`
+    /// # }
     /// ```
     #[inline]
     pub fn json<T>(content: &T) -> Response where T: rustc_serialize::Encodable {
