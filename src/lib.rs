@@ -385,6 +385,21 @@ impl Request {
     }
 
     /// Returns `true` if the request uses HTTPS, and `false` if it uses HTTP.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::{Request, Response};
+    ///
+    /// fn handle(request: &Request) -> Response {
+    ///     if !request.secure() {
+    ///         return Response::redirect(&format!("https://example.com"));
+    ///     }
+    ///
+    ///     // ...
+    /// # panic!()
+    /// }
+    /// ```
     #[inline]
     pub fn secure(&self) -> bool {
         self.https
@@ -400,6 +415,15 @@ impl Request {
     /// such as `%20`, and the query parameters such as `?p=hello`.
     ///
     /// See also `url()`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::Request;
+    ///
+    /// let request = Request::fake_http("GET", "/hello%20world?foo=bar", vec![], vec![]);
+    /// assert_eq!(request.raw_url(), "/hello%20world?foo=bar");
+    /// ```
     #[inline]
     pub fn raw_url(&self) -> &str {
         &self.url
@@ -424,6 +448,15 @@ impl Request {
     /// (eg `?p=hello`) has been removed.
     ///
     /// If there is any non-unicode character in the URL, it will be replaced with `U+FFFD`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::Request;
+    ///
+    /// let request = Request::fake_http("GET", "/hello%20world?foo=bar", vec![], vec![]);
+    /// assert_eq!(request.url(), "/hello world");
+    /// ```
     pub fn url(&self) -> String {
         let url = self.url.as_bytes();
         let url = if let Some(pos) = url.iter().position(|&c| c == b'?') {
@@ -467,18 +500,54 @@ impl Request {
     ///
     /// The body can only be retrieved once. Returns `None` is the body has already been retreived
     /// before.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::io::Read;
+    /// use rouille::{Request, Response, ResponseBody};
+    ///
+    /// fn echo(request: &Request) -> Response {
+    ///     let mut data = request.data().expect("Oops, body already retrieved, problem \
+    ///                                           in the server");
+    ///
+    ///     let mut buf = Vec::new();
+    ///     match data.read_to_end(&mut buf) {
+    ///         Ok(_) => (),
+    ///         Err(_) => return Response::text("Failed to read body")
+    ///     };
+    ///
+    ///     Response {
+    ///         data: ResponseBody::from_data(buf),
+    ///         .. Response::text("")
+    ///     }
+    /// }
+    /// ```
     pub fn data(&self) -> Option<RequestBody> {
         let reader = self.data.lock().unwrap().take();
         reader.map(|r| RequestBody { body: r, marker: PhantomData })
     }
 
     /// Returns the address of the client that made this request.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::{Request, Response};
+    ///
+    /// fn handle(request: &Request) -> Response {
+    ///     Response::text(format!("Your IP is: {:?}", request.remote_addr()))
+    /// }
+    /// ```
     #[inline]
     pub fn remote_addr(&self) -> &SocketAddr {
         &self.remote_addr
     }
 }
 
+/// Gives access to the body of a request.
+///
+/// In order to obtain this object, call `request.data()`.
 pub struct RequestBody<'a> {
     body: Box<Read>,
     marker: PhantomData<&'a ()>,
@@ -513,5 +582,11 @@ mod tests {
         let request = Request::fake_http("GET", "/", vec![], vec![62, 62, 62]);
         assert!(request.data().is_some());
         assert!(request.data().is_none());
+    }
+
+    #[test]
+    fn url_strips_get_query() {
+        let request = Request::fake_http("GET", "/?p=hello", vec![], vec![]);
+        assert_eq!(request.url(), "/");
     }
 }
