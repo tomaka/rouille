@@ -9,7 +9,7 @@
 
 /// Equivalent to a `match` expression but for routes.
 ///
-/// Here is an example usage:
+/// # Example
 ///
 /// ```no_run
 /// # #[macro_use] extern crate rouille; fn main() {
@@ -32,6 +32,8 @@
 /// );
 /// # }
 /// ```
+///
+/// # Details
 ///
 /// The macro will take each route one by one and execute the first one that matches, similar to a
 /// `match` language construct. The whole `router!` expression then returns what the body
