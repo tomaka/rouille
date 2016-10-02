@@ -38,6 +38,7 @@
 //! server is misconfigured.
 
 use std::io;
+use std::io::Error as IoError;
 use std::io::BufRead;
 use std::io::Read;
 use std::process::Command;
@@ -46,6 +47,22 @@ use std::process::Stdio;
 use Request;
 use Response;
 use ResponseBody;
+
+/// Error that can happen when parsing the JSON input.
+#[derive(Debug)]
+pub enum CgiError {
+    /// Can't parse the body of the request because it was already extracted.
+    BodyAlreadyExtracted,
+
+    /// Could not read the body from the request, or could not execute the CGI program.
+    IoError(IoError),
+}
+
+impl From<IoError> for CgiError {
+    fn from(err: IoError) -> CgiError {
+        CgiError::IoError(err)
+    }
+}
 
 pub trait CgiRun {
     /// Dispatches a request to the process.
@@ -58,11 +75,11 @@ pub trait CgiRun {
     /// The body of the returned `Response` will hold a handle to the child's stdout output. This
     /// means that the child can continue running in the background and send data to the client,
     /// even after you have finished handling the request.
-    fn start_cgi(self, request: &Request) -> Result<Response, io::Error>;
+    fn start_cgi(self, request: &Request) -> Result<Response, CgiError>;
 }
 
 impl CgiRun for Command {
-    fn start_cgi(mut self, request: &Request) -> Result<Response, io::Error> {
+    fn start_cgi(mut self, request: &Request) -> Result<Response, CgiError> {
         self.env("SERVER_SOFTWARE", "rouille")
             .env("SERVER_NAME", "localhost")            // FIXME:
             .env("GATEWAY_INTERFACE", "CGI/1.1")
@@ -84,7 +101,12 @@ impl CgiRun for Command {
         // TODO: `HTTP_` env vars with the headers
 
         let mut child = try!(self.spawn());
-        try!(io::copy(&mut io::Cursor::new(request.data()), child.stdin.as_mut().unwrap()));
+
+        if let Some(mut body) = request.data() {
+            try!(io::copy(&mut body, child.stdin.as_mut().unwrap()));
+        } else {
+            return Err(CgiError::BodyAlreadyExtracted);
+        }
 
         let response = {
             let mut stdout = io::BufReader::new(child.stdout.take().unwrap());

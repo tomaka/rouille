@@ -12,16 +12,24 @@ use rustc_serialize::Decodable;
 
 use Request;
 
+use std::io::Error as IoError;
+use std::io::Read;
 use std::mem;
 use std::num;
 use std::str::ParseBoolError;
 use url::form_urlencoded;
 
 /// Error that can happen when decoding POST data.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum PostError {
     /// The `Content-Type` header of the request indicates that it doesn't contain POST data.
     WrongContentType,
+
+    /// Can't parse the body of the request because it was already extracted.
+    BodyAlreadyExtracted,
+
+    /// Could not read the body from the request. Also happens if the body is not valid UTF-8.
+    IoError(IoError),
 
     /// A field is missing from the received data.
     MissingField(String),
@@ -37,6 +45,13 @@ pub enum PostError {
 
     /// Failed to parse a string field.
     NotUtf8(String),
+}
+
+impl From<IoError> for PostError {
+    #[inline]
+    fn from(err: IoError) -> PostError {
+        PostError::IoError(err)
+    }
 }
 
 impl From<ParseBoolError> for PostError {
@@ -105,7 +120,18 @@ pub fn get_raw_post_input(request: &Request) -> Result<Vec<(String, String)>, Po
         return Err(PostError::WrongContentType);
     }
 
-    Ok(form_urlencoded::parse(&request.data()))
+    let body = {
+        // TODO: DDoSable server if body is too large?
+        let mut out = Vec::new();       // TODO: with_capacity()?
+        if let Some(mut b) = request.data() {
+            try!(b.read_to_end(&mut out));
+        } else {
+            return Err(PostError::BodyAlreadyExtracted);
+        }
+        out
+    };
+
+    Ok(form_urlencoded::parse(&body))
 }
 
 enum PostDecoder {
