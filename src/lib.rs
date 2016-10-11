@@ -59,7 +59,7 @@ extern crate tiny_http;
 extern crate url;
 
 pub use assets::match_assets;
-pub use log::LogEntry;
+pub use log::log;
 pub use input::{SessionsManager, Session, generate_session_id};
 pub use response::{Response, ResponseBody};
 

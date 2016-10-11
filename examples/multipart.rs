@@ -7,35 +7,35 @@ use std::io::Read;
 
 fn main() {
     rouille::start_server("localhost:8001", move |request| {
-        let _entry = rouille::LogEntry::start(io::stdout(), request);
+        rouille::log(&request, io::stdout(), || {
+            router!(request,
+                (GET) (/) => {
+                    rouille::Response::html(FORM)
+                },
 
-        router!(request,
-            (GET) (/) => {
-                rouille::Response::html(FORM)
-            },
+                (POST) (/submit) => {
+                    let mut multipart = rouille::input::multipart::get_multipart_input(&request)
+                                                                                            .unwrap();
 
-            (POST) (/submit) => {
-                let mut multipart = rouille::input::multipart::get_multipart_input(&request)
-                                                                                        .unwrap();
+                    while let Some(entry) = multipart.next() {
+                        println!("{:?}", entry.name);
 
-                while let Some(entry) = multipart.next() {
-                    println!("{:?}", entry.name);
-
-                    match entry.data {
-                        rouille::input::multipart::MultipartData::Text(txt) => println!("{:?}", txt),
-                        rouille::input::multipart::MultipartData::File(mut f) => {
-                            let mut data = Vec::new();
-                            f.read_to_end(&mut data).unwrap();
-                            println!("{:?}", data)
-                        },
+                        match entry.data {
+                            rouille::input::multipart::MultipartData::Text(txt) => println!("{:?}", txt),
+                            rouille::input::multipart::MultipartData::File(mut f) => {
+                                let mut data = Vec::new();
+                                f.read_to_end(&mut data).unwrap();
+                                println!("{:?}", data)
+                            },
+                        }
                     }
-                }
 
-                rouille::Response::html(FORM)
-            },
+                    rouille::Response::html(FORM)
+                },
 
-            _ => rouille::Response::empty_404()
-        )
+                _ => rouille::Response::empty_404()
+            )
+        })
     });
 }
 

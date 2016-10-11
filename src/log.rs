@@ -8,77 +8,73 @@
 // according to those terms.
 
 use std::io::Write;
-use std::thread;
+use std::panic;
 use std::time::Duration;
 use std::time::Instant;
 
 use Request;
+use Response;
 
-/// RAII guard that ensures that a log entry corresponding to a request will be written.
+/// Adds a log entry to the given writer at each request.
+///
+/// Each request writes a line to the given parameter. The line contains various info like the URL
+/// of the request, the time taken, and the status code of the response.
 ///
 /// # Example
 ///
-/// ```no_run
-/// rouille::start_server("localhost:80", move |request| {
-///     let _entry = rouille::LogEntry::start(std::io::stdout(), request);
-///
-///     // process the request here
-///
-/// # panic!()
-///     // <-- the log entry is automatically written at the end of the handler
-/// });
 /// ```
+/// use std::io;
+/// use rouille::{Request, Response};
 ///
-pub struct LogEntry<W> where W: Write {
-    line: String,
-    output: W,
-    start_time: Instant,
-}
+/// fn handle(request: &Request) -> Response {
+///     rouille::log(request, io::stdout(), || {
+///         Response::text("hello world")
+///     })
+/// }
+/// ```
+pub fn log<W, F>(rq: &Request, mut output: W, f: F) -> Response
+    where W: Write,
+          F: FnOnce() -> Response
+{
+    let start_time = Instant::now();
+    let rq_line = format!("{} {}", rq.method(), rq.raw_url());
 
-impl<'a, W> LogEntry<W> where W: Write {
-    /// Starts a `LogEntry`.
-    pub fn start(output: W, rq: &Request) -> LogEntry<W> {
-        LogEntry {
-            line: format!("{} {}", rq.method(), rq.raw_url()),
-            output: output,
-            start_time: Instant::now(),
+    // Calling the handler and catching potential panics.
+    // Note that this we always resume unwinding afterwards, we can ignore the small panic-safety
+    // mecanism of `catch_unwind`.
+    let response = panic::catch_unwind(panic::AssertUnwindSafe(f));
+
+    let elapsed_time = format_time(start_time.elapsed());
+
+    match response {
+        Ok(response) => {
+            let _ = writeln!(output, "{} - {} - {}", rq_line, elapsed_time, response.status_code);
+            response
+        },
+        Err(payload) => {
+            // There is probably no point in printing the payload, as this is done by the panic
+            // handler.
+            let _ = writeln!(output, "{} - {} - PANIC!", rq_line, elapsed_time);
+            panic::resume_unwind(payload);
         }
     }
 }
 
-impl<W> Drop for LogEntry<W> where W: Write {
-    fn drop(&mut self) {
-        write!(self.output, "{} - ", self.line).unwrap();
-
-        if thread::panicking() {
-            write!(self.output, " - PANIC!").unwrap();
-
-        } else {
-            format_time(self.output.by_ref(), self.start_time.elapsed());
-        }
-
-        writeln!(self.output, "").unwrap();
-    }
-}
-
-fn format_time<W>(mut out: W, duration: Duration) where W: Write {
+fn format_time(duration: Duration) -> String {
     let secs_part = match duration.as_secs().checked_mul(1_000_000_000) {
         Some(v) => v,
-        None => {
-            write!(out, "{}s", duration.as_secs() as f64).unwrap();
-            return;
-        }
+        None => return format!("{}s", duration.as_secs() as f64),
     };
 
     let duration_in_ns = secs_part + duration.subsec_nanos() as u64;
 
     if duration_in_ns < 1_000 {
-        write!(out, "{}ns", duration_in_ns).unwrap()
+        format!("{}ns", duration_in_ns)
     } else if duration_in_ns < 1_000_000 {
-        write!(out, "{:.1}us", duration_in_ns as f64 / 1_000.0).unwrap()
+        format!("{:.1}us", duration_in_ns as f64 / 1_000.0)
     } else if duration_in_ns < 1_000_000_000 {
-        write!(out, "{:.1}ms", duration_in_ns as f64 / 1_000_000.0).unwrap()
+        format!("{:.1}ms", duration_in_ns as f64 / 1_000_000.0)
     } else {
-        write!(out, "{:.1}s", duration_in_ns as f64 / 1_000_000_000.0).unwrap()
+        format!("{:.1}s", duration_in_ns as f64 / 1_000_000_000.0)
     }
 }
