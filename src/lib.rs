@@ -449,6 +449,10 @@ impl Request {
     ///
     /// If there is any non-unicode character in the URL, it will be replaced with `U+FFFD`.
     ///
+    /// > **Note**: This function will decode the token `%2F` will be decoded as `/`. However the
+    /// > official speficiations say that such a token must not count as a delimiter for URL paths.
+    /// > In other words, `/hello/world` is not the same as `/hello%2Fworld`.
+    ///
     /// # Example
     ///
     /// ```
@@ -485,7 +489,7 @@ impl Request {
             Some(e) => &get_params[param .. e + param],
         };
 
-        Some(url::percent_encoding::lossy_utf8_percent_decode(value.as_bytes()))
+        Some(url::percent_encoding::lossy_utf8_percent_decode(value.replace("+", " ").as_bytes()))
     }
 
     /// Returns the value of a header of the request.
@@ -588,5 +592,35 @@ mod tests {
     fn url_strips_get_query() {
         let request = Request::fake_http("GET", "/?p=hello", vec![], vec![]);
         assert_eq!(request.url(), "/");
+    }
+
+    #[test]
+    fn urlencode_query_string() {
+        let request = Request::fake_http("GET", "/?p=hello%20world", vec![], vec![]);
+        assert_eq!(request.get_param("p"), Some("hello world".to_owned()));
+    }
+
+    #[test]
+    fn plus_in_query_string() {
+        let request = Request::fake_http("GET", "/?p=hello+world", vec![], vec![]);
+        assert_eq!(request.get_param("p"), Some("hello world".to_owned()));
+    }
+
+    #[test]
+    fn encoded_plus_in_query_string() {
+        let request = Request::fake_http("GET", "/?p=hello%2Bworld", vec![], vec![]);
+        assert_eq!(request.get_param("p"), Some("hello+world".to_owned()));
+    }
+
+    #[test]
+    fn url_encode() {
+        let request = Request::fake_http("GET", "/hello%20world", vec![], vec![]);
+        assert_eq!(request.url(), "/hello world");
+    }
+
+    #[test]
+    fn plus_in_url() {
+        let request = Request::fake_http("GET", "/hello+world", vec![], vec![]);
+        assert_eq!(request.url(), "/hello+world");
     }
 }
