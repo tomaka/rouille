@@ -214,4 +214,15 @@ mod tests {
             _ => 0
         ));
     }
+
+    #[test]
+    #[ignore]       // TODO: not implemented
+    fn param_slash() {
+        let request = Request::fake_http("GET", "/hello%2F5", vec![], vec![]);
+
+        router!(request,
+            (GET) (/{a:String}) => { assert_eq!(a, "hello/5") },
+            _ => panic!()
+        );
+    }
 }
