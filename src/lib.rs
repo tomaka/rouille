@@ -72,7 +72,7 @@ use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::panic;
-use std::panic::RefUnwindSafe;
+use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
@@ -212,10 +212,10 @@ macro_rules! assert_or_400 {
 ///
 pub fn start_server<A, F>(addr: A, handler: F) -> !
                           where A: ToSocketAddrs,
-                                F: Send + Sync + 'static + RefUnwindSafe + Fn(&Request) -> Response
+                                F: Send + Sync + 'static + Fn(&Request) -> Response
 {
     let server = tiny_http::Server::http(addr).unwrap();
-    let handler = Arc::new(handler);
+    let handler = Arc::new(AssertUnwindSafe(handler));      // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
 
     for mut request in server.incoming_requests() {
         // We spawn a thread so that requests are processed in parallel.
@@ -254,6 +254,9 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
             // Calling the handler ; this most likely takes a lot of time.
             // If the handler panics, we build a dummy response.
             let rouille_response = {
+                // We don't use the `rouille_request` anymore after the panic, so it's ok to assert
+                // it's unwind safe.
+                let rouille_request = AssertUnwindSafe(rouille_request);
                 let res = panic::catch_unwind(move || {
                     let rouille_request = rouille_request;
                     handler(&rouille_request)
