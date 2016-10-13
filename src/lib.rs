@@ -71,6 +71,8 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
+use std::panic;
+use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
@@ -210,13 +212,13 @@ macro_rules! assert_or_400 {
 ///
 pub fn start_server<A, F>(addr: A, handler: F) -> !
                           where A: ToSocketAddrs,
-                                F: Send + Sync + 'static + Fn(&Request) -> Response
+                                F: Send + Sync + 'static + RefUnwindSafe + Fn(&Request) -> Response
 {
     let server = tiny_http::Server::http(addr).unwrap();
     let handler = Arc::new(handler);
 
     for mut request in server.incoming_requests() {
-        // we spawn a thread in order to avoid crashing the server in case of a panic
+        // We spawn a thread so that requests are processed in parallel.
         let handler = handler.clone();
         thread::spawn(move || {
             // Small helper struct that makes it possible to put
@@ -249,8 +251,23 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                 }
             };
 
-            // calling the handler ; this most likely takes a lot of time
-            let mut rouille_response = handler(&rouille_request);
+            // Calling the handler ; this most likely takes a lot of time.
+            // If the handler panics, we build a dummy response.
+            let rouille_response = {
+                let res = panic::catch_unwind(move || {
+                    let rouille_request = rouille_request;
+                    handler(&rouille_request)
+                });
+
+                match res {
+                    Ok(r) => r,
+                    Err(_) => {
+                        Response::html("<h1>Internal Server Error</h1>\
+                                        <p>An internal error has occurred on the server.</p>")
+                            .with_status_code(500)
+                    }
+                }
+            };
 
             // writing the response
             let (res_data, res_len) = rouille_response.data.into_inner();
