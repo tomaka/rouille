@@ -41,7 +41,7 @@ impl<R> BoundaryReader<R> where R: Read {
     fn read_to_boundary(&mut self) -> io::Result<&[u8]> {
         use log::LogLevel;
 
-        let buf = try!(fill_buf_min(&mut self.buf, self.boundary.len()));
+        let buf = try!(fill_buf_min(&mut self.buf, self.boundary.len() * 2));
         
         if log_enabled!(LogLevel::Trace) {
             trace!("Buf: {:?}", String::from_utf8_lossy(buf));

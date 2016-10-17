@@ -1,7 +1,7 @@
 [package]
 name = "multipart"
 
-version = "0.8.1"
+version = "0.9.0-alpha.1"
 
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
@@ -25,6 +25,10 @@ tempdir = ">=0.3.4"
 [dependencies.buf_redux]
 optional = true
 version = "0.3"
+
+[dependencies.httparse]
+optional = true
+version = "1.1"
 
 [dependencies.hyper]
 optional = true
@@ -54,6 +58,6 @@ env_logger = "0.3"
 [features]
 client = []
 default = ["hyper", "server", "client"]
-server = ["buf_redux", "memchr"]
+server = ["buf_redux", "memchr", "httparse"]
 nickel_ = ["nickel", "hyper"]
 all = ["iron", "nickel_", "tiny_http"]

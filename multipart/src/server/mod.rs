@@ -11,6 +11,8 @@
 //! to accept, parse, and serve HTTP `multipart/form-data` requests (file uploads).
 //!
 //! See the `Multipart` struct for more info.
+
+
 use mime::Mime;
 
 use tempdir::TempDir;
@@ -23,6 +25,7 @@ use std::path::{Path, PathBuf};
 use std::{io, mem, ptr};
 
 use self::boundary::BoundaryReader;
+use self::parse::MultipartHeaders;
 
 macro_rules! try_opt (
     ($expr:expr) => (
@@ -30,10 +33,21 @@ macro_rules! try_opt (
             Some(val) => val,
             None => return None,
         }
+    );
+    ($expr:expr, $before_ret:expr) => (
+        match $expr {
+            Some(val) => val,
+            None => {
+                $before_ret;
+                return None;
+            }
+        }
     )
 );
 
 mod boundary;
+
+mod parse;
 
 #[cfg(feature = "hyper")]
 pub mod hyper;
@@ -100,9 +114,8 @@ impl<B: Read> Multipart<B> {
         MultipartField::read_from(self)
     }
 
-    fn read_content_disposition(&mut self) -> io::Result<Option<ContentDisp>> {
-        let line = try!(self.read_line());
-        Ok(ContentDisp::read_from(line))
+    fn read_field_headers(&mut self) -> io::Result<Option<MultipartHeaders>> {
+        MultipartHeaders::parse(&mut self.source)
     }
 
     /// Call `f` for each entry in the multipart request.
@@ -119,12 +132,6 @@ impl<B: Read> Multipart<B> {
                 Err(err) => return Err(err),
             }
         }
-    }
-
-    fn read_content_type(&mut self) -> io::Result<Option<ContentType>> {
-        debug!("Read content type!");
-        let line = try!(self.read_line());
-        Ok(ContentType::read_from(line))
     }
 
     /// Read the request fully, parsing all fields and saving all files in a new temporary
@@ -309,92 +316,6 @@ impl SaveResult {
     }
 }
 
-struct ContentType {
-    val: Mime,
-    #[allow(dead_code)]
-    boundary: Option<String>,
-}
-
-impl ContentType {
-    fn read_from(line: &str) -> Option<ContentType> {
-        const CONTENT_TYPE: &'static str = "Content-Type:";
-        const BOUNDARY: &'static str = "boundary=\"";
-
-        debug!("Reading Content-Type header from line: {:?}", line);
-
-        if let Some((cont_type, after_cont_type)) = get_str_after(CONTENT_TYPE, ';', line) {
-            let content_type = read_content_type(cont_type.trim());
-
-            let boundary = get_str_after(BOUNDARY, '"', after_cont_type).map(|tup| tup.0.into());
-
-            Some(ContentType {
-                val: content_type,
-                boundary: boundary,
-            })
-        } else {
-            get_remainder_after(CONTENT_TYPE, line).map(|cont_type| {
-                let content_type = read_content_type(cont_type.trim());
-                ContentType { val: content_type, boundary: None }
-            })
-        }
-    }
-}
-
-fn read_content_type(cont_type: &str) -> Mime {
-    cont_type.parse().ok().unwrap_or_else(::mime_guess::octet_stream)
-}
-
-struct ContentDisp {
-    field_name: String,
-    filename: Option<String>,
-}
-
-impl ContentDisp {
-    fn read_from(line: &str) -> Option<ContentDisp> {
-        debug!("Reading Content-Disposition from line: {:?}", line);
-
-        if line.is_empty() {
-            return None;
-        }
-
-        const CONT_DISP: &'static str = "Content-Disposition:";
-        const NAME: &'static str = "name=\"";
-        const FILENAME: &'static str = "filename=\"";
-
-        let after_disp_type = {
-            let (disp_type, after_disp_type) = try_opt!(get_str_after(CONT_DISP, ';', line));
-            let disp_type = disp_type.trim();
-
-            if disp_type != "form-data" {
-                error!("Unexpected Content-Disposition value: {:?}", disp_type);
-                return None;
-            }
-
-            after_disp_type
-        };
-
-        let (field_name, after_field_name) = try_opt!(get_str_after(NAME, '"', after_disp_type));
-
-        let filename = get_str_after(FILENAME, '"', after_field_name)
-            .map(|(filename, _)| filename.to_owned());
-
-        Some(ContentDisp { field_name: field_name.to_owned(), filename: filename })
-    }
-}
-
-/// Get the string after `needle` in `haystack`, stopping before `end_val_delim`
-fn get_str_after<'a>(needle: &str, end_val_delim: char, haystack: &'a str) -> Option<(&'a str, &'a str)> {
-    let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
-    let val_end_idx = try_opt!(haystack[val_start_idx..].find(end_val_delim)) + val_start_idx;
-    Some((&haystack[val_start_idx..val_end_idx], &haystack[val_end_idx..]))
-}
-
-/// Get everything after `needle` in `haystack`
-fn get_remainder_after<'a>(needle: &str, haystack: &'a str) -> Option<(&'a str)> {
-    let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
-    Some(&haystack[val_start_idx..])
-}
-
 /// A server-side HTTP request that may or may not be multipart.
 ///
 /// May be implemented by mutable references if providing the request or body by-value is
@@ -424,18 +345,18 @@ pub struct MultipartField<'a, B: 'a> {
 
 impl<'a, B: Read + 'a> MultipartField<'a, B> {
     fn read_from(multipart: &'a mut Multipart<B>) -> io::Result<Option<MultipartField<'a, B>>> {
-        let cont_disp = match multipart.read_content_disposition() {
-            Ok(Some(cont_disp)) => cont_disp,
+        let field_headers =  match multipart.read_field_headers() {
+            Ok(Some(headers)) => headers,
             Ok(None) => return Ok(None),
-            Err(err) => return Err(err),
-        };        
+            Err(err) => return Err(err)
+        };
 
-        let data = match try!(multipart.read_content_type()) {
+        let data = match field_headers.cont_type {
             Some(content_type) => {
                 let _ = try!(multipart.read_line()); // Consume empty line
                 MultipartData::File(
                     MultipartFile::from_stream(
-                        cont_disp.filename, 
+                        field_headers.cont_disp.filename,
                         content_type.val,
                         &mut multipart.source,
                     )
@@ -450,7 +371,7 @@ impl<'a, B: Read + 'a> MultipartField<'a, B> {
 
         Ok(Some(
             MultipartField {
-                name: cont_disp.field_name,
+                name: field_headers.cont_disp.field_name,
                 data: data,
             }
         ))
