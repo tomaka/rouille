@@ -353,8 +353,7 @@ impl<'a, B: Read + 'a> MultipartField<'a, B> {
                  )
             },
             None => {
-                // Empty line consumed by read_content_type()
-                let text = try!(multipart.read_to_string()); 
+                let text = try!(multipart.read_to_string());
                 MultipartData::Text(&text)
             },
         };
