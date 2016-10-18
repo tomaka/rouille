@@ -7,9 +7,7 @@
 
 extern crate httparse;
 
-use self::httparse::{EMPTY_HEADER, Header, Status};
-
-use super::boundary::BoundaryReader;
+use self::httparse::{EMPTY_HEADER, Status};
 
 use mime::Mime;
 
@@ -57,16 +55,17 @@ impl MultipartHeaders {
     pub fn parse<R: BufRead>(r: &mut R) -> io::Result<Option<MultipartHeaders>> {
         const HEADER_LEN: usize = 4;
 
-        let mut consume = 0;
+        // These are only written once so they don't need to be `mut` or initialized.
+        let consume;
+        let header_len;
 
         let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
-        let mut header_len = 0;
 
         {
             let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
 
             loop {
-                let mut buf = try!(r.fill_buf());
+                let buf = try!(r.fill_buf());
 
                 match try_io!(httparse::parse_headers(buf, &mut raw_headers)) {
                     Status::Complete((consume_, raw_headers)) =>  {
@@ -78,8 +77,6 @@ impl MultipartHeaders {
                 }
             }
 
-            debug!("Parsed field headers: {:?}", raw_headers);
-
             for (raw, header) in raw_headers.iter().take(header_len).zip(&mut headers) {
                 header.name = raw.name;
                 header.val = try!(io_str_utf8(raw.value));
@@ -87,6 +84,8 @@ impl MultipartHeaders {
         }
 
         let headers = &headers[..header_len];
+
+        debug!("Parsed field headers: {:?}", headers);
 
         r.consume(consume);
 
@@ -167,24 +166,31 @@ impl ContentType {
     fn read_from(headers: &[StrHeader]) -> Option<ContentType> {
         const CONTENT_TYPE: &'static str = "Content-Type";
 
-        let header = try_opt!(find_header(headers, CONTENT_TYPE));
+        let header = try_opt!(
+            find_header(headers, CONTENT_TYPE),
+            debug!("Content-Type header not found for field.")
+        );
 
         const BOUNDARY: &'static str = "boundary=\"";
 
-        if let Some((cont_type, after_cont_type)) = get_str_after(CONTENT_TYPE, ';', header.val) {
+        if let Some((cont_type, after_cont_type)) = split_once(header.val, ';') {
+            debug!("Found Content-Type: {:?}", cont_type);
+
             let content_type = read_content_type(cont_type.trim());
 
-            let boundary = get_str_after(BOUNDARY, '"', after_cont_type).map(|tup| tup.0.into());
+            let boundary = get_str_after(BOUNDARY, '"', after_cont_type)
+                .map(|tup| tup.0.to_string());
+
+            debug!("Found sub-boundary: {:?}", boundary);
 
             Some(ContentType {
                 val: content_type,
                 boundary: boundary,
             })
         } else {
-            get_remainder_after(CONTENT_TYPE, header.val).map(|cont_type| {
-                let content_type = read_content_type(cont_type.trim());
-                ContentType { val: content_type, boundary: None }
-            })
+            debug!("Found Content-Type: {:?}", header.val);
+            let content_type = read_content_type(header.val.trim());
+            Some(ContentType { val: content_type, boundary: None })
         }
     }
 }
@@ -203,12 +209,6 @@ fn get_str_after<'a>(needle: &str, end_val_delim: char, haystack: &'a str) -> Op
     let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
     let val_end_idx = try_opt!(haystack[val_start_idx..].find(end_val_delim)) + val_start_idx;
     Some((&haystack[val_start_idx..val_end_idx], &haystack[val_end_idx..]))
-}
-
-/// Get everything after `needle` in `haystack`
-fn get_remainder_after<'a>(needle: &str, haystack: &'a str) -> Option<(&'a str)> {
-    let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
-    Some(&haystack[val_start_idx..])
 }
 
 fn io_str_utf8(buf: &[u8]) -> io::Result<&str> {

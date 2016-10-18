@@ -227,15 +227,6 @@ impl<B: Read> Multipart<B> {
         Ok(())
     } 
 
-    fn read_line(&mut self) -> io::Result<&str> {
-        self.line_buf.clear();
-
-        match self.source.read_line(&mut self.line_buf) {
-            Ok(read) => Ok(&self.line_buf[..read]),
-            Err(err) => Err(err),
-        }
-    }
-
     fn read_to_string(&mut self) -> io::Result<&str> {
         self.line_buf.clear();
 
@@ -353,7 +344,6 @@ impl<'a, B: Read + 'a> MultipartField<'a, B> {
 
         let data = match field_headers.cont_type {
             Some(content_type) => {
-                let _ = try!(multipart.read_line()); // Consume empty line
                 MultipartData::File(
                     MultipartFile::from_stream(
                         field_headers.cont_disp.filename,
