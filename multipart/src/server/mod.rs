@@ -12,6 +12,9 @@
 //!
 //! See the `Multipart` struct for more info.
 
+extern crate buf_redux;
+extern crate httparse;
+extern crate memchr;
 
 use mime::Mime;
 
@@ -25,7 +28,7 @@ use std::path::{Path, PathBuf};
 use std::{io, mem, ptr};
 
 use self::boundary::BoundaryReader;
-use self::parse::MultipartHeaders;
+use self::field::FieldHeaders;
 
 macro_rules! try_opt (
     ($expr:expr) => (
@@ -46,8 +49,7 @@ macro_rules! try_opt (
 );
 
 mod boundary;
-
-mod parse;
+mod field;
 
 #[cfg(feature = "hyper")]
 pub mod hyper;
@@ -114,8 +116,8 @@ impl<B: Read> Multipart<B> {
         MultipartField::read_from(self)
     }
 
-    fn read_field_headers(&mut self) -> io::Result<Option<MultipartHeaders>> {
-        MultipartHeaders::parse(&mut self.source)
+    fn read_field_headers(&mut self) -> io::Result<Option<FieldHeaders>> {
+        FieldHeaders::parse(&mut self.source)
     }
 
     /// Call `f` for each entry in the multipart request.

@@ -27,14 +27,16 @@
 //! See the [`server::nickel`](server/nickel/index.html) module for more information. Enables the `hyper`
 //! feature.
 #![warn(missing_docs)]
-#[macro_use] extern crate log;
 
-#[cfg(test)] extern crate env_logger;
+#[macro_use]
+extern crate log;
+
+#[cfg(test)]
+extern crate env_logger;
 
 extern crate mime;
 extern crate mime_guess;
 extern crate rand;
-
 extern crate tempdir;
 
 #[cfg(feature = "hyper")]

@@ -5,11 +5,11 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-extern crate httparse;
+//! `multipart` field header parsing.
 
-use self::httparse::{EMPTY_HEADER, Status};
+use super::httparse::{self, EMPTY_HEADER, Status};
 
-use mime::Mime;
+use mime::{Attr, Mime, Value};
 
 use std::io::{self, BufRead};
 use std::str;
@@ -46,13 +46,17 @@ struct StrHeader<'a> {
     val: &'a str,
 }
 
-pub struct MultipartHeaders {
+/// The headers that (may) appear before a `multipart/form-data` field.
+pub struct FieldHeaders {
+    /// The `Content-Disposition` header, required.
     pub cont_disp: ContentDisp,
+    /// The `Content-Type` header, optional.
     pub cont_type: Option<ContentType>,
 }
 
-impl MultipartHeaders {
-    pub fn parse<R: BufRead>(r: &mut R) -> io::Result<Option<MultipartHeaders>> {
+impl FieldHeaders {
+    /// Parse the field headers from the passed `BufRead`, consuming the relevant bytes.
+    pub fn parse<R: BufRead>(r: &mut R) -> io::Result<Option<Self>> {
         const HEADER_LEN: usize = 4;
 
         // These are only written once so they don't need to be `mut` or initialized.
@@ -92,7 +96,7 @@ impl MultipartHeaders {
         Ok(Self::read_from(headers))
     }
 
-    fn read_from(headers: &[StrHeader]) -> Option<MultipartHeaders> {
+    fn read_from(headers: &[StrHeader]) -> Option<FieldHeaders> {
         let cont_disp = try_opt!(
                 ContentDisp::read_from(headers),
                 debug!("Failed to read Content-Disposition")
@@ -100,15 +104,18 @@ impl MultipartHeaders {
 
         let cont_type = ContentType::read_from(headers);
 
-        Some(MultipartHeaders {
+        Some(FieldHeaders {
             cont_disp: cont_disp,
             cont_type: cont_type,
         })
     }
 }
 
+/// The `Content-Disposition` header.
 pub struct ContentDisp {
+    /// The name of the `multipart/form-data` field.
     pub field_name: String,
+    /// The optional filename for this field.
     pub filename: Option<String>,
 }
 
@@ -145,21 +152,25 @@ impl ContentDisp {
         };
 
         let (field_name, after_field_name) = try_opt!(
-            get_str_after(NAME, '"', after_disp_type),
+            get_str_after(NAME, ';', after_disp_type),
             error!("Expected field name and maybe filename, got {:?}", after_disp_type)
         );
 
-        let filename = get_str_after(FILENAME, '"', after_field_name)
-            .map(|(filename, _)| filename.to_owned());
+        let field_name = trim_quotes(field_name);
+
+        let filename = get_str_after(FILENAME, ';', after_field_name)
+            .map(|(filename, _)| trim_quotes(filename).to_owned());
 
         Some(ContentDisp { field_name: field_name.to_owned(), filename: filename })
     }
 }
 
+/// The `Content-Type` header.
 pub struct ContentType {
+    /// The MIME type of the `multipart` field.
+    ///
+    /// May contain a sub-boundary parameter.
     pub val: Mime,
-    #[allow(dead_code)]
-    pub boundary: Option<String>,
 }
 
 impl ContentType {
@@ -171,27 +182,15 @@ impl ContentType {
             debug!("Content-Type header not found for field.")
         );
 
-        const BOUNDARY: &'static str = "boundary=\"";
+        // Boundary parameter will be parsed into the `Mime`
+        debug!("Found Content-Type: {:?}", header.val);
+        let content_type = read_content_type(header.val.trim());
+        Some(ContentType { val: content_type })
+    }
 
-        if let Some((cont_type, after_cont_type)) = split_once(header.val, ';') {
-            debug!("Found Content-Type: {:?}", cont_type);
-
-            let content_type = read_content_type(cont_type.trim());
-
-            let boundary = get_str_after(BOUNDARY, '"', after_cont_type)
-                .map(|tup| tup.0.to_string());
-
-            debug!("Found sub-boundary: {:?}", boundary);
-
-            Some(ContentType {
-                val: content_type,
-                boundary: boundary,
-            })
-        } else {
-            debug!("Found Content-Type: {:?}", header.val);
-            let content_type = read_content_type(header.val.trim());
-            Some(ContentType { val: content_type, boundary: None })
-        }
+    /// Get the optional boundary parameter for this `Content-Type`.
+    pub fn boundary(&self) -> Option<&str> {
+        self.val.get_param(Attr::Boundary).map(Value::as_str)
     }
 }
 
@@ -199,15 +198,19 @@ fn read_content_type(cont_type: &str) -> Mime {
     cont_type.parse().ok().unwrap_or_else(::mime_guess::octet_stream)
 }
 
-
 fn split_once(s: &str, delim: char) -> Option<(&str, &str)> {
     s.find(delim).map(|idx| s.split_at(idx))
+}
+
+fn trim_quotes(s: &str) -> &str {
+    s.trim_matches('"')
 }
 
 /// Get the string after `needle` in `haystack`, stopping before `end_val_delim`
 fn get_str_after<'a>(needle: &str, end_val_delim: char, haystack: &'a str) -> Option<(&'a str, &'a str)> {
     let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
-    let val_end_idx = try_opt!(haystack[val_start_idx..].find(end_val_delim)) + val_start_idx;
+    let val_end_idx = haystack[val_start_idx..].find(end_val_delim)
+        .map_or(haystack.len(), |end_idx| end_idx + val_start_idx);
     Some((&haystack[val_start_idx..val_end_idx], &haystack[val_end_idx..]))
 }
 

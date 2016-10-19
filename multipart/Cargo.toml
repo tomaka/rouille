@@ -22,13 +22,10 @@ mime_guess = "1.8"
 rand = "0.3"
 tempdir = ">=0.3.4"
 
-[dependencies.buf_redux]
-optional = true
-version = "0.3"
-
-[dependencies.httparse]
-optional = true
-version = "1.1"
+#Server Dependencies
+buf_redux = { version = "0.3", optional = true }
+httparse = { version = "1.1", optional = true }
+memchr = {version = "0.1", optional = true }
 
 [dependencies.hyper]
 optional = true
@@ -38,10 +35,6 @@ version = "0.9"
 [dependencies.iron]
 optional = true
 version = "0.4"
-
-[dependencies.memchr]
-optional = true
-version = "0.1"
 
 # NOTE: use `nickel_` feature, as `hyper` feature is required.
 [dependencies.nickel]
@@ -58,6 +51,6 @@ env_logger = "0.3"
 [features]
 client = []
 default = ["hyper", "server", "client"]
-server = ["buf_redux", "memchr", "httparse"]
+server = ["buf_redux", "httparse", "memchr"]
 nickel_ = ["nickel", "hyper"]
 all = ["iron", "nickel_", "tiny_http"]
