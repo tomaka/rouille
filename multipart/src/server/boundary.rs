@@ -68,7 +68,7 @@ impl<R> BoundaryReader<R> where R: Read {
                 let test = &buf[self.search_idx .. self.search_idx + self.boundary.len()];
 
                 match first_nonmatching_idx(test, &self.boundary) {
-                    Some(idx) => self.search_idx += idx,
+                    Some(idx) => self.search_idx += idx + 1,
                     None => self.boundary_read = true,
                 } 
             } else {
