@@ -9,12 +9,11 @@ use client::HttpStream as ClientStream;
 
 use server::HttpRequest as ServerRequest;
 
-use rand::Rng;
-use rand::distributions::{Range, Sample};
+use rand::{self, Rng};
 
 use std::collections::HashMap;
-use std::io;
 use std::io::prelude::*;
+use std::{io, iter};
 
 #[derive(Debug)]
 struct TestFields {
@@ -42,8 +41,10 @@ fn gen_test_fields() -> TestFields {
     const MIN_FIELDS: usize = 1;
     const MAX_FIELDS: usize = 3;
 
-    let texts_count = gen_range(MIN_FIELDS, MAX_FIELDS);
-    let files_count = gen_range(MIN_FIELDS, MAX_FIELDS);
+    let mut rng = rand::weak_rng();
+
+    let texts_count = rng.gen_range(MIN_FIELDS, MAX_FIELDS);
+    let files_count = rng.gen_range(MIN_FIELDS, MAX_FIELDS);
 
     TestFields {
         texts: (0..texts_count).map(|_| (gen_string(), gen_string())).collect(),
@@ -51,29 +52,26 @@ fn gen_test_fields() -> TestFields {
     }
 }
 
-fn gen_range(min: usize, max: usize) -> usize {
-    Range::new(min, max).sample(&mut ::rand::weak_rng())
-}
-
 fn gen_string() -> String {
     const MIN_LEN: usize = 3;
     const MAX_LEN: usize = 8;
+    const MAX_DASHES: usize = 3;
 
-    let mut rng = ::rand::weak_rng();
-    let str_len = gen_range(MIN_LEN, MAX_LEN);
+    let mut rng_1 = rand::weak_rng();
+    let mut rng_2 = rand::weak_rng();
 
-    rng.gen_ascii_chars().take(str_len).collect()
+    let str_len_1 = rng_1.gen_range(MIN_LEN, MAX_LEN + 1);
+    let str_len_2 = rng_2.gen_range(MIN_LEN, MAX_LEN + 1);
+    let num_dashes = rng_1.gen_range(0, MAX_DASHES + 1);
+
+    rng_1.gen_ascii_chars().take(str_len_1)
+        .chain(iter::repeat('-').take(num_dashes))
+        .chain(rng_2.gen_ascii_chars().take(str_len_2))
+        .collect()
 }
 
 fn gen_bytes() -> Vec<u8> {
-    const MIN_LEN: usize = 8;
-    const MAX_LEN: usize = 16;
-
-    let mut rng = ::rand::weak_rng();
-    let bytes_len = gen_range(MIN_LEN, MAX_LEN);
-
-    rng.gen_ascii_chars().take(bytes_len)
-        .map(|c| c as u8).collect()
+    gen_string().into_bytes()
 }
 
 fn test_client(test_fields: &TestFields) -> HttpBuffer {
@@ -88,7 +86,7 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
     // Intersperse file fields amongst text fields
     for (name, text) in &test_fields.texts {
         if let Some((file_name, file)) = test_files.next() {
-            multipart.write_stream(file_name, &mut &**file, None, None).unwrap();
+            multipart.write_stream(file_name, &mut &**file, Some(file_name), None).unwrap();
         }
 
         multipart.write_text(name, text).unwrap();    
