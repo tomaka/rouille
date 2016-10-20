@@ -1,10 +1,10 @@
 [package]
 name = "rouille"
-version = "0.1.7"
+version = "0.2.0"
 authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/tomaka/rouille"
-documentation = "http://tomaka.github.io/rouille/rouille/index.html"
+documentation = "http://docs.rs/rouille"
 description = "High-level web framework"
 
 [dependencies]
