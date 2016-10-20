@@ -102,8 +102,23 @@ impl From<num::ParseFloatError> for PostError {
 /// }
 /// ```
 ///
+#[inline]
 pub fn get_post_input<T>(request: &Request) -> Result<T, PostError> where T: Decodable {
     let data = try!(get_raw_post_input(request));
+    decode_raw_post_input(data)
+}
+
+/// Takes raw post input (as obtained with `get_raw_post_input`) and decodes it into a struct.
+///
+/// Since you can only retreive the body of the request once, it will trigger an error to call
+/// `get_post_input` and `get_raw_post_input` on the same request. This function is provided so
+/// that you can do that.
+///
+/// > **Note**: The `get_post_input` function is just a shortcut for `get_raw_post_input` followed
+/// > with `decode_raw_post_input`.
+pub fn decode_raw_post_input<T>(data: Vec<(String, String)>) -> Result<T, PostError>
+    where T: Decodable
+{
     let mut decoder = PostDecoder::Start(data);
     T::decode(&mut decoder)
 }
