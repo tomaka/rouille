@@ -20,7 +20,7 @@ macro_rules! try_io(
             use std::io::{Error, ErrorKind};
             match $try {
                 Ok(val) => val,
-                Err(e) => return Err(Error::new(ErrorKind::InvalidData, format!("{:?}", e))),
+                Err(e) => return Err(Error::new(ErrorKind::InvalidData, e)),
             }
         }
     )
