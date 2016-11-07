@@ -125,8 +125,9 @@ impl<'a, T> Session<'a, T> where T: Clone {
         }
 
         // FIXME: correct interactions with existing headers
-        let header_value = format!("{}={}; Max-Age={}", self.manager.cookie_name, self.key,
-                                                        self.manager.timeout_s);
+        // TODO: allow setting domain
+        let header_value = format!("{}={}; Max-Age={}; Path=/; HttpOnly",
+                                   self.manager.cookie_name, self.key, self.manager.timeout_s);
         response.headers.push(("Set-Cookie".to_owned(), header_value));
         response
     }
