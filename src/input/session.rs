@@ -36,6 +36,7 @@ use input;
 /// })
 /// ```
 ///
+#[derive(Debug)]
 pub struct SessionsManager<T> where T: Clone {
     // TODO: eventually replace the key with `[u8; 64]` or something similar
     sessions: Mutex<HashMap<String, T>>,
@@ -81,6 +82,7 @@ impl<T> SessionsManager<T> where T: Clone {
 }
 
 /// Represents an entry in the sessions manager.
+#[derive(Debug)]
 pub struct Session<'a, T> where T: Clone + 'a {
     manager: &'a SessionsManager<T>,
     key: String,
