@@ -9,7 +9,7 @@ use multipart::server::Multipart;
 use std::fs::File;
 use std::env;
 
-const LOG_LEVEL: LogLevelFilter = LogLevelFilter::Off;
+const LOG_LEVEL: LogLevelFilter = LogLevelFilter::Debug;
 
 struct SimpleLogger;
 
