@@ -239,6 +239,8 @@ impl<B: Read> Multipart<B> {
     }
 
     fn consume_boundary(&mut self) -> io::Result<bool> {
+        debug!("Consume boundary!");
+
         try!(self.source.consume_boundary());
 
         let mut out = [0; 2];

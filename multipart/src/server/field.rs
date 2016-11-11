@@ -132,8 +132,8 @@ impl ContentDisp {
             error!("Field headers did not contain Content-Disposition header (required)")
         );
 
-        const NAME: &'static str = "name=\"";
-        const FILENAME: &'static str = "filename=\"";
+        const NAME: &'static str = "name=";
+        const FILENAME: &'static str = "filename=";
 
         let after_disp_type = {
             let (disp_type, after_disp_type) = try_opt!(

@@ -24,7 +24,7 @@ tempdir = ">=0.3.4"
 
 #Server Dependencies
 buf_redux = { version = "0.3", optional = true }
-memchr = {version = "0.1", optional = true }
+memchr = { version = "0.1", optional = true }
 
 # Optional Integrations
 hyper = { version = "0.9", optional = true }
@@ -36,12 +36,8 @@ nickel = { optional = true, version = "0.9" }
 tiny_http = { version = "0.5", optional = true }
 
 [dependencies.httparse]
-# FIXME: when updated version is released
-#version = "1.1",
-git = "https://github.com/seanmonstar/httparse"
+version = "1.2"
 optional = true
-default-features = false
-
 
 [dev-dependencies]
 env_logger = "0.3"

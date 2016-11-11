@@ -57,8 +57,6 @@ impl<R> BoundaryReader<R> where R: Read {
 
             let maybe_boundary = memchr(self.boundary[0], lookahead);
 
-            debug!("maybe_boundary: {:?}", maybe_boundary);
-
             self.search_idx = match maybe_boundary {
                 Some(boundary_start) => self.search_idx + boundary_start,
                 None => buf.len(),
@@ -67,8 +65,15 @@ impl<R> BoundaryReader<R> where R: Read {
             if self.search_idx + self.boundary.len() <= buf.len() {
                 let test = &buf[self.search_idx .. self.search_idx + self.boundary.len()];
 
+                if log_enabled!(LogLevel::Trace) {
+                    trace!("Possible boundary: {:?}", String::from_utf8_lossy(test));
+                }
+
                 match first_nonmatching_idx(test, &self.boundary) {
-                    Some(idx) => self.search_idx += idx + 1,
+                    Some(idx) => {
+                        debug!("First nonmatching idx: {}", idx);
+                        self.search_idx += idx + 1;
+                    },
                     None => self.boundary_read = true,
                 } 
             } else {
