@@ -341,8 +341,8 @@ impl<'d> PreparedFields<'d> {
         self.content_len
     }
 
-    #[cfg_attr(not(feature = "hyper"), allow(dead_code))]
-    fn boundary(&self) -> &str {
+    /// Get the boundary that was used to serialize the request.
+    pub fn boundary(&self) -> &str {
         &self.boundary
     } 
 }
