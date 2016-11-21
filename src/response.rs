@@ -97,6 +97,23 @@ impl Response {
         }
     }
 
+    /// Builds a `Response` that outputs SVG.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::Response;
+    /// let response = Response::svg("<svg xmlns='http://www.w3.org/2000/svg'/>");
+    /// ```
+    #[inline]
+    pub fn svg<D>(content: D) -> Response where D: Into<Vec<u8>> {
+        Response {
+            status_code: 200,
+            headers: vec![("Content-Type".to_owned(), "image/svg+xml; charset=utf8".to_owned())],
+            data: ResponseBody::from_data(content),
+        }
+    }
+
     /// Builds a `Response` that outputs plain text.
     ///
     /// # Example
