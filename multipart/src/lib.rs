@@ -27,6 +27,7 @@
 //! See the [`server::nickel`](server/nickel/index.html) module for more information. Enables the `hyper`
 //! feature.
 #![warn(missing_docs)]
+#![cfg_attr(feature = "nightly", feature(insert_str))]
 
 #[macro_use]
 extern crate log;

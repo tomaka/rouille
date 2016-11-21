@@ -9,10 +9,18 @@
 
 use super::httparse::{self, EMPTY_HEADER, Status};
 
+use super::Multipart;
+
+use super::boundary::BoundaryReader;
+
 use mime::{Attr, Mime, Value};
 
-use std::io::{self, BufRead};
+use std::io::{self, Read, BufRead, Write};
+use std::fs::{self, File};
+use std::path::{Path, PathBuf};
 use std::str;
+
+const RANDOM_FILENAME_LEN: usize = 12;
 
 macro_rules! try_io(
     ($try:expr) => (
@@ -189,10 +197,243 @@ impl ContentType {
     }
 
     /// Get the optional boundary parameter for this `Content-Type`.
+    #[allow(dead_code)]
     pub fn boundary(&self) -> Option<&str> {
         self.val.get_param(Attr::Boundary).map(Value::as_str)
     }
 }
+
+/// A field in a multipart request. May be either text or a binary stream (file).
+#[derive(Debug)]
+pub struct MultipartField<'a, B: 'a> {
+    /// The field's name from the form
+    pub name: String,
+    /// The data of the field. Can be text or binary.
+    pub data: MultipartData<'a, B>,
+}
+
+pub fn read_field<B: Read>(multipart: &mut Multipart<B>) -> io::Result<Option<MultipartField<B>>> {
+    let field_headers =  match multipart.read_field_headers() {
+        Ok(Some(headers)) => headers,
+        Ok(None) => return Ok(None),
+        Err(err) => return Err(err)
+    };
+
+    let data = match field_headers.cont_type {
+        Some(content_type) => {
+            MultipartData::File(
+                MultipartFile::from_stream(
+                    field_headers.cont_disp.filename,
+                    content_type.val,
+                    &mut multipart.source,
+                )
+            )
+        },
+        None => {
+            let text = try!(multipart.read_to_string());
+            MultipartData::Text(&text)
+        },
+    };
+
+    Ok(Some(
+        MultipartField {
+            name: field_headers.cont_disp.field_name,
+            data: data,
+        }
+    ))
+}
+
+/// The data of a field in a `multipart/form-data` request.
+#[derive(Debug)]
+pub enum MultipartData<'a, B: 'a> {
+    /// The field's payload is a text string.
+    Text(&'a str),
+    /// The field's payload is a binary stream (file).
+    File(MultipartFile<'a, B>),
+    // TODO: Support multiple files per field (nested boundaries)
+    // MultiFiles(Vec<MultipartFile>),
+}
+
+impl<'a, B> MultipartData<'a, B> {
+    /// Borrow this payload as a text field, if possible.
+    pub fn as_text(&self) -> Option<&str> {
+        match *self {
+            MultipartData::Text(ref s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Borrow this payload as a file field, if possible.
+    /// Mutably borrows so the contents can be read.
+    pub fn as_file(&mut self) -> Option<&mut MultipartFile<'a, B>> {
+        match *self {
+            MultipartData::File(ref mut file) => Some(file),
+            _ => None,
+        }
+    }
+}
+
+/// A representation of a file in HTTP `multipart/form-data`.
+///
+/// Note that the file is not yet saved to the local filesystem;
+/// instead, this struct exposes `Read` and `BufRead` impls which point
+/// to the beginning of the file's contents in the HTTP stream.
+///
+/// You can read it to EOF, or use one of the `save_*()` methods here
+/// to save it to disk.
+#[derive(Debug)]
+pub struct MultipartFile<'a, B: 'a> {
+    filename: Option<String>,
+    content_type: Mime,
+    stream: &'a mut BoundaryReader<B>,
+}
+
+impl<'a, B: Read> MultipartFile<'a, B> {
+    fn from_stream(filename: Option<String>,
+                   content_type: Mime,
+                   stream: &'a mut BoundaryReader<B>) -> MultipartFile<'a, B> {
+        MultipartFile {
+            filename: filename,
+            content_type: content_type,
+            stream: stream,
+        }
+    }
+
+    /// Save this file to the given output stream.
+    ///
+    /// If successful, returns the number of bytes written.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save_to<W: Write>(&mut self, mut out: W) -> io::Result<u64> {
+        retry_on_interrupt(|| io::copy(self.stream, &mut out))
+    }
+
+    /// Save this file to the given output stream, **truncated** to `limit`
+    /// (no more than `limit` bytes will be written out).
+    ///
+    /// If successful, returns the number of bytes written.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save_to_limited<W: Write>(&mut self, mut out: W, limit: u64) -> io::Result<u64> {
+        retry_on_interrupt(|| io::copy(&mut self.stream.take(limit), &mut out))
+    }
+
+    /// Save this file to `path`.
+    ///
+    /// Returns the saved file info on success, or any errors otherwise.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save_as<P: Into<PathBuf>>(&mut self, path: P) -> io::Result<SavedFile> {
+        let path = path.into();
+        let file = try!(create_full_path(&path));
+        let size = try!(self.save_to(file));
+
+        Ok(SavedFile {
+            path: path,
+            filename: self.filename.clone(),
+            size: size,
+        })
+    }
+
+    /// Save this file in the directory pointed at by `dir`,
+    /// using a random alphanumeric string as the filename.
+    ///
+    /// Any missing directories in the `dir` path will be created.
+    ///
+    /// Returns the saved file's info on success, or any errors otherwise.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save_in<P: AsRef<Path>>(&mut self, dir: P) -> io::Result<SavedFile> {
+        let path = dir.as_ref().join(::random_alphanumeric(RANDOM_FILENAME_LEN));
+        self.save_as(path)
+    }
+
+    /// Save this file to `path`, **truncated** to `limit` (no more than `limit` bytes will be written out).
+    ///
+    /// Any missing directories in the `dir` path will be created.
+    ///
+    /// Returns the saved file's info on success, or any errors otherwise.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save_as_limited<P: Into<PathBuf>>(&mut self, path: P, limit: u64) -> io::Result<SavedFile> {
+        let path = path.into();
+        let file = try!(create_full_path(&path));
+        let size = try!(self.save_to_limited(file, limit));
+
+        Ok(SavedFile {
+            path: path,
+            filename: self.filename.clone(),
+            size: size,
+        })
+    }
+
+    /// Save this file in the directory pointed at by `dir`,
+    /// using a random alphanumeric string as the filename.
+    ///
+    /// **Truncates** file to `limit` (no more than `limit` bytes will be written out).
+    ///
+    /// Any missing directories in the `dir` path will be created.
+    ///
+    /// Returns the saved file's info on success, or any errors otherwise.
+    ///
+    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
+    pub fn save_in_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> io::Result<SavedFile> {
+        let path = dir.as_ref().join(::random_alphanumeric(RANDOM_FILENAME_LEN));
+        self.save_as_limited(path, limit)
+    }
+
+    /// Get the filename of this entry, if supplied.
+    ///
+    /// ##Warning
+    /// You should treat this value as untrustworthy because it is an arbitrary string provided by
+    /// the client. You should *not* blindly append it to a directory path and save the file there,
+    /// as such behavior could easily be exploited by a malicious client.
+    pub fn filename(&self) -> Option<&str> {
+        self.filename.as_ref().map(String::as_ref)
+    }
+
+    /// Get the MIME type (`Content-Type` value) of this file, if supplied by the client,
+    /// or `"applicaton/octet-stream"` otherwise.
+    pub fn content_type(&self) -> &Mime {
+        &self.content_type
+    }
+}
+
+impl<'a, B: Read> Read for MultipartFile<'a, B> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
+        self.stream.read(buf)
+    }
+}
+
+impl<'a, B: Read> BufRead for MultipartFile<'a, B> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.stream.fill_buf()
+    }
+
+    fn consume(&mut self, amt: usize) {
+        self.stream.consume(amt)
+    }
+}
+
+/// A file saved to the local filesystem from a multipart request.
+#[derive(Debug)]
+pub struct SavedFile {
+    /// The complete path this file was saved at.
+    pub path: PathBuf,
+
+    /// The original filename of this file, if one was provided in the request.
+    ///
+    /// ##Warning
+    /// You should treat this value as untrustworthy because it is an arbitrary string provided by
+    /// the client. You should *not* blindly append it to a directory path and save the file there,
+    /// as such behavior could easily be exploited by a malicious client.
+    pub filename: Option<String>,
+
+    /// The number of bytes written to the disk; may be truncated.
+    pub size: u64,
+}
+
+
 
 fn read_content_type(cont_type: &str) -> Mime {
     cont_type.parse().ok().unwrap_or_else(::mime_guess::octet_stream)
@@ -220,4 +461,26 @@ fn io_str_utf8(buf: &[u8]) -> io::Result<&str> {
 
 fn find_header<'a, 'b>(headers: &'a [StrHeader<'b>], name: &str) -> Option<&'a StrHeader<'b>> {
     headers.iter().find(|header| header.name == name)
+}
+
+fn retry_on_interrupt<F, T>(mut do_fn: F) -> io::Result<T> where F: FnMut() -> io::Result<T> {
+    loop {
+        match do_fn() {
+            Ok(val) => return Ok(val),
+            Err(err) => if err.kind() != io::ErrorKind::Interrupted {
+                return Err(err);
+            },
+        }
+    }
+}
+
+fn create_full_path(path: &Path) -> io::Result<File> {
+    if let Some(parent) = path.parent() {
+        try!(fs::create_dir_all(parent));
+    } else {
+        // RFC: return an error instead?
+        warn!("Attempting to save file in what looks like a root directory. File path: {:?}", path);
+    }
+
+    File::create(&path)
 }
