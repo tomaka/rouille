@@ -30,7 +30,7 @@ fn main() {
     log::set_logger(|max_log_level| {
         max_log_level.set(LOG_LEVEL);
         Box::new(SimpleLogger)
-    });
+    }).expect("Could not initialize logger");
 
     let mut args = env::args().skip(1);
 
