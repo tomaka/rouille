@@ -153,7 +153,7 @@ impl Intercept {
                         file.save_in_limited(&entries.dir, self.file_size_limit);
                         "Error reading field: \"{}\" (filename: \"{}\")",
                         field.name,
-                        file.filename.as_ref().map_or("(none)", String::as_ref)
+                        file.filename().unwrap_or("(none)")
                     );
 
                     if file.size == self.file_size_limit {
