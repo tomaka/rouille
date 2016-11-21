@@ -41,7 +41,10 @@ impl<R> BoundaryReader<R> where R: Read {
     fn read_to_boundary(&mut self) -> io::Result<&[u8]> {
         use log::LogLevel;
 
-        let buf = try!(fill_buf_min(&mut self.buf, self.boundary.len() * 2));
+        // Make sure there's enough bytes in the buffer to positively identify the boundary.
+        let min_len = self.search_idx + (self.boundary.len() * 2);
+
+        let buf = try!(fill_buf_min(&mut self.buf, min_len));
         
         if log_enabled!(LogLevel::Trace) {
             trace!("Buf: {:?}", String::from_utf8_lossy(buf));
@@ -72,7 +75,7 @@ impl<R> BoundaryReader<R> where R: Read {
                 match first_nonmatching_idx(test, &self.boundary) {
                     Some(idx) => {
                         debug!("First nonmatching idx: {}", idx);
-                        self.search_idx += idx + 1;
+                        self.search_idx += idx;
                     },
                     None => self.boundary_read = true,
                 } 
@@ -85,7 +88,6 @@ impl<R> BoundaryReader<R> where R: Read {
             "After-loop Buf len: {} Search idx: {} Boundary read: {:?}", 
             buf.len(), self.search_idx, self.boundary_read
         );
-
 
         let mut buf_end = self.search_idx;
         
