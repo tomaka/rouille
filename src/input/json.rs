@@ -7,6 +7,32 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+//! Parsing JSON data in the body of a request.
+//!
+//! Returns an error if the content-type of the request is not JSON, if the JSON is malformed,
+//! or if a field is missing or fails to parse.
+//!
+//! # Example
+//!
+//! ```
+//! extern crate rustc_serialize;
+//! # #[macro_use] extern crate rouille;
+//! # use rouille::{Request, Response};
+//! # fn main() {}
+//!
+//! fn route_handler(request: &Request) -> Response {
+//!     #[derive(RustcDecodable)]
+//!     struct Json {
+//!         field1: String,
+//!         field2: i32,
+//!     }
+//!
+//!     let json: Json = try_or_400!(rouille::input::get_json_input(request));
+//!     Response::text(format!("field1's value is {}", json.field1))
+//! }
+//! ```
+//!
+
 use rustc_serialize::Decodable;
 use rustc_serialize::json;
 use std::io::Error as IoError;
