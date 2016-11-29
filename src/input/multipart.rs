@@ -7,6 +7,11 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+//! Parsing data sent with `multipart/form-data`.
+//!
+//! > **Note**: You are encouraged to look at [the `post` module](../post/index.html) instead in
+//! > order to parse data from HTML forms.
+
 use Request;
 use RequestBody;
 

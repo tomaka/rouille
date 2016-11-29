@@ -19,11 +19,19 @@ fn main() {
                 },
 
                 (POST) (/submit) => {
-                    let data: FormData = try_or_400!(rouille::input::get_post_input(request));
+                    let data = try_or_400!(post_input!(request, {
+                        login: String,
+                        password: String,
+                    }));
+
                     println!("{:?}", data);
 
+                    #[derive(Debug, RustcEncodable)]
+                    struct TemplateOut { login: String, }
+                    let template_out = TemplateOut { login: data.login, };
+
                     let mut output = Vec::new();
-                    form_success.render(&mut output, &data);
+                    form_success.render(&mut output, &template_out);
                     rouille::Response::html(output)
                 },
 
@@ -31,10 +39,4 @@ fn main() {
             )
         })
     });
-}
-
-#[derive(Debug, RustcEncodable, RustcDecodable)]
-struct FormData {
-    login: String,
-    password: String,
 }

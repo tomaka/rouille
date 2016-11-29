@@ -11,7 +11,6 @@ use rustc_serialize::base64::FromBase64;
 use Request;
 
 pub use self::json::get_json_input;
-pub use self::post::get_post_input;
 
 pub mod json;
 pub mod multipart;

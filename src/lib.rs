@@ -100,13 +100,11 @@ mod router;
 /// use rouille::Response;
 ///
 /// fn handle_something(request: &Request) -> Response {
-///     #[derive(RustcDecodable)]
-///     struct FormData {
+///     let data = try_or_400!(post_input!(request, {
 ///         field1: u32,
 ///         field2: String,
-///     }
+///     }));
 ///
-///     let _data: FormData = try_or_400!(rouille::input::get_post_input(request));
 ///     Response::text("hello")
 /// }
 /// # }
@@ -140,19 +138,16 @@ macro_rules! try_or_404 {
 ///
 /// ```
 /// # #[macro_use] extern crate rouille;
-/// # extern crate rustc_serialize;
 /// # fn main() {
 /// use rouille::Request;
 /// use rouille::Response;
 ///
 /// fn handle_something(request: &Request) -> Response {
-///     #[derive(RustcDecodable)]
-///     struct FormData {
+///     let data = try_or_400!(post_input!(request, {
 ///         field1: u32,
 ///         field2: String,
-///     }
+///     }));
 ///
-///     let data: FormData = try_or_400!(rouille::input::get_post_input(request));
 ///     assert_or_400!(data.field1 >= 2);
 ///     Response::text("hello")
 /// }
@@ -489,7 +484,7 @@ impl Request {
             url
         };
 
-        url::percent_encoding::lossy_utf8_percent_decode(url)
+        url::percent_encoding::percent_decode(url).decode_utf8_lossy().into_owned()
     }
 
     /// Returns the value of a GET parameter.
@@ -509,7 +504,7 @@ impl Request {
             Some(e) => &get_params[param .. e + param],
         };
 
-        Some(url::percent_encoding::lossy_utf8_percent_decode(value.replace("+", " ").as_bytes()))
+        Some(url::percent_encoding::percent_decode(value.replace("+", " ").as_bytes()).decode_utf8_lossy().into_owned())
     }
 
     /// Returns the value of a header of the request.
