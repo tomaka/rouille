@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.3.0
+
+- Reworked POST input. You can now use the `post_input!` macro instead of creating a decodable
+  struct.
+- Removed the `input::session` module and replaced it with the `session` module. Sessions no longer
+  store data in a hashmap, but instead only provide a way to generate a unique ID per client.
+
 ## Version 0.2.0
 
 - Fixed the `+` character in the query string not being replaced with a space as it should.
