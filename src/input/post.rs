@@ -51,6 +51,7 @@
 //!   they are merged together. If you don't use a `Vec` then an error is returned in that
 //!   situation. If the client provides multiple values and some of them fail to parse, an error
 //!   is returned. You can use a `Vec<Option<T>>` if you don't want an error on parse failure.
+//!   Empty vecs are possible.
 //! - The file-uploads-related types. See below.
 //!
 //! > **Note**: You may find resources on the web telling you that you must put brackets (`[` `]`)
@@ -346,6 +347,11 @@ impl<T, C> DecodePostField<C> for Vec<T> where T: DecodePostField<C> {
     fn merge_multiple(mut self, mut existing: Vec<T>) -> Result<Vec<T>, PostFieldError> {
         self.append(&mut existing);
         Ok(self)
+    }
+
+    #[inline]
+    fn not_found(_: C) -> Result<Self, PostFieldError> {
+        Ok(Vec::new())
     }
 }
 
@@ -829,6 +835,20 @@ mod tests {
         }).unwrap();
 
         assert_eq!(input.field, false);
+    }
+
+    #[test]
+    fn missing_field_vec() {
+        let request = Request::fake_http("GET", "/", vec![
+            ("Host".to_owned(), "localhost".to_owned()),
+            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
+        ], b"wrong=value".to_vec());
+
+        let input = post_input!(&request, {
+            field: Vec<String>
+        }).unwrap();
+
+        assert!(input.field.is_empty());
     }
 
     #[test]

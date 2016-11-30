@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.3.1
+
+- Empty Vecs are now allowed for POST input.
+
 ## Version 0.3.0
 
 - Reworked POST input. You can now use the `post_input!` macro instead of creating a decodable
