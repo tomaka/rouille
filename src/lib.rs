@@ -60,7 +60,6 @@ extern crate url;
 
 pub use assets::match_assets;
 pub use log::log;
-pub use input::{SessionsManager, Session, generate_session_id};
 pub use response::{Response, ResponseBody};
 
 use std::io::Cursor;
@@ -80,6 +79,7 @@ use std::ascii::AsciiExt;
 
 pub mod cgi;
 pub mod input;
+pub mod session;
 
 mod assets;
 mod find_route;
