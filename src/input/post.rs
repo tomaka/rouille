@@ -396,6 +396,8 @@ impl DecodePostField<()> for BufferedFile {
     }
 }
 
+/// Parse input from HTML forms. See [the `post` module](input/post/index.html) for general
+/// documentation.
 #[macro_export]
 macro_rules! post_input {
     ($request:expr, {$($field:ident: $ty:ty $({$config:expr})*),*$(,)*}) => ({

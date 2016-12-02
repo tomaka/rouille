@@ -7,6 +7,14 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+//! Analyze the request's headers and body.
+//! 
+//! This module provides functions and sub-modules that allow you to easily analyze or parse the
+//! request's headers and body.
+//! 
+//! - In order to parse JSON, see [the `json` module](json/input.html).
+//! - In order to parse input from HTML forms, see [the `post` module](post/input.html).
+
 use rustc_serialize::base64::FromBase64;
 use Request;
 
