@@ -14,15 +14,20 @@
 //! 
 //! - In order to parse JSON, see [the `json` module](json/input.html).
 //! - In order to parse input from HTML forms, see [the `post` module](post/input.html).
+//! - In order to read a plain text body, see
+//!   [the `plain_text_body` function](fn.plain_text_body.html).
 
 use rustc_serialize::base64::FromBase64;
 use Request;
 
 pub use self::json::get_json_input;
+pub use self::plain::plain_text_body;
 
 pub mod json;
 pub mod multipart;
 pub mod post;
+
+mod plain;
 
 /// Credentials returned by `get_basic_http_auth`.
 #[derive(Debug, Clone, PartialEq, Eq)]
