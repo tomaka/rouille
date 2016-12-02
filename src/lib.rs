@@ -15,7 +15,7 @@
 //! use rouille::Request;
 //! use rouille::Response;
 //!
-//! rouille::start_server("0.0.0.0:1234", move |request| {
+//! rouille::start_server("0.0.0.0:80", move |request| {
 //!     Response::text("hello world")
 //! });
 //! ```
@@ -36,17 +36,19 @@
 //!
 //! - In order to dispatch between various code depending on the URL, you can use the `router!`
 //!   macro.
-//! - In order to serve static files, use the `match_assets` function.
-//! - ... TODO: write the rest
+//! - In order to analyze the body of the request, like handling JSON input, form input, etc. you
+//!   can take a look at [the `input` module](input/index.html).
 //!
 //! # Returning a response
-//! 
+//!
 //! Once you analyzed the request, it is time to return a response by returning a
 //! [`Response`](struct.Response.html) object.
-//! 
+//!
 //! All the members of `Response` are public, so you can customize it as you want. There are also
 //! several constructors that you build a basic `Response` which can then modify.
-//! 
+//!
+//! In order to serve static files, take a look at
+//! [the `match_assets` function](fn.match_assets.html).
 
 #![deny(unsafe_code)]
 
