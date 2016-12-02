@@ -5,7 +5,9 @@ authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/tomaka/rouille"
 documentation = "http://docs.rs/rouille"
-description = "High-level web framework"
+description = "High-level idiomatic web framework."
+readme = "README.md"
+keywords = ["web", "framework", "http", "rest"]
 
 [dependencies]
 filetime = "0.1.10"
