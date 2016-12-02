@@ -146,13 +146,7 @@ fn note_routes(request: &Request, db: &Transaction) -> Response {
             // This route modifies the content of an existing note.
 
             // We start by reading the body of the HTTP request into a `String`.
-            let body = {
-                let mut out = String::new();
-                // We use the `try_or_400!` macro return a 400 error code in case of a failure
-                // to read the data.
-                try_or_400!(request.data().unwrap().read_to_string(&mut out));
-                out
-            };
+            let body = try_or_400!(rouille::input::plain_text_body(&request));
 
             // And write the content with a query. This line can only panic if the
             // SQL is malformed.
@@ -172,13 +166,7 @@ fn note_routes(request: &Request, db: &Transaction) -> Response {
             // This route creates a new node whose initial content is the body.
 
             // We start by reading the body of the HTTP request into a `String`.
-            let body = {
-                let mut out = String::new();
-                // We use the `try_or_400!` macro return a 400 error code in case of a failure
-                // to read the data.
-                try_or_400!(request.data().unwrap().read_to_string(&mut out));
-                out
-            };
+            let body = try_or_400!(rouille::input::plain_text_body(&request));
 
             // To do so, we first create a variable that will receive the content.
             let mut id: Option<i32> = None;
