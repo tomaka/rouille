@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.3.2
+
+- Added the `rouille::input::plain_text_body` function.
+
 ## Version 0.3.1
 
 - Empty Vecs are now allowed for POST input.
