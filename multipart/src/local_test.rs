@@ -9,7 +9,7 @@ use client::HttpStream as ClientStream;
 
 use server::HttpRequest as ServerRequest;
 
-use rand::{self, Rng};
+use rand::{self, Rng, ThreadRng};
 
 use std::collections::HashMap;
 use std::io::prelude::*;
@@ -53,12 +53,12 @@ fn gen_test_fields() -> TestFields {
 }
 
 fn gen_string() -> String {
-    const MIN_LEN: usize = 3;
-    const MAX_LEN: usize = 8;
-    const MAX_DASHES: usize = 3;
+    const MIN_LEN: usize = 2;
+    const MAX_LEN: usize = 5;
+    const MAX_DASHES: usize = 2;
 
-    let mut rng_1 = rand::weak_rng();
-    let mut rng_2 = rand::weak_rng();
+    let mut rng_1 = rand::thread_rng();
+    let mut rng_2 = rand::thread_rng();
 
     let str_len_1 = rng_1.gen_range(MIN_LEN, MAX_LEN + 1);
     let str_len_2 = rng_2.gen_range(MIN_LEN, MAX_LEN + 1);
@@ -183,6 +183,7 @@ impl HttpBuffer {
             data: &self.buf,
             boundary: &self.boundary,
             content_len: self.content_len,
+            rng: rand::thread_rng(),
         }
     }
 }
@@ -211,16 +212,18 @@ impl ClientStream for HttpBuffer {
     fn finish(self) -> Result<Self, io::Error> { Ok(self) }
 }
 
-#[derive(Debug)]
 pub struct ServerBuffer<'a> {
     data: &'a [u8],
     boundary: &'a str,
     content_len: Option<u64>,
+    rng: ThreadRng,
 }
 
 impl<'a> Read for ServerBuffer<'a> {
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
-        self.data.read(out)
+        // Simulate the randomness of a network connection by not always reading everything
+        let len = self.rng.gen_range(1, out.len());
+        self.data.read(&mut out[..len])
     }
 }
 
