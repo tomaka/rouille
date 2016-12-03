@@ -47,7 +47,7 @@ pub fn session<F>(request: &Request, cookie_name: &str, timeout_s: u64, inner: F
 {
     let mut cookie = input::get_cookies(request).into_iter();
     let cookie = cookie.find(|&(ref k, _)| k == &cookie_name);
-    let cookie = cookie.map(|(k, v)| v);
+    let cookie = cookie.map(|(_, v)| v);
 
     let session = if let Some(cookie) = cookie {
         Session {

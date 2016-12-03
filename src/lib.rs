@@ -67,8 +67,6 @@ pub use response::{Response, ResponseBody};
 use std::io::Cursor;
 use std::io::Result as IoResult;
 use std::io::Read;
-use std::error;
-use std::fmt;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
@@ -215,7 +213,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
     let server = tiny_http::Server::http(addr).unwrap();
     let handler = Arc::new(AssertUnwindSafe(handler));      // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
 
-    for mut request in server.incoming_requests() {
+    for request in server.incoming_requests() {
         // We spawn a thread so that requests are processed in parallel.
         let handler = handler.clone();
         thread::spawn(move || {
@@ -283,7 +281,9 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                 }
             }
 
-            tiny_http_request.lock().unwrap().take().unwrap().respond(response);
+            // We don't really care if we fail to send the response to the client, as there's
+            // nothing we can do anyway.
+            let _ = tiny_http_request.lock().unwrap().take().unwrap().respond(response);
         });
     }
 

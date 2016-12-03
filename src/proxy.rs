@@ -128,7 +128,7 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
     let mut socket = io::BufReader::new(socket);
 
     let mut headers = Vec::new();
-    let mut status = 200;
+    let status;
     {
         let mut lines = socket.by_ref().lines();
 

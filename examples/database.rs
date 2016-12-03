@@ -12,7 +12,6 @@ extern crate rouille;
 extern crate postgres;
 extern crate rustc_serialize;
 
-use std::io::Read;
 use std::sync::Mutex;
 
 use postgres::Connection;

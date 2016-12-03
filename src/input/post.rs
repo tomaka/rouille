@@ -109,7 +109,6 @@ use std::io::BufRead;
 use std::io::Error as IoError;
 use std::io::Read;
 use std::num;
-use std::str::ParseBoolError;
 
 // Must be made public so that it can be used by the `post_input` macro.
 #[doc(hidden)]
@@ -225,7 +224,7 @@ pub trait DecodePostField<Config>: fmt::Debug {
     /// an object for each of them and then merge them with this method.
     ///
     /// The default implementation returns `UnexpectedMultipleValues`.
-    fn merge_multiple(self, existing: Self) -> Result<Self, PostFieldError> where Self: Sized {
+    fn merge_multiple(self, _existing: Self) -> Result<Self, PostFieldError> where Self: Sized {
         Err(PostFieldError::UnexpectedMultipleValues)
     }
 
@@ -233,7 +232,7 @@ pub trait DecodePostField<Config>: fmt::Debug {
     ///
     /// The default implementation returns `MissingField`.
     #[inline]
-    fn not_found(config: Config) -> Result<Self, PostFieldError> where Self: Sized {
+    fn not_found(_: Config) -> Result<Self, PostFieldError> where Self: Sized {
         Err(PostFieldError::MissingField)
     }
 }
@@ -288,7 +287,7 @@ impl<T, C> DecodePostField<C> for Option<T> where T: DecodePostField<C> {
     fn from_field(config: C, content: &str) -> Result<Self, PostFieldError> {
         match DecodePostField::from_field(config, content) {
             Ok(val) => Ok(Some(val)),
-            Err(err) => Ok(None)
+            Err(_) => Ok(None)
         }
     }
 
@@ -298,7 +297,7 @@ impl<T, C> DecodePostField<C> for Option<T> where T: DecodePostField<C> {
     {
         match DecodePostField::from_file(config, file, filename, mime) {
             Ok(val) => Ok(Some(val)),
-            Err(err) => Ok(None)
+            Err(_) => Ok(None)
         }
     }
 
@@ -315,7 +314,7 @@ impl DecodePostField<()> for bool {
     }
 
     #[inline]
-    fn from_file<R>(_: (), _: R, _: Option<&str>, mime: &str) -> Result<Self, PostFieldError>
+    fn from_file<R>(_: (), _: R, _: Option<&str>, _: &str) -> Result<Self, PostFieldError>
         where R: BufRead
     {
         Ok(true)
@@ -515,7 +514,7 @@ macro_rules! post_input {
                                         }),
                                     };
                                 },
-                                multipart::MultipartData::File(mut f) => {
+                                multipart::MultipartData::File(f) => {
                                     let name = f.filename().map(|n| n.to_owned());
                                     let name = name.as_ref().map(|n| &n[..]);
                                     let mime = f.content_type().to_string();

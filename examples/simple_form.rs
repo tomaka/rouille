@@ -31,7 +31,7 @@ fn main() {
                     let template_out = TemplateOut { login: data.login, };
 
                     let mut output = Vec::new();
-                    form_success.render(&mut output, &template_out);
+                    form_success.render(&mut output, &template_out).unwrap();
                     rouille::Response::html(output)
                 },
 
