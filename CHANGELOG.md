@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.3.3
+
+- Added the `proxy` module with basic reverse proxy.
+
 ## Version 0.3.2
 
 - Added the `rouille::input::plain_text_body` function.
