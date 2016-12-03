@@ -9,7 +9,6 @@
 
 use std::io::Error as IoError;
 use std::io::Read;
-use rustc_serialize::base64::FromBase64;
 use Request;
 
 /// Error that can happen when parsing the request body as plain text.

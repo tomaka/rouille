@@ -3,7 +3,6 @@ extern crate rouille;
 extern crate rustc_serialize;
 
 use std::io;
-use std::io::Read;
 
 fn main() {
     rouille::start_server("localhost:8001", move |request| {

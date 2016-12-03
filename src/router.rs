@@ -185,7 +185,7 @@ mod tests {
 
         assert_eq!(1, router!(request,
             (GET) (/hello) => { 0 },
-            (GET) (/{val:u32}) => { 0 },
+            (GET) (/{_val:u32}) => { 0 },
             (GET) (/) => { 1 },
             _ => 0
         ));
@@ -210,7 +210,7 @@ mod tests {
         assert_eq!(1, router!(request,
             (GET) (/hello/) => { 0 },
             (GET) (/hello/{id:u32}) => { if id == 5 { 1 } else { 0 } },
-            (GET) (/hello/{id:String}) => { 0 },
+            (GET) (/hello/{_id:String}) => { 0 },
             _ => 0
         ));
     }

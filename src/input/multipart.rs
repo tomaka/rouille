@@ -15,8 +15,6 @@
 use Request;
 use RequestBody;
 
-use std::mem;
-
 use multipart::server::Multipart as InnerMultipart;
 
 // TODO: provide wrappers around these
