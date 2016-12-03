@@ -107,7 +107,7 @@ impl<B: Read> Multipart<B> {
     /// If the previously returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry.
     pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<B>>> {
-        if !try!(self.consume_boundary()) {
+        if try!(self.consume_boundary()) {
             return Ok(None);
         }
 
@@ -236,23 +236,11 @@ impl<B: Read> Multipart<B> {
         }
     }
 
+    // Consume the next boundary.
+    // Returns `true` if the last boundary was read, `false` otherwise.
     fn consume_boundary(&mut self) -> io::Result<bool> {
         debug!("Consume boundary!");
-
-        try!(self.source.consume_boundary());
-
-        let mut out = [0; 2];
-        let _ = try!(self.source.read(&mut out));
-
-        if *b"\r\n" == out {
-            Ok(true)
-        } else {
-            if *b"--" != out {
-                warn!("Unexpected 2-bytes after boundary: {:?}", out);
-            }
-
-            Ok(false)
-        }
+        self.source.consume_boundary()
     }
 }
 

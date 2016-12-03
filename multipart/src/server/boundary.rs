@@ -10,6 +10,8 @@
 use super::buf_redux::BufReader;
 use super::memchr::memchr;
 
+use log::LogLevel;
+
 use std::cmp;
 use std::borrow::Borrow;
 
@@ -19,7 +21,7 @@ use std::io::prelude::*;
 /// A struct implementing `Read` and `BufRead` that will yield bytes until it sees a given sequence.
 #[derive(Debug)]
 pub struct BoundaryReader<R> {
-    buf: BufReader<R>,
+    source: BufReader<R>,
     boundary: Vec<u8>,
     search_idx: usize,
     boundary_read: bool,
@@ -30,7 +32,7 @@ impl<R> BoundaryReader<R> where R: Read {
     #[doc(hidden)]
     pub fn from_reader<B: Into<Vec<u8>>>(reader: R, boundary: B) -> BoundaryReader<R> {
         BoundaryReader {
-            buf: BufReader::new(reader),
+            source: BufReader::new(reader),
             boundary: boundary.into(),
             search_idx: 0,
             boundary_read: false,
@@ -39,12 +41,10 @@ impl<R> BoundaryReader<R> where R: Read {
     }
 
     fn read_to_boundary(&mut self) -> io::Result<&[u8]> {
-        use log::LogLevel;
-
         // Make sure there's enough bytes in the buffer to positively identify the boundary.
         let min_len = self.search_idx + (self.boundary.len() * 2);
 
-        let buf = try!(fill_buf_min(&mut self.buf, min_len));
+        let buf = try!(fill_buf_min(&mut self.source, min_len));
         
         if log_enabled!(LogLevel::Trace) {
             trace!("Buf: {:?}", String::from_utf8_lossy(buf));
@@ -55,33 +55,35 @@ impl<R> BoundaryReader<R> where R: Read {
             buf.len(), self.search_idx, self.boundary_read
         );
 
-        while !(self.boundary_read || self.at_end) && self.search_idx < buf.len() {
+        while !self.boundary_read && self.search_idx < buf.len() {
             let lookahead = &buf[self.search_idx..];
 
-            let maybe_boundary = memchr(self.boundary[0], lookahead);
-
-            self.search_idx = match maybe_boundary {
+            // Find the first byte of the candidate boundary, quickly.
+            self.search_idx = match memchr(self.boundary[0], lookahead) {
                 Some(boundary_start) => self.search_idx + boundary_start,
                 None => buf.len(),
             };
 
-            if self.search_idx + self.boundary.len() <= buf.len() {
-                let test = &buf[self.search_idx .. self.search_idx + self.boundary.len()];
+            if log_enabled!(LogLevel::Trace) {
+                let len = cmp::min(lookahead.len(), self.boundary.len());
+                trace!("Possible boundary: {:?}", String::from_utf8_lossy(&lookahead[..len]));
+            }
 
-                if log_enabled!(LogLevel::Trace) {
-                    trace!("Possible boundary: {:?}", String::from_utf8_lossy(test));
-                }
+            // See if the candidate is actually our boundary
+            match first_nonmatching_idx(lookahead, &self.boundary) {
+                Some(idx) => {
+                    debug!("First nonmatching idx: {}", idx);
+                    // Skip the nonmatching bit of the candidate
+                    self.search_idx += idx;
+                },
+                // We've only positively read the boundary if we have seen all of the candidate.
+                None => self.boundary_read = lookahead.len() >= self.boundary.len(),
+            }
 
-                match first_nonmatching_idx(test, &self.boundary) {
-                    Some(idx) => {
-                        debug!("First nonmatching idx: {}", idx);
-                        self.search_idx += idx;
-                    },
-                    None => self.boundary_read = true,
-                } 
-            } else {
+            // We can still return the part of the buffer that didn't match a boundary.
+            if lookahead.len() < self.boundary.len() {
                 break;
-            }            
+            }
         }        
         
         debug!(
@@ -89,20 +91,21 @@ impl<R> BoundaryReader<R> where R: Read {
             buf.len(), self.search_idx, self.boundary_read
         );
 
-        let mut buf_end = self.search_idx;
-        
-        if self.boundary_read && self.search_idx >= 2 {
+        // If the two bytes before the boundary are a CR-LF, we need to back up
+        // the cursor so we don't yield bytes that client code isn't expecting.
+        if self.search_idx >= 2 {
             let two_bytes_before = &buf[self.search_idx - 2 .. self.search_idx];
 
-            debug!("Two bytes before: {:?} (\"\\r\\n\": {:?})", two_bytes_before, b"\r\n");
+            debug!("Two bytes before: {:?} ({:?}) (\"\\r\\n\": {:?})",
+                   String::from_utf8_lossy(two_bytes_before), two_bytes_before, b"\r\n");
 
             if two_bytes_before == &*b"\r\n" {
                 debug!("Subtract two!");
-                buf_end -= 2;
+                self.search_idx -= 2;
             } 
         }
 
-        let ret_buf = &buf[..buf_end];
+        let ret_buf = &buf[..self.search_idx];
 
         if log_enabled!(LogLevel::Trace) {
             trace!("Returning buf: {:?}", String::from_utf8_lossy(ret_buf));
@@ -112,9 +115,9 @@ impl<R> BoundaryReader<R> where R: Read {
     }
 
     #[doc(hidden)]
-    pub fn consume_boundary(&mut self) -> io::Result<()> {
+    pub fn consume_boundary(&mut self) -> io::Result<bool> {
         if self.at_end {
-            return Ok(());
+            return Ok(true);
         }
 
         while !self.boundary_read {
@@ -127,12 +130,46 @@ impl<R> BoundaryReader<R> where R: Read {
             self.consume(buf_len);
         }
 
-        self.buf.consume(self.search_idx + self.boundary.len());
-
+        self.source.consume(self.search_idx);
         self.search_idx = 0;
+
+        if log_enabled!(LogLevel::Trace) {
+            trace!("Consumed up to self.search_idx, remaining buf: {:?}",
+                   String::from_utf8_lossy(self.source.get_buf())
+            );
+        }
+
+        let consume_amt = {
+            let buf = self.source.get_buf();
+
+            self.boundary.len() + if buf[..2] == *b"\r\n" { 2 } else { 0 }
+        };
+
+        self.source.consume(consume_amt);
         self.boundary_read = false;
- 
-        Ok(())
+
+        let mut bytes_after = [0, 0];
+
+        let read = try!(self.source.read(&mut bytes_after));
+
+        if read == 1 {
+            let _ = try!(self.source.read(&mut bytes_after[1..]));
+        }
+
+        if bytes_after == *b"--" {
+            self.at_end = true;
+        } else if bytes_after != *b"\r\n" {
+            warn!("Unexpected bytes following boundary: {:?}", String::from_utf8_lossy(&bytes_after));
+        }
+
+        if log_enabled!(LogLevel::Trace) {
+            trace!("Consumed boundary (at_end: {:?}), remaining buf: {:?}",
+                    self.at_end,
+                   String::from_utf8_lossy(self.source.get_buf())
+            );
+        }
+
+        Ok(self.at_end)
     }
 
     // Keeping this around to support nested boundaries later.
@@ -145,7 +182,7 @@ impl<R> BoundaryReader<R> where R: Read {
 
 impl<R> Borrow<R> for BoundaryReader<R> {
     fn borrow(&self) -> &R {
-        self.buf.get_ref() 
+        self.source.get_ref()
     }
 }
 
@@ -172,7 +209,7 @@ impl<R> BufRead for BoundaryReader<R> where R: Read {
 
         debug!("Consume! amt: {} true amt: {}", amt, true_amt);
 
-        self.buf.consume(true_amt);
+        self.source.consume(true_amt);
         self.search_idx -= true_amt;
     }
 }
@@ -185,6 +222,8 @@ fn fill_buf_min<R: Read>(buf: &mut BufReader<R>, min: usize) -> io::Result<&[u8]
     Ok(buf.get_buf())
 }
 
+// Returns the first index which `left` and `right` don't match, None otherwise.
+// If they are different lengths and they match up to the end of the shorter one, returns None.
 fn first_nonmatching_idx(left: &[u8], right: &[u8]) -> Option<usize> {
     for (idx, (lb, rb)) in left.iter().zip(right).enumerate() {
         if lb != rb {
@@ -202,8 +241,8 @@ mod test {
     use std::io;
     use std::io::prelude::*;
 
-    const BOUNDARY: &'static str = "\r\n--boundary";
-    const TEST_VAL: &'static str = "\r\n--boundary\r
+    const BOUNDARY: &'static str = "--boundary";
+    const TEST_VAL: &'static str = "--boundary\r
 dashed-value-1\r
 --boundary\r
 dashed-value-2\r
@@ -258,7 +297,7 @@ dashed-value-2\r
         debug!("Testing boundary (split)");
         
         // Substitute for `.step_by()` being unstable.
-        for split_at in (0 .. TEST_VAL.len()).filter(|x| x % 2 != 0) {
+        for split_at in 0 .. TEST_VAL.len(){
             debug!("Testing split at: {}", split_at);
 
             let src = SplitReader::split(TEST_VAL.as_bytes(), split_at);
@@ -281,7 +320,7 @@ dashed-value-2\r
 
         debug!("Read 2");
         let _ = reader.read_to_string(buf).unwrap();
-        assert_eq!(buf, "\r\ndashed-value-1");
+        assert_eq!(buf, "dashed-value-1");
         buf.clear();
 
         debug!("Consume 2");
@@ -289,7 +328,7 @@ dashed-value-2\r
 
         debug!("Read 3");
         let _ = reader.read_to_string(buf).unwrap();
-        assert_eq!(buf, "\r\ndashed-value-2");
+        assert_eq!(buf, "dashed-value-2");
         buf.clear();
 
         debug!("Consume 3");
@@ -297,6 +336,6 @@ dashed-value-2\r
 
         debug!("Read 4");
         let _ = reader.read_to_string(buf).unwrap();
-        assert_eq!(buf, "--");
+        assert_eq!(buf, "");
     }
 }
