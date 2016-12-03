@@ -81,6 +81,7 @@ use std::ascii::AsciiExt;
 
 pub mod cgi;
 pub mod input;
+pub mod proxy;
 pub mod session;
 
 mod assets;
