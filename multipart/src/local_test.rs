@@ -97,14 +97,19 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
        multipart.write_stream(file_name, &mut &**file, None, None).unwrap();
     }
 
-
     multipart.send().unwrap()
 }
 
 fn test_server(buf: HttpBuffer, mut fields: TestFields) {
     use server::{Multipart, MultipartData};
 
-    let mut multipart = Multipart::from_request(buf.for_server())
+    let server_buf = buf.for_server();
+
+    if let Some(content_len) = server_buf.content_len {
+        assert!(content_len == server_buf.data.len() as u64, "Supplied content_len different from actual");
+    }
+
+    let mut multipart = Multipart::from_request(server_buf)
         .unwrap_or_else(|_| panic!("Buffer should be multipart!"));
 
     trace!("Fields for server test: {:?}", fields);
