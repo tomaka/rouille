@@ -30,6 +30,9 @@ macro_rules! try_lazy (
 /// A `LazyError` wrapping `std::io::Error`.
 pub type LazyIoError<'a> = LazyError<'a, io::Error>;
 
+/// `Result` type for `LazyIoError`.
+pub type LazyIoResult<'a, T> = Result<T, LazyIoError<'a>>;
+
 /// An error for lazily written multipart requests, including the original error as well
 /// as the field which caused the error, if applicable.
 pub struct LazyError<'a, E> {
@@ -175,7 +178,7 @@ impl<'n, 'd> Multipart<'n, 'd> {
     ///
     /// A certain amount of field data will be buffered. See
     /// [`prepare_threshold()`](#method.prepare_threshold) for more information on this behavior.
-    pub fn prepare(&mut self) -> Result<PreparedFields<'d>, LazyIoError<'n>> {
+    pub fn prepare(&mut self) -> LazyIoResult<'n, PreparedFields<'d>> {
        self.prepare_threshold(Some(DEFAULT_BUFFER_THRESHOLD)) 
     }
 
@@ -186,7 +189,7 @@ impl<'n, 'd> Multipart<'n, 'd> {
     /// all fields are copied to memory.
     ///
     ///
-    pub fn prepare_threshold(&mut self, buffer_threshold: Option<u64>) -> Result<PreparedFields<'d>, LazyIoError<'n>> {
+    pub fn prepare_threshold(&mut self, buffer_threshold: Option<u64>) -> LazyIoResult<'n, PreparedFields<'d>> {
         let boundary = super::gen_boundary();
         PreparedFields::from_fields(&mut self.fields, boundary.into(), buffer_threshold)
     }
@@ -241,8 +244,6 @@ struct Stream<'n, 'd> {
 /// The result of [`Multipart::prepare()`](struct.Multipart.html#method.prepare) or
 /// `Multipart::prepare_threshold()`. Implements `Read`, contains the entire request body.
 pub struct PreparedFields<'d> {
-    // NOTE: the order of these fields have been reversed so fields can be popped one-by-one from
-    // the end.
     fields: Vec<PreparedField<'d>>,
     #[cfg_attr(not(feature = "hyper"), allow(dead_code))]
     boundary: String,
@@ -251,61 +252,23 @@ pub struct PreparedFields<'d> {
 
 impl<'d> PreparedFields<'d> {
     fn from_fields<'n>(fields: &mut Vec<Field<'n, 'd>>, boundary: String, buffer_threshold: Option<u64>) -> Result<Self, LazyIoError<'n>> {
-        let buffer_threshold = buffer_threshold.unwrap_or(::std::u64::MAX);
+        let buffer_threshold = buffer_threshold.unwrap_or(0);
 
         let mut prep_fields = Vec::with_capacity(fields.len());
 
-        // We reverse so we can pop efficiently from the end
-        let mut fields = fields.drain(..).rev().peekable();
+        let mut fields = fields.drain(..).peekable();
 
         let mut contiguous = Vec::new();
-        let mut remainder: Option<Box<Read>> = None;
-        let mut use_content_len = true;
-        let mut content_len = 0;
 
         while fields.peek().is_some() {
-            {
-                let mut writer = MultipartWriter::new(&mut contiguous, &*boundary);
-
-                while let Some(field) = fields.next() {
-                    match field.data {
-                        Data::Text(text) => if text.len() as u64 <= buffer_threshold  {
-                            try_lazy!(field.name, writer.write_text(&field.name, &*text));
-                        } else {
-                            try_lazy!(field.name, writer.write_field_headers(&field.name, None, None));
-                            content_len += text.len() as u64;
-                            remainder = Some(Box::new(io::Cursor::new(CowStrAsRef(text))));
-                        },
-                        Data::File(path) => {
-                            let (content_type, filename) = super::mime_filename(&*path);
-                            let mut file = try_lazy!(field.name, File::open(&*path));
-                            let len = try_lazy!(field.name, file.metadata()).len();
-
-                            if len <= buffer_threshold {
-                                try_lazy!(field.name, writer.write_stream(&mut file, &field.name, filename, Some(content_type)));
-                            } else {
-                                try_lazy!(field.name, writer.write_field_headers(&field.name, filename, Some(content_type)));
-                                remainder = Some(Box::new(file));
-                                content_len += len;
-                            }
-                        },
-                        Data::Stream(stream) => {
-                            let filename = stream.filename.as_ref().map(|f| &**f);
-                            try_lazy!(field.name, writer.write_field_headers(&field.name, filename, stream.content_type));
-                            remainder = Some(stream.stream);
-                            use_content_len = false;
-                        },
-                    }
-
-                    if remainder.is_some() { break; }
-                }
-            }
-
-            content_len += contiguous.len() as u64;
+            let remainder = {
+                let writer = MultipartWriter::new(&mut contiguous, &*boundary);
+                try!(write_fields(writer, &mut fields, buffer_threshold))
+            };
 
             let contiguous = io::Cursor::new(mem::replace(&mut contiguous, Vec::new()));
 
-            if let Some(rem) = remainder.take() {
+            if let Some(rem) = remainder {
                 prep_fields.push(PreparedField::Partial(contiguous.chain(rem)));
             } else {
                 prep_fields.push(PreparedField::Contiguous(contiguous));
@@ -316,22 +279,21 @@ impl<'d> PreparedFields<'d> {
         let mut end_written = false;
         
         if let Some(&mut PreparedField::Contiguous(ref mut vec)) = prep_fields.last_mut() {
-            let start_len = vec.get_ref().len();
             try_lazy!(write!(vec, "\r\n--{}--", boundary));
-            content_len += (vec.get_ref().len() - start_len) as u64;
             end_written = true;
         } 
         
         if !end_written {
             let vec = format!("\r\n--{}--", boundary).into_bytes();
-            content_len += vec.len() as u64;
             prep_fields.push(PreparedField::Contiguous(io::Cursor::new(vec)));
         }
+
+        let content_len = get_content_len(&prep_fields);
 
         Ok(PreparedFields {
             fields: prep_fields,
             boundary: boundary,
-            content_len: if use_content_len { Some(content_len) } else { None },
+            content_len: content_len,
         })
     }
 
@@ -364,6 +326,52 @@ impl<'d> Read for PreparedFields<'d> {
 
         Ok(bytes_read)        
     }
+}
+
+fn get_content_len(fields: &[PreparedField]) -> Option<u64> {
+    let mut content_len = 0;
+
+    for field in fields {
+        match *field {
+            PreparedField::Contiguous(ref vec) => content_len += vec.get_ref().len() as u64,
+            PreparedField::Partial(_) => return None,
+        }
+    }
+
+    Some(content_len)
+}
+
+fn write_fields<'n, 'd, I: Iterator<Item = Field<'n, 'd>>>(mut writer: MultipartWriter<&mut Vec<u8>>, fields: I, buffer_threshold: u64)
+-> LazyIoResult<'n, Option<Box<Read + 'd>>> {
+    for field in fields {
+        match field.data {
+            Data::Text(text) => if text.len() as u64 <= buffer_threshold  {
+                try_lazy!(field.name, writer.write_text(&field.name, &*text));
+            } else {
+                try_lazy!(field.name, writer.write_field_headers(&field.name, None, None));
+                return Ok(Some(Box::new(io::Cursor::new(CowStrAsRef(text)))));
+            },
+            Data::File(path) => {
+                let (content_type, filename) = super::mime_filename(&*path);
+                let mut file = try_lazy!(field.name, File::open(&*path));
+                let len = try_lazy!(field.name, file.metadata()).len();
+
+                if len <= buffer_threshold {
+                    try_lazy!(field.name, writer.write_stream(&mut file, &field.name, filename, Some(content_type)));
+                } else {
+                    try_lazy!(field.name, writer.write_field_headers(&field.name, filename, Some(content_type)));
+                    return Ok(Some(Box::new(file)));
+                }
+            },
+            Data::Stream(stream) => {
+                let filename = stream.filename.as_ref().map(|f| &**f);
+                try_lazy!(field.name, writer.write_field_headers(&field.name, filename, stream.content_type));
+                return Ok(Some(stream.stream));
+            },
+        }
+    }
+
+    Ok(None)
 }
 
 #[doc(hidden)]
