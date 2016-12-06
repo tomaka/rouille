@@ -22,6 +22,7 @@ use Request;
 
 pub use self::json::get_json_input;
 pub use self::plain::plain_text_body;
+pub use self::plain::plain_text_body_with_limit;
 
 pub mod json;
 pub mod multipart;
