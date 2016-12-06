@@ -20,8 +20,14 @@ pub enum PlainTextError {
     /// Wrong content type.
     WrongContentType,
 
-    /// Could not read the body from the request. Also happens if the body is not valid UTF-8.
+    /// Could not read the body from the request.
     IoError(IoError),
+
+    /// The limit to the number of bytes has been exceeded.
+    LimitExceeded,
+
+    /// The content-type encoding is not ASCII or UTF-8, or the body is not valid UTF-8.
+    NotUtf8,
 }
 
 impl From<IoError> for PlainTextError {
@@ -32,7 +38,12 @@ impl From<IoError> for PlainTextError {
 
 /// Read plain text data from the body of a request.
 ///
-/// Returns an error if the content-type of the request is not text/plain.
+/// Returns an error if the content-type of the request is not text/plain. Only the UTF-8 encoding
+/// is supported. You will get an error if the client passed non-UTF8 data.
+///
+/// If the body of the request exceeds 1MB of data, an error is returned to prevent a malicious
+/// client from crashing the server. Use the `plain_text_body_with_limit` function to customize
+/// the limit.
 ///
 /// # Example
 ///
@@ -46,7 +57,22 @@ impl From<IoError> for PlainTextError {
 /// }
 /// ```
 ///
+#[inline]
 pub fn plain_text_body(request: &Request) -> Result<String, PlainTextError> {
+    plain_text_body_with_limit(request, 1 * 1024 * 1024)
+}
+
+/// Reads plain text data from the body of a request.
+///
+/// This does the same as `plain_text_body`, but with a customizable limit in bytes to how much
+/// data will be read from the request. If the limit is exceeded, a `LimitExceeded` error is
+/// returned.
+pub fn plain_text_body_with_limit(request: &Request, limit: usize)
+                                  -> Result<String, PlainTextError>
+{
+    // TODO: handle encoding ; return NotUtf8 if a non-utf8 charset is sent
+    // if no encoding is specified by the client, the default is `US-ASCII` which is compatible with UTF8
+
     if let Some(header) = request.header("Content-Type") {
         if !header.starts_with("text/plain") {
             return Err(PlainTextError::WrongContentType);
@@ -55,8 +81,22 @@ pub fn plain_text_body(request: &Request) -> Result<String, PlainTextError> {
         return Err(PlainTextError::WrongContentType);
     }
 
-    let mut out = String::new();
-    try!(request.data().unwrap().read_to_string(&mut out));
+    let body = match request.data() {
+        Some(b) => b,
+        None => return Err(PlainTextError::BodyAlreadyExtracted),
+    };
+
+    let mut out = Vec::new();
+    try!(body.take(limit.saturating_add(1) as u64).read_to_end(&mut out));
+    if out.len() > limit {
+        return Err(PlainTextError::LimitExceeded);
+    }
+
+    let out = match String::from_utf8(out) {
+        Ok(o) => o,
+        Err(_) => return Err(PlainTextError::NotUtf8),
+    };
+
     Ok(out)
 }
 
@@ -64,12 +104,25 @@ pub fn plain_text_body(request: &Request) -> Result<String, PlainTextError> {
 mod test {
     use Request;
     use super::plain_text_body;
+    use super::plain_text_body_with_limit;
     use super::PlainTextError;
 
     #[test]
-    fn ok_content_type() {
+    fn ok() {
         let request = Request::fake_http("GET", "/", vec![
             ("Content-Type".to_owned(), "text/plain".to_owned())
+        ], b"test".to_vec());
+
+        match plain_text_body(&request) {
+            Ok(ref d) if d == "test" => (),
+            _ => panic!()
+        }
+    }
+    
+    #[test]
+    fn charset() {
+        let request = Request::fake_http("GET", "/", vec![
+            ("Content-Type".to_owned(), "text/plain; charset=utf8".to_owned())
         ], b"test".to_vec());
 
         match plain_text_body(&request) {
@@ -96,6 +149,72 @@ mod test {
 
         match plain_text_body(&request) {
             Err(PlainTextError::WrongContentType) => (),
+            _ => panic!()
+        }
+    }
+
+    #[test]
+    fn body_twice() {
+        let request = Request::fake_http("GET", "/", vec![
+            ("Content-Type".to_owned(), "text/plain; charset=utf8".to_owned())
+        ], b"test".to_vec());
+        
+        match plain_text_body(&request) {
+            Ok(ref d) if d == "test" => (),
+            _ => panic!()
+        }
+
+        match plain_text_body(&request) {
+            Err(PlainTextError::BodyAlreadyExtracted) => (),
+            _ => panic!()
+        }
+    }
+
+    #[test]
+    fn bytes_limit() {
+        let request = Request::fake_http("GET", "/", vec![
+            ("Content-Type".to_owned(), "text/plain".to_owned())
+        ], b"test".to_vec());
+
+        match plain_text_body_with_limit(&request, 2) {
+            Err(PlainTextError::LimitExceeded) => (),
+            _ => panic!()
+        }
+    }
+
+    #[test]
+    fn exact_limit() {
+        let request = Request::fake_http("GET", "/", vec![
+            ("Content-Type".to_owned(), "text/plain".to_owned())
+        ], b"test".to_vec());
+
+        match plain_text_body_with_limit(&request, 4) {
+            Ok(ref d) if d == "test" => (),
+            _ => panic!()
+        }
+    }
+
+    #[test]
+    fn non_utf8_body() {
+        let request = Request::fake_http("GET", "/", vec![
+            ("Content-Type".to_owned(), "text/plain; charset=utf8".to_owned())
+        ], b"\xc3\x28".to_vec());
+
+        match plain_text_body(&request) {
+            Err(PlainTextError::NotUtf8) => (),
+            _ => panic!()
+        }
+    }
+
+    #[test]
+    #[ignore]       // TODO: not implemented
+    fn non_utf8_encoding() {
+        let request = Request::fake_http("GET", "/", vec![
+            ("Content-Type".to_owned(), "text/plain; charset=iso-8859-1".to_owned())
+        ], b"test".to_vec());
+
+        match plain_text_body(&request) {
+            Err(PlainTextError::NotUtf8) => (),
             _ => panic!()
         }
     }

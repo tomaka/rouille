@@ -92,6 +92,8 @@ impl From<json::DecoderError> for JsonError {
 /// ```
 ///
 pub fn get_json_input<O>(request: &Request) -> Result<O, JsonError> where O: Decodable {
+    // TODO: add an optional bytes limit
+
     if let Some(header) = request.header("Content-Type") {
         if !header.starts_with("application/json") {
             return Err(JsonError::WrongContentType);
