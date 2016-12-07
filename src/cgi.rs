@@ -133,6 +133,7 @@ impl CgiRun for Command {
                 status_code: status,
                 headers: headers,
                 data: ResponseBody::from_reader(stdout),
+                upgrade: None,
             }
         };
 

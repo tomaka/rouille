@@ -132,7 +132,8 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
                 ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
                 ("ETag".to_owned(), etag.to_string())
             ],
-            data: ResponseBody::empty()
+            data: ResponseBody::empty(),
+            upgrade: None,
         };
     }
 
@@ -144,6 +145,7 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
             ("ETag".to_owned(), etag.to_string())
         ],
         data: ResponseBody::from_file(file),
+        upgrade: None,
     }
 }
 

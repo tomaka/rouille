@@ -56,6 +56,7 @@ extern crate filetime;
 extern crate multipart;
 extern crate rand;
 extern crate rustc_serialize;
+extern crate sha1;
 extern crate time;
 extern crate tiny_http;
 extern crate url;
@@ -63,6 +64,7 @@ extern crate url;
 pub use assets::match_assets;
 pub use log::log;
 pub use response::{Response, ResponseBody};
+pub use tiny_http::ReadWrite;
 
 use std::io::Cursor;
 use std::io::Result as IoResult;
@@ -81,6 +83,7 @@ pub mod cgi;
 pub mod input;
 pub mod proxy;
 pub mod session;
+pub mod websocket;
 
 mod assets;
 mod find_route;
@@ -249,7 +252,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
 
             // Calling the handler ; this most likely takes a lot of time.
             // If the handler panics, we build a dummy response.
-            let rouille_response = {
+            let mut rouille_response = {
                 // We don't use the `rouille_request` anymore after the panic, so it's ok to assert
                 // it's unwind safe.
                 let rouille_request = AssertUnwindSafe(rouille_request);
@@ -281,13 +284,28 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                 }
             }
 
-            // We don't really care if we fail to send the response to the client, as there's
-            // nothing we can do anyway.
-            let _ = tiny_http_request.lock().unwrap().take().unwrap().respond(response);
+            if let Some(ref mut upgrade) = rouille_response.upgrade {
+                let trq = tiny_http_request.lock().unwrap().take().unwrap();
+                let socket = trq.upgrade("websocket", response);
+                upgrade.build(socket);
+
+            } else {
+                // We don't really care if we fail to send the response to the client, as there's
+                // nothing we can do anyway.
+                let _ = tiny_http_request.lock().unwrap().take().unwrap().respond(response);
+            }
         });
     }
 
     unreachable!()
+}
+
+/// Trait for objects that can take ownership of a raw connection to the client data.
+///
+/// The purpose of this trait is to be used with the `Connection: Upgrade` header, hence its name.
+pub trait Upgrade {
+    /// Initializes the object with the given socket.
+    fn build(&mut self, socket: Box<ReadWrite + Send>); 
 }
 
 /// Represents a request that your handler must answer to.

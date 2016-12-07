@@ -172,5 +172,6 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
         status_code: status,
         headers: headers,
         data: ResponseBody::from_reader(socket),
+        upgrade: None,
     })
 }

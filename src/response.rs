@@ -12,6 +12,7 @@ use std::io::Cursor;
 use std::io::Read;
 use std::fs::File;
 use rustc_serialize;
+use Upgrade;
 
 /// Contains a prototype of a response.
 ///
@@ -30,6 +31,13 @@ pub struct Response {
 
     /// An opaque type that contains the body of the response.
     pub data: ResponseBody,
+
+    /// If set, rouille will give ownership of the client socket to the `Upgrade` object.
+    ///
+    /// In all circumstances, the value of the `Connection` header is managed by the framework and
+    /// cannot be customized. If this value is set, the response will automatically contain
+    /// `Connection: Upgrade`.
+    pub upgrade: Option<Box<Upgrade + Send>>,
 }
 
 impl Response {
@@ -77,6 +85,7 @@ impl Response {
             status_code: 303,
             headers: vec![("Location".to_owned(), target.to_owned())],
             data: ResponseBody::empty(),
+            upgrade: None,
         }
     }
 
@@ -94,6 +103,7 @@ impl Response {
             status_code: 200,
             headers: vec![("Content-Type".to_owned(), "text/html; charset=utf8".to_owned())],
             data: ResponseBody::from_data(content),
+            upgrade: None,
         }
     }
 
@@ -111,6 +121,7 @@ impl Response {
             status_code: 200,
             headers: vec![("Content-Type".to_owned(), "image/svg+xml; charset=utf8".to_owned())],
             data: ResponseBody::from_data(content),
+            upgrade: None,
         }
     }
 
@@ -128,6 +139,7 @@ impl Response {
             status_code: 200,
             headers: vec![("Content-Type".to_owned(), "text/plain; charset=utf8".to_owned())],
             data: ResponseBody::from_string(text),
+            upgrade: None,
         }
     }
 
@@ -159,6 +171,7 @@ impl Response {
             status_code: 200,
             headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
             data: ResponseBody::from_data(data),
+            upgrade: None,
         }
     }
 
@@ -178,6 +191,7 @@ impl Response {
             status_code: 401,
             headers: vec![("WWW-Authenticate".to_owned(), format!("Basic realm=\"{}\"", realm))],
             data: ResponseBody::empty(),
+            upgrade: None,
         }
     }
 
@@ -194,7 +208,8 @@ impl Response {
         Response {
             status_code: 400,
             headers: vec![],
-            data: ResponseBody::empty()
+            data: ResponseBody::empty(),
+            upgrade: None,
         }
     }
 
@@ -211,7 +226,8 @@ impl Response {
         Response {
             status_code: 404,
             headers: vec![],
-            data: ResponseBody::empty()
+            data: ResponseBody::empty(),
+            upgrade: None,
         }
     }
 
