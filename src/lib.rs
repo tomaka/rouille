@@ -536,6 +536,34 @@ impl Request {
         self.headers.iter().find(|&&(ref k, _)| k.eq_ignore_ascii_case(key)).map(|&(_, ref v)| v.clone())
     }
 
+    /// Returns the state of the `DNT` (Do Not Track) header.
+    ///
+    /// If the header is missing or is malformed, `None` is returned. If the header exists,
+    /// `Some(true)` is returned if `DNT` is `1` and `Some(false)` is returned if `DNT` is `0`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::{Request, Response};
+    ///
+    /// # fn track_user(request: &Request) {}
+    /// fn handle(request: &Request) -> Response {
+    ///     if !request.do_not_track().unwrap_or(false) {
+    ///         track_user(&request);
+    ///     }
+    ///
+    ///     // ...
+    /// # panic!()
+    /// }
+    /// ```
+    pub fn do_not_track(&self) -> Option<bool> {
+        match self.header("DNT") {
+            Some(ref h) if h == "1" => Some(true),
+            Some(ref h) if h == "0" => Some(false),
+            _ => None
+        }
+    }
+
     /// Returns the body of the request.
     ///
     /// The body can only be retrieved once. Returns `None` is the body has already been retreived
@@ -658,5 +686,20 @@ mod tests {
     fn plus_in_url() {
         let request = Request::fake_http("GET", "/hello+world", vec![], vec![]);
         assert_eq!(request.url(), "/hello+world");
+    }
+
+    #[test]
+    fn dnt() {
+        let request = Request::fake_http("GET", "/", vec![("DNT".to_owned(), "1".to_owned())], vec![]);
+        assert_eq!(request.do_not_track(), Some(true));
+
+        let request = Request::fake_http("GET", "/", vec![("DNT".to_owned(), "0".to_owned())], vec![]);
+        assert_eq!(request.do_not_track(), Some(false));
+
+        let request = Request::fake_http("GET", "/", vec![], vec![]);
+        assert_eq!(request.do_not_track(), None);
+
+        let request = Request::fake_http("GET", "/", vec![("DNT".to_owned(), "malformed".to_owned())], vec![]);
+        assert_eq!(request.do_not_track(), None);
     }
 }
