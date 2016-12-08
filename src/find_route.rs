@@ -14,7 +14,7 @@
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```
 /// # #[macro_use] extern crate rouille;
 /// # fn main() {
 /// use rouille::{Request, Response};
@@ -34,7 +34,7 @@
 ///    // ...
 /// }
 ///
-/// # let request = unsafe { ::std::mem::uninitialized() };
+/// # let request = return;
 /// // First calls `handle_request_a`. If it returns anything else than a 404 error, then the
 /// // `response` will contain the return value.
 /// //
