@@ -12,6 +12,8 @@ use std::panic;
 use std::time::Duration;
 use std::time::Instant;
 
+use chrono;
+
 use Request;
 use Response;
 
@@ -36,15 +38,16 @@ pub fn log<W, F>(rq: &Request, mut output: W, f: F) -> Response
     where W: Write,
           F: FnOnce() -> Response
 {
-    let start_time = Instant::now();
-    let rq_line = format!("{} {}", rq.method(), rq.raw_url());
+    let start_instant = Instant::now();
+    let rq_line = format!("{} UTC - {} {}", chrono::UTC::now().format("%Y-%m-%d %H:%M:%S%.6f"),
+                                            rq.method(), rq.raw_url());
 
     // Calling the handler and catching potential panics.
     // Note that this we always resume unwinding afterwards, we can ignore the small panic-safety
     // mecanism of `catch_unwind`.
     let response = panic::catch_unwind(panic::AssertUnwindSafe(f));
 
-    let elapsed_time = format_time(start_time.elapsed());
+    let elapsed_time = format_time(start_instant.elapsed());
 
     match response {
         Ok(response) => {

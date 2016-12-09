@@ -52,6 +52,7 @@
 
 #![deny(unsafe_code)]
 
+extern crate chrono;
 extern crate filetime;
 extern crate multipart;
 extern crate rand;
