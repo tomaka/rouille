@@ -86,7 +86,7 @@ fn main() {
 
         // If the response is a success, we commit the transaction before returning. It's only at
         // this point that data are actually written in the database.
-        if response.success() {
+        if response.is_success() {
             db.commit().unwrap();
         }
 
