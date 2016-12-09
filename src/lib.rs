@@ -428,7 +428,7 @@ impl Request {
     /// use rouille::{Request, Response};
     ///
     /// fn handle(request: &Request) -> Response {
-    ///     if !request.secure() {
+    ///     if !request.is_secure() {
     ///         return Response::redirect(&format!("https://example.com"));
     ///     }
     ///
@@ -437,7 +437,7 @@ impl Request {
     /// }
     /// ```
     #[inline]
-    pub fn secure(&self) -> bool {
+    pub fn is_secure(&self) -> bool {
         self.https
     }
 
