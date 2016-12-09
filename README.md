@@ -4,8 +4,6 @@
 
 [![](https://docs.rs/rouille/badge.svg)](https://docs.rs/rouille)
 
-## [Link to WIP book](http://tomaka.github.io/rouille/book/)
-
 ## License
 
 Licensed under either of
