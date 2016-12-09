@@ -27,6 +27,8 @@ fn main() {
         router!(request,
             (GET) (/) => {
                 // The / route outputs an HTML client so that the user can try the websockets.
+                // Note that in a real website you should probably use some templating system, or
+                // at least load the HTML from a file.
                 Response::html("<script type=\"text/javascript\">
                     var socket = new WebSocket(\"ws://localhost:8000/ws\", \"echo\");
                     function send(data) {{
