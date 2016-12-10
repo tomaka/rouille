@@ -34,7 +34,7 @@ use ResponseBody;
 /// ```no_run
 /// rouille::start_server("localhost:8000", move |request| {
 ///     let response = rouille::match_assets(&request, "public");
-///     if response.success() {
+///     if response.is_success() {
 ///         return response;
 ///     }
 ///

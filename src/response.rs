@@ -50,25 +50,25 @@ impl Response {
     /// ```
     /// use rouille::Response;
     /// let response = Response::text("hello world");
-    /// assert!(response.success());
+    /// assert!(response.is_success());
     /// ```
     #[inline]
-    pub fn success(&self) -> bool {
+    pub fn is_success(&self) -> bool {
         self.status_code >= 200 && self.status_code < 400
     }
 
-    /// Shortcut for `!response.success()`.
+    /// Shortcut for `!response.is_success()`.
     ///
     /// # Example
     ///
     /// ```
     /// use rouille::Response;
     /// let response = Response::empty_400();
-    /// assert!(response.error());
+    /// assert!(response.is_error());
     /// ```
     #[inline]
-    pub fn error(&self) -> bool {
-        !self.success()
+    pub fn is_error(&self) -> bool {
+        !self.is_success()
     }
 
     /// Builds a `Response` that redirects the user to another URL with a 303 status code.
