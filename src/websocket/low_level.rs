@@ -182,7 +182,7 @@ impl<'a> Iterator for ElementsIter<'a> {
                         (length, mask)
                     },
                     127 => {
-                        if total_buffered < 8 {
+                        if total_buffered < 14 {
                             self.state.buffer.extend_from_slice(self.data);
                             self.data = &[];
                             return None;
