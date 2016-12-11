@@ -15,7 +15,7 @@ fn main() {
                 (GET) (/) => {
                     let mut output = Vec::new();
                     form.render_data(&mut output, &mustache::Data::Bool(false));
-                    rouille::Response::html(output)
+                    rouille::Response::html(String::from_utf8(output).unwrap())
                 },
 
                 (POST) (/submit) => {
@@ -32,7 +32,7 @@ fn main() {
 
                     let mut output = Vec::new();
                     form_success.render(&mut output, &template_out).unwrap();
-                    rouille::Response::html(output)
+                    rouille::Response::html(String::from_utf8(output).unwrap())
                 },
 
                 _ => rouille::Response::empty_404()

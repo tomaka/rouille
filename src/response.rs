@@ -98,11 +98,11 @@ impl Response {
     /// let response = Response::text("<p>hello <strong>world</strong></p>");
     /// ```
     #[inline]
-    pub fn html<D>(content: D) -> Response where D: Into<Vec<u8>> {
+    pub fn html<D>(content: D) -> Response where D: Into<String> {
         Response {
             status_code: 200,
             headers: vec![("Content-Type".to_owned(), "text/html; charset=utf8".to_owned())],
-            data: ResponseBody::from_data(content),
+            data: ResponseBody::from_string(content),
             upgrade: None,
         }
     }
@@ -116,11 +116,11 @@ impl Response {
     /// let response = Response::svg("<svg xmlns='http://www.w3.org/2000/svg'/>");
     /// ```
     #[inline]
-    pub fn svg<D>(content: D) -> Response where D: Into<Vec<u8>> {
+    pub fn svg<D>(content: D) -> Response where D: Into<String> {
         Response {
             status_code: 200,
             headers: vec![("Content-Type".to_owned(), "image/svg+xml; charset=utf8".to_owned())],
-            data: ResponseBody::from_data(content),
+            data: ResponseBody::from_string(content),
             upgrade: None,
         }
     }
