@@ -15,6 +15,7 @@ use time;
 
 use Request;
 use Response;
+use ResponseCacheControl;
 use ResponseBody;
 
 /// Searches inside `path` for a file that matches the given request. If a file is found,
@@ -121,32 +122,15 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
         .unwrap_or(time::now().tm_nsec as u64)
         ^ 0xd3f40305c9f8e911u64).to_string();
 
-    let not_modified: bool = request.header("If-None-Match")
-        .map(|req_etag| req_etag == etag)
-        .unwrap_or(false);
-
-    if not_modified {
-        return Response {
-            status_code: 304,
-            headers: vec![
-                ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
-                ("ETag".to_owned(), etag.to_string())
-            ],
-            data: ResponseBody::empty(),
-            upgrade: None,
-        };
-    }
-
     Response {
-        status_code: 200,
-        headers: vec![
-            ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
-            ("Content-Type".to_owned(), extension_to_mime(extension).to_owned()),
-            ("ETag".to_owned(), etag.to_string())
-        ],
+        content_type: Some(extension_to_mime(extension).into()),
+        cache_control: ResponseCacheControl::Public {
+            max_age: 3600,
+            must_revalidate: false,
+        },
         data: ResponseBody::from_file(file),
-        upgrade: None,
-    }
+        .. Response::empty_200()
+    }.with_etag(etag.to_owned(), request)
 }
 
 /// Returns the mime type of a file based on its extension.

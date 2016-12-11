@@ -52,12 +52,12 @@
 //! use std::sync::mpsc::Receiver;
 //!
 //! use rouille::Request;
-//! use rouille::Response;
+//! use rouille::RawResponse;
 //! use rouille::websocket;
 //! # fn main() {}
 //!
 //! fn handle_request(request: &Request, websockets: &Mutex<Vec<Receiver<websocket::Websocket>>>)
-//!                   -> Response
+//!                   -> RawResponse
 //! {
 //!     let (response, websocket) = try_or_400!(websocket::start(request, Some("my-subprotocol")));
 //!     websockets.lock().unwrap().push(websocket);
@@ -80,7 +80,8 @@ use rustc_serialize::base64::ToBase64;
 use tiny_http::HTTPVersion;
 
 use Request;
-use Response;
+use ResponseBody;
+use RawResponse;
 
 mod low_level;
 mod websocket;
@@ -105,7 +106,7 @@ pub enum WebsocketError {
 
 /// Builds a `Response` that initiates the websocket protocol.
 pub fn start(request: &Request, subprotocol: Option<&str>)
-             -> Result<(Response, mpsc::Receiver<Websocket>), WebsocketError>
+             -> Result<(RawResponse, mpsc::Receiver<Websocket>), WebsocketError>
 {
     if request.method() != "GET" {
         return Err(WebsocketError::InvalidWebsocketRequest);
@@ -150,14 +151,21 @@ pub fn start(request: &Request, subprotocol: Option<&str>)
 
     let (tx, rx) = mpsc::channel();
 
-    let mut response = Response::text("");
-    response.status_code = 101;
-    response.headers.push(("Upgrade".into(), "websocket".into()));
-    if let Some(sp) = subprotocol {
-        response.headers.push(("Sec-Websocket-Protocol".into(), sp.to_owned()));
-    }
-    response.headers.push(("Sec-Websocket-Accept".into(), key));
-    response.upgrade = Some(Box::new(tx) as Box<_>);
+    let response = RawResponse {
+        status_code: 101,
+        headers: {
+            let mut headers = Vec::new();
+            headers.push(("Upgrade".into(), "websocket".into()));
+            if let Some(sp) = subprotocol {
+                headers.push(("Sec-Websocket-Protocol".into(), sp.to_owned().into()));      // TODO: meh alloc
+            }
+            headers.push(("Sec-Websocket-Accept".into(), key.into()));
+            headers
+        },
+        data: ResponseBody::empty(),
+        upgrade: Some(Box::new(tx) as Box<_>),
+    };
+
     Ok((response, rx))
 }
 
