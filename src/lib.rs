@@ -91,38 +91,8 @@ mod find_route;
 mod log;
 mod response;
 mod router;
-
-/// This macro assumes that the current function returns a `Response` and takes a `Result`.
-/// If the expression you pass to the macro is an error, then a 400 response is returned.
-///
-/// # Example
-///
-/// ```
-/// # #[macro_use] extern crate rouille;
-/// # extern crate rustc_serialize;
-/// # fn main() {
-/// use rouille::Request;
-/// use rouille::Response;
-///
-/// fn handle_something(request: &Request) -> Response {
-///     let data = try_or_400!(post_input!(request, {
-///         field1: u32,
-///         field2: String,
-///     }));
-///
-///     Response::text("hello")
-/// }
-/// # }
-/// ```
-#[macro_export]
-macro_rules! try_or_400 {
-    ($result:expr) => (
-        match $result {
-            Ok(r) => r,
-            Err(_) => return $crate::Response::empty_400(),
-        }
-    );
-}
+#[doc(hidden)]
+pub mod try_or_400;
 
 /// This macro assumes that the current function returns a `Response` and takes a `Result`.
 /// If the expression you pass to the macro is an error, then a 404 response is returned.
