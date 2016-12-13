@@ -121,32 +121,15 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
         .unwrap_or(time::now().tm_nsec as u64)
         ^ 0xd3f40305c9f8e911u64).to_string();
 
-    let not_modified: bool = request.header("If-None-Match")
-        .map(|req_etag| req_etag == etag)
-        .unwrap_or(false);
-
-    if not_modified {
-        return Response {
-            status_code: 304,
-            headers: vec![
-                ("Cache-Control".into(), "public, max-age=3600".into()),
-                ("ETag".into(), etag.into())
-            ],
-            data: ResponseBody::empty(),
-            upgrade: None,
-        };
-    }
-
     Response {
         status_code: 200,
         headers: vec![
             ("Cache-Control".into(), "public, max-age=3600".into()),
             ("Content-Type".into(), extension_to_mime(extension).into()),
-            ("ETag".into(), etag.into())
         ],
         data: ResponseBody::from_file(file),
         upgrade: None,
-    }
+    }.with_etag(request, etag)
 }
 
 /// Returns the mime type of a file based on its extension.

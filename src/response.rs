@@ -7,12 +7,14 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+use std::ascii::AsciiExt;
 use std::borrow::Cow;
 use std::io;
 use std::io::Cursor;
 use std::io::Read;
 use std::fs::File;
 use rustc_serialize;
+use Request;
 use Upgrade;
 
 /// Contains a prototype of a response.
@@ -253,6 +255,78 @@ impl Response {
     #[inline]
     pub fn with_status_code(mut self, code: u16) -> Response {
         self.status_code = code;
+        self
+    }
+
+    /// Adds or replaces a `ETag` header to the response, and turns the response into an empty 304
+    /// response if the ETag matches a `If-None-Match` header of the request.
+    ///
+    /// An ETag is a unique representation of the content of a resource. If the content of the
+    /// resource changes, the ETag should change as well.
+    /// The purpose of using ETags is that a client can later ask the server to send the body of
+    /// a response only if it still matches a certain ETag the client has stored in memory.
+    ///
+    /// > **Note**: You should always try to specify an ETag for responses that have a large body.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use rouille::Request;
+    /// use rouille::Response;
+    ///
+    /// fn handle(request: &Request) -> Response {
+    ///     Response::text("hello world").with_etag(request, "my-etag-1234")
+    /// }
+    /// ```
+    pub fn with_etag<E>(mut self, request: &Request, etag: E) -> Response
+        where E: Into<Cow<'static, str>>
+    {
+        if !self.is_success() {
+            return self;
+        }
+
+        let etag = etag.into();
+
+        let not_modified = if let Some(header) = request.header("If-None-Match") {
+            if header == etag {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if not_modified {
+            self.data = ResponseBody::empty();
+            self.status_code = 304;
+        }
+
+        self.with_etag_keep(etag)
+    }
+
+    /// Adds a `ETag` header to the response, or replaces an existing header if there is one.
+    ///
+    /// > **Note**: Contrary to `with_etag`, this function doesn't try to turn the response into
+    /// > a 304 response. If you're unsure of what to do, prefer `with_etag`.
+    pub fn with_etag_keep<E>(mut self, etag: E) -> Response
+        where E: Into<Cow<'static, str>>
+    {
+        // TODO: if you find a more elegant way to do that, don't hesitate to open a PR
+
+        let mut etag = Some(etag);
+
+        for &mut (ref key, ref mut val) in self.headers.iter_mut() {
+            if key.eq_ignore_ascii_case("ETag") {
+                *val = etag.take().unwrap().into();
+                break;
+            }
+        }
+
+        if let Some(etag) = etag {
+            self.headers.push(("ETag".into(), etag.into()));
+        }
+
         self
     }
 }
