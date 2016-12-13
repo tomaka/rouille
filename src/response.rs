@@ -34,7 +34,9 @@ pub struct Response {
     /// - Content-Range
     /// - Trailer
     /// - Transfer-Encoding
-    /// - Upgrade       FIXME: design this
+    ///
+    /// Additionnaly, the `Upgrade` header is ignored as well unless the `upgrade` field of the
+    /// `Response` is set to something.
     ///
     /// The reason for this is that these headers are too low-level and are directly handled by
     /// the underlying HTTP response system.
