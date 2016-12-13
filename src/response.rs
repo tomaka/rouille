@@ -7,6 +7,7 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+use std::borrow::Cow;
 use std::io;
 use std::io::Cursor;
 use std::io::Read;
@@ -27,7 +28,7 @@ pub struct Response {
     /// Note that important headers such as `Connection` or `Content-Length` will be ignored
     /// from this list.
     // TODO: document precisely which headers
-    pub headers: Vec<(String, String)>,
+    pub headers: Vec<(Cow<'static, str>, Cow<'static, str>)>,
 
     /// An opaque type that contains the body of the response.
     pub data: ResponseBody,
@@ -79,11 +80,21 @@ impl Response {
     /// use rouille::Response;
     /// let response = Response::redirect("/foo");
     /// ```
+    ///
+    /// Another example with a `String`:
+    ///
+    /// ```
+    /// use rouille::Response;
+    /// let user_id = 5;
+    /// let response = Response::redirect(format!("/users/{}", user_id));
+    /// ```
     #[inline]
-    pub fn redirect(target: &str) -> Response {
+    pub fn redirect<S>(target: S) -> Response
+        where S: Into<Cow<'static, str>>
+    {
         Response {
             status_code: 303,
-            headers: vec![("Location".to_owned(), target.to_owned())],
+            headers: vec![("Location".into(), target.into())],
             data: ResponseBody::empty(),
             upgrade: None,
         }
@@ -101,7 +112,7 @@ impl Response {
     pub fn html<D>(content: D) -> Response where D: Into<String> {
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".to_owned(), "text/html; charset=utf8".to_owned())],
+            headers: vec![("Content-Type".into(), "text/html; charset=utf8".into())],
             data: ResponseBody::from_string(content),
             upgrade: None,
         }
@@ -119,7 +130,7 @@ impl Response {
     pub fn svg<D>(content: D) -> Response where D: Into<String> {
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".to_owned(), "image/svg+xml; charset=utf8".to_owned())],
+            headers: vec![("Content-Type".into(), "image/svg+xml; charset=utf8".into())],
             data: ResponseBody::from_string(content),
             upgrade: None,
         }
@@ -137,7 +148,7 @@ impl Response {
     pub fn text<S>(text: S) -> Response where S: Into<String> {
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".to_owned(), "text/plain; charset=utf8".to_owned())],
+            headers: vec![("Content-Type".into(), "text/plain; charset=utf8".into())],
             data: ResponseBody::from_string(text),
             upgrade: None,
         }
@@ -169,7 +180,7 @@ impl Response {
 
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".to_owned(), "application/json".to_owned())],
+            headers: vec![("Content-Type".into(), "application/json".into())],
             data: ResponseBody::from_data(data),
             upgrade: None,
         }
@@ -189,7 +200,7 @@ impl Response {
         // TODO: escape the realm
         Response {
             status_code: 401,
-            headers: vec![("WWW-Authenticate".to_owned(), format!("Basic realm=\"{}\"", realm))],
+            headers: vec![("WWW-Authenticate".into(), format!("Basic realm=\"{}\"", realm).into())],
             data: ResponseBody::empty(),
             upgrade: None,
         }

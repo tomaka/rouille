@@ -179,7 +179,7 @@ fn note_routes(request: &Request, db: &Transaction) -> Response {
 
             let mut response = Response::text("The note has been created");
             response.status_code = 201;
-            response.headers.push(("Location".to_owned(), format!("/note/{}", id)));
+            response.headers.push(("Location".into(), format!("/note/{}", id).into()));
             response
         },
 

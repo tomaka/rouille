@@ -278,7 +278,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                                             .with_data(res_data, res_len);
 
             for (key, value) in rouille_response.headers {
-                if let Ok(header) = tiny_http::Header::from_bytes(key, value) {
+                if let Ok(header) = tiny_http::Header::from_bytes(key.as_bytes(), value.as_bytes()) {
                     response.add_header(header);
                 } else {
                     // TODO: ?
@@ -430,7 +430,7 @@ impl Request {
     ///
     /// fn handle(request: &Request) -> Response {
     ///     if !request.is_secure() {
-    ///         return Response::redirect(&format!("https://example.com"));
+    ///         return Response::redirect(format!("https://example.com"));
     ///     }
     ///
     ///     // ...
