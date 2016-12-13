@@ -120,7 +120,7 @@ fn handle_route(request: &Request, session_data: &mut Option<SessionData>) -> Re
                 // including an attempt at XSS. Storing in memory what the user gave us is not
                 // wrong, but we have to take care not to interpret it as HTML data for example.
                 *session_data = Some(SessionData { login: data.login });
-                return Response::redirect("/");
+                return Response::redirect_303("/");
 
             } else {
                 // We return a dummy response to indicate that the login failed. In a real
@@ -177,7 +177,7 @@ fn handle_route(request: &Request, session_data: &mut Option<SessionData>) -> Re
                 // this example is structured is appropriate for a website that is entirely
                 // private. Don't hesitate to structure it in a different way, for example by
                 // having a function that is dedicated only to public routes.
-                Response::redirect("/")
+                Response::redirect_303("/")
             }
         )
     }

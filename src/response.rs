@@ -72,28 +72,136 @@ impl Response {
         !self.is_success()
     }
 
-    /// Builds a `Response` that redirects the user to another URL with a 303 status code.
+    /// Builds a `Response` that redirects the user to another URL with a 301 status code. This
+    /// semantically means a permanent redirect.
+    ///
+    /// > **Note**: If you're uncertain about which status code to use for a redirection, 303 is
+    /// > the safest choice.
     ///
     /// # Example
     ///
     /// ```
     /// use rouille::Response;
-    /// let response = Response::redirect("/foo");
+    /// let response = Response::redirect_301("/foo");
     /// ```
+    #[inline]
+    pub fn redirect_301<S>(target: S) -> Response
+        where S: Into<Cow<'static, str>>
+    {
+        Response {
+            status_code: 301,
+            headers: vec![("Location".into(), target.into())],
+            data: ResponseBody::empty(),
+            upgrade: None,
+        }
+    }
+
+    /// Builds a `Response` that redirects the user to another URL with a 302 status code. This
+    /// semantically means a temporary redirect.
     ///
-    /// Another example with a `String`:
+    /// > **Note**: If you're uncertain about which status code to use for a redirection, 303 is
+    /// > the safest choice.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::Response;
+    /// let response = Response::redirect_302("/bar");
+    /// ```
+    #[inline]
+    pub fn redirect_302<S>(target: S) -> Response
+        where S: Into<Cow<'static, str>>
+    {
+        Response {
+            status_code: 302,
+            headers: vec![("Location".into(), target.into())],
+            data: ResponseBody::empty(),
+            upgrade: None,
+        }
+    }
+
+    /// Builds a `Response` that redirects the user to another URL with a 303 status code. This
+    /// means "See Other" and is usually used to indicate where the response of a query is
+    /// located.
+    ///
+    /// For example when a user sends a POST request to URL `/foo` the server can return a 303
+    /// response with a target to `/bar`, in which case the browser will automatically change
+    /// the page to `/bar` (with a GET request to `/bar`).
+    ///
+    /// > **Note**: If you're uncertain about which status code to use for a redirection, 303 is
+    /// > the safest choice.
+    ///
+    /// # Example
     ///
     /// ```
     /// use rouille::Response;
     /// let user_id = 5;
-    /// let response = Response::redirect(format!("/users/{}", user_id));
+    /// let response = Response::redirect_303(format!("/users/{}", user_id));
     /// ```
     #[inline]
-    pub fn redirect<S>(target: S) -> Response
+    pub fn redirect_303<S>(target: S) -> Response
         where S: Into<Cow<'static, str>>
     {
         Response {
             status_code: 303,
+            headers: vec![("Location".into(), target.into())],
+            data: ResponseBody::empty(),
+            upgrade: None,
+        }
+    }
+
+    /// Builds a `Response` that redirects the user to another URL with a 307 status code. This
+    /// semantically means a permanent redirect.
+    ///
+    /// The difference between 307 and 301 is that the client must keep the same method after
+    /// the redirection. For example if the browser sends a POST request to `/foo` and that route
+    /// returns a 307 redirection to `/bar`, then the browser will make a POST request to `/bar`.
+    /// With a 301 redirection it would use a GET request instead.
+    ///
+    /// > **Note**: If you're uncertain about which status code to use for a redirection, 303 is
+    /// > the safest choice.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::Response;
+    /// let response = Response::redirect_307("/foo");
+    /// ```
+    #[inline]
+    pub fn redirect_307<S>(target: S) -> Response
+        where S: Into<Cow<'static, str>>
+    {
+        Response {
+            status_code: 307,
+            headers: vec![("Location".into(), target.into())],
+            data: ResponseBody::empty(),
+            upgrade: None,
+        }
+    }
+
+    /// Builds a `Response` that redirects the user to another URL with a 302 status code. This
+    /// semantically means a temporary redirect.
+    ///
+    /// The difference between 308 and 302 is that the client must keep the same method after
+    /// the redirection. For example if the browser sends a POST request to `/foo` and that route
+    /// returns a 308 redirection to `/bar`, then the browser will make a POST request to `/bar`.
+    /// With a 302 redirection it would use a GET request instead.
+    ///
+    /// > **Note**: If you're uncertain about which status code to use for a redirection, 303 is
+    /// > the safest choice.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::Response;
+    /// let response = Response::redirect_302("/bar");
+    /// ```
+    #[inline]
+    pub fn redirect_308<S>(target: S) -> Response
+        where S: Into<Cow<'static, str>>
+    {
+        Response {
+            status_code: 308,
             headers: vec![("Location".into(), target.into())],
             data: ResponseBody::empty(),
             upgrade: None,
