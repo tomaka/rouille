@@ -179,7 +179,7 @@ pub fn start<S>(request: &Request, subprotocol: Option<S>)
 
     let mut response = Response::text("");
     response.status_code = 101;
-    response.headers.push(("Upgrade".into(), "websocket".into()));
+    response.headers.push(("Upgrade".into(), "websocket".into()));      // FIXME: ignored ; see lib.rs
     if let Some(sp) = subprotocol {
         response.headers.push(("Sec-Websocket-Protocol".into(), sp.into()));
     }

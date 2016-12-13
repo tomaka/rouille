@@ -25,9 +25,25 @@ pub struct Response {
 
     /// List of headers to be returned in the response.
     ///
-    /// Note that important headers such as `Connection` or `Content-Length` will be ignored
-    /// from this list.
-    // TODO: document precisely which headers
+    /// The value of the following headers will be ignored from this list, even if present:
+    ///
+    /// - Accept-Ranges
+    /// - Connection
+    /// - Content-Encoding
+    /// - Content-Length
+    /// - Content-Range
+    /// - Trailer
+    /// - Transfer-Encoding
+    /// - Upgrade       FIXME: design this
+    ///
+    /// The reason for this is that these headers are too low-level and are directly handled by
+    /// the underlying HTTP response system.
+    ///
+    /// The value of `Content-Length` is automatically determined by the `ResponseBody` object of
+    /// the `data` member.
+    ///
+    /// If you want to send back `Connection: upgrade`, you should set the value of the `upgrade`
+    /// field to something.
     pub headers: Vec<(Cow<'static, str>, Cow<'static, str>)>,
 
     /// An opaque type that contains the body of the response.
