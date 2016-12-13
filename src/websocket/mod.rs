@@ -70,6 +70,7 @@ pub use self::websocket::SendError;
 pub use self::websocket::Websocket;
 
 use std::ascii::AsciiExt;
+use std::borrow::Cow;
 use std::error;
 use std::fmt;
 use std::sync::mpsc;
@@ -127,9 +128,12 @@ impl fmt::Display for WebsocketError {
 }
 
 /// Builds a `Response` that initiates the websocket protocol.
-pub fn start(request: &Request, subprotocol: Option<&str>)
-             -> Result<(Response, mpsc::Receiver<Websocket>), WebsocketError>
+pub fn start<S>(request: &Request, subprotocol: Option<S>)
+                -> Result<(Response, mpsc::Receiver<Websocket>), WebsocketError>
+    where S: Into<Cow<'static, str>>
 {
+    let subprotocol = subprotocol.map(|s| s.into());
+
     if request.method() != "GET" {
         return Err(WebsocketError::InvalidWebsocketRequest);
     }
@@ -156,8 +160,8 @@ pub fn start(request: &Request, subprotocol: Option<&str>)
         _ => return Err(WebsocketError::InvalidWebsocketRequest),
     }
 
-    if let Some(sp) = subprotocol {
-        if !requested_protocols(request).any(|p| p == sp) {
+    if let Some(ref sp) = subprotocol {
+        if !requested_protocols(request).any(|p| &p == sp) {
             return Err(WebsocketError::WrongSubprotocol);
         }
     }
@@ -177,9 +181,9 @@ pub fn start(request: &Request, subprotocol: Option<&str>)
     response.status_code = 101;
     response.headers.push(("Upgrade".into(), "websocket".into()));
     if let Some(sp) = subprotocol {
-        response.headers.push(("Sec-Websocket-Protocol".into(), sp.to_owned()));
+        response.headers.push(("Sec-Websocket-Protocol".into(), sp.into()));
     }
-    response.headers.push(("Sec-Websocket-Accept".into(), key));
+    response.headers.push(("Sec-Websocket-Accept".into(), key.into()));
     response.upgrade = Some(Box::new(tx) as Box<_>);
     Ok((response, rx))
 }

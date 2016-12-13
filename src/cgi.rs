@@ -156,7 +156,7 @@ impl CgiRun for Command {
                 if header == "Status" {
                     status = val[0..3].parse().expect("Status returned by CGI program is invalid");
                 } else {
-                    headers.push((header.to_owned(), val.to_owned()));
+                    headers.push((header.to_owned().into(), val.to_owned().into()));
                 }
             }
 

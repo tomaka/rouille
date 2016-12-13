@@ -70,7 +70,7 @@ pub fn session<F>(request: &Request, cookie_name: &str, timeout_s: u64, inner: F
         // TODO: allow setting domain
         let header_value = format!("{}={}; Max-Age={}; Path=/; HttpOnly",
                                     cookie_name, session.key, timeout_s);
-        response.headers.push(("Set-Cookie".to_owned(), header_value));
+        response.headers.push(("Set-Cookie".into(), header_value.into()));
     }
 
     response

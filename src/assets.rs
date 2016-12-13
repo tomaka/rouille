@@ -129,8 +129,8 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
         return Response {
             status_code: 304,
             headers: vec![
-                ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
-                ("ETag".to_owned(), etag.to_string())
+                ("Cache-Control".into(), "public, max-age=3600".into()),
+                ("ETag".into(), etag.into())
             ],
             data: ResponseBody::empty(),
             upgrade: None,
@@ -140,9 +140,9 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
     Response {
         status_code: 200,
         headers: vec![
-            ("Cache-Control".to_owned(), "public, max-age=3600".to_owned()),
-            ("Content-Type".to_owned(), extension_to_mime(extension).to_owned()),
-            ("ETag".to_owned(), etag.to_string())
+            ("Cache-Control".into(), "public, max-age=3600".into()),
+            ("Content-Type".into(), extension_to_mime(extension).into()),
+            ("ETag".into(), etag.into())
         ],
         data: ResponseBody::from_file(file),
         upgrade: None,

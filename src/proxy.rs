@@ -199,7 +199,7 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
             };
             let val = &val[1..];
 
-            headers.push((header.to_owned(), val.to_owned()));
+            headers.push((header.to_owned().into(), val.to_owned().into()));
         }
     }
 
