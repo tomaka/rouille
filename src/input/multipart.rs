@@ -12,6 +12,9 @@
 //! > **Note**: You are encouraged to look at [the `post` module](../post/index.html) instead in
 //! > order to parse data from HTML forms.
 
+use std::error;
+use std::fmt;
+
 use Request;
 use RequestBody;
 
@@ -31,6 +34,28 @@ pub enum MultipartError {
 
     /// Can't parse the body of the request because it was already extracted.
     BodyAlreadyExtracted,
+}
+
+impl error::Error for MultipartError {
+    #[inline]
+    fn description(&self) -> &str {
+        match *self {
+            MultipartError::WrongContentType => {
+                "the `Content-Type` header of the request indicates that it doesn't contain \
+                 multipart data or is invalid"
+            },
+            MultipartError::BodyAlreadyExtracted => {
+                "can't parse the body of the request because it was already extracted"
+            },
+        }
+    }
+}
+
+impl fmt::Display for MultipartError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "{}", error::Error::description(self))
+    }
 }
 
 /// Attempts to decode the content of the request as `multipart/form-data` data.

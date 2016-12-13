@@ -7,6 +7,8 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+use std::error;
+use std::fmt;
 use std::io::Error as IoError;
 use std::io::Read;
 use Request;
@@ -33,6 +35,44 @@ pub enum PlainTextError {
 impl From<IoError> for PlainTextError {
     fn from(err: IoError) -> PlainTextError {
         PlainTextError::IoError(err)
+    }
+}
+
+impl error::Error for PlainTextError {
+    #[inline]
+    fn description(&self) -> &str {
+        match *self {
+            PlainTextError::BodyAlreadyExtracted => {
+                "the body of the request was already extracted"
+            },
+            PlainTextError::WrongContentType => {
+                "the request didn't have a plain text content type"
+            },
+            PlainTextError::IoError(_) => {
+                "could not read the body from the request, or could not execute the CGI program"
+            },
+            PlainTextError::LimitExceeded => {
+                "the limit to the number of bytes has been exceeded"
+            },
+            PlainTextError::NotUtf8 => {
+                "the content-type encoding is not ASCII or UTF-8, or the body is not valid UTF-8"
+            },
+        }
+    }
+
+    #[inline]
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            PlainTextError::IoError(ref e) => Some(e),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for PlainTextError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "{}", error::Error::description(self))
     }
 }
 

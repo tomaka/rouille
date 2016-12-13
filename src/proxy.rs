@@ -51,6 +51,8 @@
 //! ```
 
 use std::borrow::Cow;
+use std::error;
+use std::fmt;
 use std::io;
 use std::io::Error as IoError;
 use std::io::BufRead;
@@ -66,7 +68,7 @@ use ResponseBody;
 /// Error that can happen when dispatching the request to another server.
 #[derive(Debug)]
 pub enum ProxyError {
-    /// Can't parse the body of the request because it was already extracted.
+    /// Can't pass through the body of the request because it was already extracted.
     BodyAlreadyExtracted,
 
     /// Could not read the body from the request, or could not connect to the remote server, or
@@ -80,6 +82,39 @@ pub enum ProxyError {
 impl From<IoError> for ProxyError {
     fn from(err: IoError) -> ProxyError {
         ProxyError::IoError(err)
+    }
+}
+
+impl error::Error for ProxyError {
+    #[inline]
+    fn description(&self) -> &str {
+        match *self {
+            ProxyError::BodyAlreadyExtracted => {
+                "the body of the request was already extracted"
+            },
+            ProxyError::IoError(_) => {
+                "could not read the body from the request, or could not connect to the remote \
+                 server, or the connection to the remote server closed unexpectedly"
+            },
+            ProxyError::HttpParseError => {
+                "the destination server didn't produce compliant HTTP"
+            },
+        }
+    }
+
+    #[inline]
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            ProxyError::IoError(ref e) => Some(e),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for ProxyError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "{}", error::Error::description(self))
     }
 }
 
