@@ -177,10 +177,11 @@ fn note_routes(request: &Request, db: &Transaction) -> Response {
 
             let id = id.unwrap();
 
-            let mut response = Response::text("The note has been created");
-            response.status_code = 201;
-            response.headers.push(("Location".to_owned(), format!("/note/{}", id)));
-            response
+            Response {
+                status_code: 201,
+                location: Some(format!("/note/{}", id).into()),
+                .. Response::text("The note has been created")
+            }
         },
 
         (DELETE) (/note/{id: i32}) => {

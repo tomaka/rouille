@@ -44,7 +44,7 @@ fn main() {
                     <button type=\"submit\">Send</button>
                     </form></p>
                     <p>Received: </p>
-                    <p id=\"result\"></p>")
+                    <p id=\"result\"></p>").into()
             },
 
             (GET) (/ws) => {
@@ -73,7 +73,7 @@ fn main() {
             },
 
             // Default 404 route as with all examples.
-            _ => rouille::Response::empty_404()
+            _ => rouille::Response::empty_404().into()
         )
     });
 }

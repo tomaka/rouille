@@ -64,7 +64,8 @@ extern crate url;
 
 pub use assets::match_assets;
 pub use log::log;
-pub use response::{Response, ResponseBody};
+pub use response::{Response, ResponseBody, RawResponse};
+pub use response::{ResponseCookie, ResponseCacheControl};
 pub use tiny_http::ReadWrite;
 
 use std::io::Cursor;
@@ -119,7 +120,7 @@ macro_rules! try_or_400 {
     ($result:expr) => (
         match $result {
             Ok(r) => r,
-            Err(_) => return $crate::Response::empty_400(),
+            Err(_) => return $crate::Response::empty_400().into(),
         }
     );
 }
@@ -131,7 +132,7 @@ macro_rules! try_or_404 {
     ($result:expr) => (
         match $result {
             Ok(r) => r,
-            Err(_) => return $crate::Response::empty_404(),
+            Err(_) => return $crate::Response::empty_404().into(),
         }
     );
 }
@@ -162,7 +163,7 @@ macro_rules! try_or_404 {
 macro_rules! assert_or_400 {
     ($cond:expr) => (
         if !$cond {
-            return $crate::Response::empty_400();
+            return $crate::Response::empty_400().into();
         } 
     );
 }
@@ -202,7 +203,7 @@ macro_rules! assert_or_400 {
 ///     *requests_counter.lock().unwrap() += 1;
 ///
 ///     // rest of the handler
-/// # panic!()
+/// # rouille::Response::empty_404()
 /// })
 /// ```
 ///
@@ -210,9 +211,10 @@ macro_rules! assert_or_400 {
 ///
 /// If your request handler panicks, a 500 error will automatically be sent to the client.
 ///
-pub fn start_server<A, F>(addr: A, handler: F) -> !
-                          where A: ToSocketAddrs,
-                                F: Send + Sync + 'static + Fn(&Request) -> Response
+pub fn start_server<A, F, R>(addr: A, handler: F) -> !
+                             where A: ToSocketAddrs,
+                                   F: Send + Sync + 'static + Fn(&Request) -> R,
+                                   R: Into<RawResponse>
 {
     let server = tiny_http::Server::http(addr).unwrap();
     let handler = Arc::new(AssertUnwindSafe(handler));      // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
@@ -259,7 +261,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                 let rouille_request = AssertUnwindSafe(rouille_request);
                 let res = panic::catch_unwind(move || {
                     let rouille_request = rouille_request;
-                    handler(&rouille_request)
+                    handler(&rouille_request).into()
                 });
 
                 match res {
@@ -268,6 +270,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                         Response::html("<h1>Internal Server Error</h1>\
                                         <p>An internal error has occurred on the server.</p>")
                             .with_status_code(500)
+                            .into()
                     }
                 }
             };
@@ -278,7 +281,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
                                             .with_data(res_data, res_len);
 
             for (key, value) in rouille_response.headers {
-                if let Ok(header) = tiny_http::Header::from_bytes(key, value) {
+                if let Ok(header) = tiny_http::Header::from_bytes(&*key, &*value) {
                     response.add_header(header);
                 } else {
                     // TODO: ?
@@ -430,7 +433,7 @@ impl Request {
     ///
     /// fn handle(request: &Request) -> Response {
     ///     if !request.is_secure() {
-    ///         return Response::redirect(&format!("https://example.com"));
+    ///         return Response::redirect(format!("https://example.com"));
     ///     }
     ///
     ///     // ...

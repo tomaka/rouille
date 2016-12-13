@@ -21,10 +21,10 @@
 //! client.
 //!
 //! ```
-//! use rouille::{Request, Response};
+//! use rouille::{Request, Response, RawResponse};
 //! use rouille::proxy;
 //!
-//! fn handle_request(request: &Request) -> Response {
+//! fn handle_request(request: &Request) -> RawResponse {
 //!     let config = match request.header("Host") {
 //!         Some(ref h) if h == "domain1.com" => {
 //!             proxy::ProxyConfig {
@@ -40,12 +40,12 @@
 //!             }
 //!         },
 //!
-//!         _ => return Response::empty_404()
+//!         _ => return Response::empty_404().into()
 //!     };
 //!
 //!     match proxy::proxy(request, config) {
 //!         Ok(r) => r,
-//!         Err(_) => Response::text("Bad gateway").with_status_code(500),
+//!         Err(_) => Response::text("Bad gateway").with_status_code(500).into(),
 //!     }
 //! }
 //! ```
@@ -60,7 +60,7 @@ use std::net::TcpStream;
 use std::net::ToSocketAddrs;
 
 use Request;
-use Response;
+use RawResponse;
 use ResponseBody;
 
 /// Error that can happen when dispatching the request to another server.
@@ -98,7 +98,7 @@ pub struct ProxyConfig<A> {
 ///
 /// > **Note**: SSL is not supported.
 // TODO: ^
-pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, ProxyError>
+pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<RawResponse, ProxyError>
     where A: ToSocketAddrs
 {
     let mut socket = try!(TcpStream::connect(config.addr));
@@ -164,11 +164,11 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
             };
             let val = &val[1..];
 
-            headers.push((header.to_owned(), val.to_owned()));
+            headers.push((header.to_owned().into(), val.to_owned().into()));
         }
     }
 
-    Ok(Response {
+    Ok(RawResponse {
         status_code: status,
         headers: headers,
         data: ResponseBody::from_reader(socket),

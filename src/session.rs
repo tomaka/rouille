@@ -40,6 +40,7 @@ use rand::Rng;
 
 use Request;
 use Response;
+use ResponseCookie;
 use input;
 
 pub fn session<F>(request: &Request, cookie_name: &str, timeout_s: u64, inner: F) -> Response
@@ -66,11 +67,17 @@ pub fn session<F>(request: &Request, cookie_name: &str, timeout_s: u64, inner: F
     let mut response = inner(&session);
 
     if session.key_was_retreived.load(Ordering::Relaxed) {       // TODO: use `get_mut()`
-        // FIXME: correct interactions with existing headers
+        // FIXME: interaction with existing cookie
         // TODO: allow setting domain
-        let header_value = format!("{}={}; Max-Age={}; Path=/; HttpOnly",
-                                    cookie_name, session.key, timeout_s);
-        response.headers.push(("Set-Cookie".to_owned(), header_value));
+        response.cookies.push(ResponseCookie {
+            name: cookie_name.to_owned().into(),    // TODO: not zero-cost
+            value: session.key.into(),
+            http_only: true,
+            path: Some("/".into()),
+            domain: None,
+            max_age: Some(timeout_s),
+            secure: true,
+        });
     }
 
     response

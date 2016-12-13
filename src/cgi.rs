@@ -45,7 +45,7 @@ use std::process::Command;
 use std::process::Stdio;
 
 use Request;
-use Response;
+use RawResponse;
 use ResponseBody;
 
 /// Error that can happen when parsing the JSON input.
@@ -75,11 +75,11 @@ pub trait CgiRun {
     /// The body of the returned `Response` will hold a handle to the child's stdout output. This
     /// means that the child can continue running in the background and send data to the client,
     /// even after you have finished handling the request.
-    fn start_cgi(self, request: &Request) -> Result<Response, CgiError>;
+    fn start_cgi(self, request: &Request) -> Result<RawResponse, CgiError>;
 }
 
 impl CgiRun for Command {
-    fn start_cgi(mut self, request: &Request) -> Result<Response, CgiError> {
+    fn start_cgi(mut self, request: &Request) -> Result<RawResponse, CgiError> {
         self.env("SERVER_SOFTWARE", "rouille")
             .env("SERVER_NAME", "localhost")            // FIXME:
             .env("GATEWAY_INTERFACE", "CGI/1.1")
@@ -125,11 +125,11 @@ impl CgiRun for Command {
                 if header == "Status" {
                     status = val[0..3].parse().expect("Status returned by CGI program is invalid");
                 } else {
-                    headers.push((header.to_owned(), val.to_owned()));
+                    headers.push((header.to_owned().into(), val.to_owned().into()));
                 }
             }
 
-            Response {
+            RawResponse {
                 status_code: status,
                 headers: headers,
                 data: ResponseBody::from_reader(stdout),
