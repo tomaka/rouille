@@ -37,6 +37,8 @@
 //! into an error 500 and add an entry to the logs, which is probably what you want when your
 //! server is misconfigured.
 
+use std::error;
+use std::fmt;
 use std::io;
 use std::io::Error as IoError;
 use std::io::BufRead;
@@ -51,7 +53,7 @@ use ResponseBody;
 /// Error that can happen when parsing the JSON input.
 #[derive(Debug)]
 pub enum CgiError {
-    /// Can't parse the body of the request because it was already extracted.
+    /// Can't pass through the body of the request because it was already extracted.
     BodyAlreadyExtracted,
 
     /// Could not read the body from the request, or could not execute the CGI program.
@@ -61,6 +63,35 @@ pub enum CgiError {
 impl From<IoError> for CgiError {
     fn from(err: IoError) -> CgiError {
         CgiError::IoError(err)
+    }
+}
+
+impl error::Error for CgiError {
+    #[inline]
+    fn description(&self) -> &str {
+        match *self {
+            CgiError::BodyAlreadyExtracted => {
+                "the body of the request was already extracted"
+            },
+            CgiError::IoError(_) => {
+                "could not read the body from the request, or could not execute the CGI program"
+            },
+        }
+    }
+
+    #[inline]
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            CgiError::IoError(ref e) => Some(e),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for CgiError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "{}", error::Error::description(self))
     }
 }
 

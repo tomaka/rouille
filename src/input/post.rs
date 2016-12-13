@@ -104,6 +104,7 @@
 use Request;
 
 use std::borrow::Cow;
+use std::error;
 use std::fmt;
 use std::io::BufRead;
 use std::io::Error as IoError;
@@ -140,6 +141,45 @@ impl From<IoError> for PostError {
     #[inline]
     fn from(err: IoError) -> PostError {
         PostError::IoError(err)
+    }
+}
+
+impl error::Error for PostError {
+    #[inline]
+    fn description(&self) -> &str {
+        match *self {
+            PostError::BodyAlreadyExtracted => {
+                "the body of the request was already extracted"
+            },
+            PostError::WrongContentType => {
+                "the request didn't have a post content type"
+            },
+            PostError::IoError(_) => {
+                "could not read the body from the request, or could not execute the CGI program"
+            },
+            PostError::NotUtf8(_) => {
+                "the content-type encoding is not ASCII or UTF-8, or the body is not valid UTF-8"
+            },
+            PostError::Field { .. } => {
+                "failed to parse a requested field"
+            },
+        }
+    }
+
+    #[inline]
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            PostError::IoError(ref e) => Some(e),
+            PostError::Field { ref error, .. } => Some(error),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for PostError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "{}", error::Error::description(self))
     }
 }
 
@@ -183,6 +223,49 @@ impl From<num::ParseFloatError> for PostFieldError {
     #[inline]
     fn from(err: num::ParseFloatError) -> PostFieldError {
         PostFieldError::WrongDataTypeFloat(err)
+    }
+}
+
+impl error::Error for PostFieldError {
+    #[inline]
+    fn description(&self) -> &str {
+        match *self {
+            PostFieldError::IoError(_) => {
+                "could not read the body from the request, or could not execute the CGI program"
+            },
+            PostFieldError::MissingField => {
+                "the field is missing from the request's client"
+            },
+            PostFieldError::WrongFieldType => {
+                "expected a file but got a field, or vice versa"
+            },
+            PostFieldError::UnexpectedMultipleValues => {
+                "got multiple values for the same field while only one was expected"
+            },
+            PostFieldError::WrongDataTypeInt(_) => {
+                "failed to parse an integer field"
+            },
+            PostFieldError::WrongDataTypeFloat(_) => {
+                "failed to parse a floating-point field"
+            },
+        }
+    }
+
+    #[inline]
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            PostFieldError::IoError(ref e) => Some(e),
+            PostFieldError::WrongDataTypeInt(ref e) => Some(e),
+            PostFieldError::WrongDataTypeFloat(ref e) => Some(e),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for PostFieldError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "{}", error::Error::description(self))
     }
 }
 

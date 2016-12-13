@@ -70,6 +70,8 @@ pub use self::websocket::SendError;
 pub use self::websocket::Websocket;
 
 use std::ascii::AsciiExt;
+use std::error;
+use std::fmt;
 use std::sync::mpsc;
 use std::vec::IntoIter as VecIntoIter;
 use sha1::Sha1;
@@ -101,6 +103,27 @@ pub enum WebsocketError {
 
     /// The subprotocol passed to the function was not requested by the client.
     WrongSubprotocol,
+}
+
+impl error::Error for WebsocketError {
+    #[inline]
+    fn description(&self) -> &str {
+        match *self {
+            WebsocketError::InvalidWebsocketRequest => {
+                "the request does not match a websocket request"
+            },
+            WebsocketError::WrongSubprotocol => {
+                "the subprotocol passed to the function was not requested by the client"
+            },
+        }
+    }
+}
+
+impl fmt::Display for WebsocketError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "{}", error::Error::description(self))
+    }
 }
 
 /// Builds a `Response` that initiates the websocket protocol.

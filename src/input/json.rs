@@ -33,10 +33,12 @@
 //! ```
 //!
 
-use rustc_serialize::Decodable;
-use rustc_serialize::json;
+use std::error;
+use std::fmt;
 use std::io::Error as IoError;
 use std::io::Read;
+use rustc_serialize::Decodable;
+use rustc_serialize::json;
 use Request;
 
 /// Error that can happen when parsing the JSON input.
@@ -64,6 +66,42 @@ impl From<IoError> for JsonError {
 impl From<json::DecoderError> for JsonError {
     fn from(err: json::DecoderError) -> JsonError {
         JsonError::ParseError(err)
+    }
+}
+
+impl error::Error for JsonError {
+    #[inline]
+    fn description(&self) -> &str {
+        match *self {
+            JsonError::BodyAlreadyExtracted => {
+                "the body of the request was already extracted"
+            },
+            JsonError::WrongContentType => {
+                "the request didn't have a JSON content type"
+            },
+            JsonError::IoError(_) => {
+                "could not read the body from the request, or could not execute the CGI program"
+            },
+            JsonError::ParseError(_) => {
+                "error while parsing the JSON body"
+            },
+        }
+    }
+
+    #[inline]
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            JsonError::IoError(ref e) => Some(e),
+            JsonError::ParseError(ref e) => Some(e),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for JsonError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "{}", error::Error::description(self))
     }
 }
 
