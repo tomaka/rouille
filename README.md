@@ -64,7 +64,8 @@ following results:
 - A hello world in Go yields ~51k requests/sec.
 - The default installation of nginx yields ~39k requests/sec.
 
-While not the fastest, rouille has *reasonable* performances.
+While not the fastest, rouille has *reasonable* performances. Amongst all these examples, rouille
+is the only one to use synchronous I/O.
 
 ### Are there plugins for features such as database connection, templating, etc.
 
