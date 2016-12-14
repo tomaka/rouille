@@ -277,7 +277,22 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
             let mut response = tiny_http::Response::empty(rouille_response.status_code)
                                             .with_data(res_data, res_len);
 
+            let mut upgrade_header = "".into();
+
             for (key, value) in rouille_response.headers {
+                if key.eq_ignore_ascii_case("Content-Length") {
+                    continue;
+                }
+
+                if key.eq_ignore_ascii_case("Content-Encoding") {
+                    continue;
+                }
+
+                if key.eq_ignore_ascii_case("Upgrade") {
+                    upgrade_header = value;
+                    continue;
+                }
+
                 if let Ok(header) = tiny_http::Header::from_bytes(key.as_bytes(), value.as_bytes()) {
                     response.add_header(header);
                 } else {
@@ -287,7 +302,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
 
             if let Some(ref mut upgrade) = rouille_response.upgrade {
                 let trq = tiny_http_request.lock().unwrap().take().unwrap();
-                let socket = trq.upgrade("websocket", response);
+                let socket = trq.upgrade(&upgrade_header, response);
                 upgrade.build(socket);
 
             } else {
