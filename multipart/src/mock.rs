@@ -71,7 +71,7 @@ impl HttpBuffer {
 impl Write for HttpBuffer {
     fn write(&mut self, out: &[u8]) -> io::Result<usize> {
         if out.len() == 0 {
-            debug!("Passed a zero-sized buffer.");
+            debug!("HttpBuffer::write() was passed a zero-sized buffer.");
             return Ok(0);
         }
 
@@ -115,7 +115,7 @@ pub struct ServerRequest<'a> {
 impl<'a> Read for ServerRequest<'a> {
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
         if out.len() == 0 {
-            debug!("Passed a zero-sized buffer.");
+            debug!("ServerRequest::read() was passed a zero-sized buffer.");
             return Ok(0);
         }
 
