@@ -273,7 +273,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
             };
 
             // writing the response
-            let (res_data, res_len) = rouille_response.data.into_inner();
+            let (res_data, res_len) = rouille_response.data.into_reader_and_size();
             let mut response = tiny_http::Response::empty(rouille_response.status_code)
                                             .with_data(res_data, res_len);
 
