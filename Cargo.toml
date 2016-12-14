@@ -9,9 +9,14 @@ description = "High-level idiomatic web framework."
 readme = "README.md"
 keywords = ["web", "framework", "http", "rest"]
 
+[features]
+default = ["gzip"]
+gzip = ["flate2"]
+
 [dependencies]
 chrono = "0.2.0"
 filetime = "0.1.10"
+flate2 = { version = "0.2.14", optional = true }
 multipart = { version = "0.5.1", default-features = false, features = ["server"] }
 rand = "0.3.11"
 rustc-serialize = "0.3"

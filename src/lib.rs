@@ -54,6 +54,8 @@
 
 extern crate chrono;
 extern crate filetime;
+#[cfg(feature = "flate2")]
+extern crate flate2;
 extern crate multipart;
 extern crate rand;
 extern crate rustc_serialize;
@@ -82,6 +84,7 @@ use std::thread;
 use std::ascii::AsciiExt;
 
 pub mod cgi;
+pub mod content_encoding;
 pub mod input;
 pub mod proxy;
 pub mod session;
@@ -363,10 +366,6 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
 
             for (key, value) in rouille_response.headers {
                 if key.eq_ignore_ascii_case("Content-Length") {
-                    continue;
-                }
-
-                if key.eq_ignore_ascii_case("Content-Encoding") {
                     continue;
                 }
 
