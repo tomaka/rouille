@@ -206,7 +206,11 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
     }
 
     fn write_boundary(&mut self) -> io::Result<()> {
-        write!(self.inner, "\r\n--{}\r\n", self.boundary)
+        if self.data_written {
+            try!(self.inner.write_all(b"\r\n"));
+        }
+
+        write!(self.inner, "--{}\r\n", self.boundary)
     }
 
     fn write_text(&mut self, name: &str, text: &str) -> io::Result<()> {
@@ -235,7 +239,7 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
 
     fn write_field_headers(&mut self, name: &str, filename: Option<&str>, content_type: Option<Mime>) 
     -> io::Result<()> {
-        chain_result! {
+        let res = chain_result! {
             // Write the first boundary, or the boundary for the previous field.
             self.write_boundary(),
             { self.data_written = true; Ok(()) },
@@ -245,7 +249,15 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
             content_type.map(|content_type| write!(self.inner, "\r\nContent-Type: {}", content_type))
                 .unwrap_or(Ok(())),
             self.inner.write_all(b"\r\n\r\n")
-        }
+        };
+
+        self.data_written = true;
+
+        res
+    }
+
+    fn inner_mut(&mut self) -> &mut W {
+        &mut self.inner
     }
 
     fn finish(mut self) -> io::Result<W> {

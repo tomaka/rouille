@@ -8,7 +8,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use std::io::prelude::*;
-use std::{fmt, io, mem};
+use std::{fmt, io, mem, vec};
 
 use super::{HttpRequest, HttpStream, MultipartWriter};
 
@@ -244,7 +244,8 @@ struct Stream<'n, 'd> {
 /// The result of [`Multipart::prepare()`](struct.Multipart.html#method.prepare) or
 /// `Multipart::prepare_threshold()`. Implements `Read`, contains the entire request body.
 pub struct PreparedFields<'d> {
-    fields: Vec<PreparedField<'d>>,
+    fields: vec::IntoIter<PreparedField<'d>>,
+    next_field: Option<PreparedField<'d>>,
     #[cfg_attr(not(feature = "hyper"), allow(dead_code))]
     boundary: String,
     content_len: Option<u64>,
@@ -291,7 +292,8 @@ impl<'d> PreparedFields<'d> {
         let content_len = get_content_len(&prep_fields);
 
         Ok(PreparedFields {
-            fields: prep_fields,
+            fields: prep_fields.into_iter(),
+            next_field: None,
             boundary: boundary,
             content_len: content_len,
         })
@@ -311,20 +313,29 @@ impl<'d> PreparedFields<'d> {
 
 impl<'d> Read for PreparedFields<'d> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if buf.is_empty() { return Ok(0) }
-        if self.fields.is_empty() { return Ok(0) }
+        if buf.len() == 0 { return Err(io::ErrorKind::WriteZero.into()) }
 
-        let bytes_read = if let Some(mut curr) = self.fields.last_mut() {
-            try!(curr.read(buf))
-        } else {
-            0
-        };
+        let mut total_read = 0;
 
-        if bytes_read == 0 {
-            let _ = self.fields.pop();
+        while total_read < buf.len() {
+            if let None = self.next_field {
+                self.next_field = self.fields.next();
+            }
+
+            let buf = &mut buf[total_read..];
+
+            let num_read = if let Some(ref mut field) = self.next_field {
+                try!(field.read(buf))
+            } else {
+                break;
+            };
+
+            if num_read == 0 {
+                self.next_field = None;
+            }
         }
 
-        Ok(bytes_read)        
+        Ok(total_read)
     }
 }
 
@@ -477,17 +488,7 @@ mod hyper {
     impl<'d> super::PreparedFields<'d> {
         /// #### Feature: `hyper`
         /// Convert `self` to `hyper::client::Body`.
-        pub fn to_body<'b>(&'b mut self) -> Body<'b> {
-            use super::PreparedField;
-            // We have a single contiguous body, provide it directly
-            if self.fields.len() == 1 {
-                if let PreparedField::Contiguous(ref body) = self.fields[0] {
-                    return Body::BufBody(body.get_ref(), body.get_ref().len());
-                } else {
-                    unreachable!("Only one field but it was not contiguous!");
-                }
-            }
-
+        pub fn to_body<'b>(&'b mut self) -> Body<'b> where 'd: 'b {
             if let Some(content_len) = self.content_len {
                 Body::SizedBody(self, content_len)
             } else {

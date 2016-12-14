@@ -14,7 +14,8 @@
 
 extern crate buf_redux;
 extern crate httparse;
-extern crate memchr;
+extern crate safemem;
+extern crate twoway;
 
 use tempdir::TempDir;
 
@@ -23,7 +24,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
-use std::{io, mem, ptr};
+use std::{io, mem};
 
 use self::boundary::BoundaryReader;
 use self::field::FieldHeaders;
@@ -88,14 +89,9 @@ impl Multipart<()> {
 
 impl<B: Read> Multipart<B> {
     /// Construct a new `Multipart` with the given body reader and boundary.
-    /// This will prepend the requisite `"--"` to the boundary.
     pub fn with_body<Bnd: Into<String>>(body: B, boundary: Bnd) -> Self {
-        let boundary = prepend_str("--", boundary.into());
-
-        debug!("Boundary: {}", boundary);
-
         Multipart { 
-            source: BoundaryReader::from_reader(body, boundary),
+            source: BoundaryReader::from_reader(body, boundary.into()),
             line_buf: String::new(),
         }
     }
@@ -236,8 +232,8 @@ impl<B: Read> Multipart<B> {
         }
     }
 
-    // Consume the next boundary.
-    // Returns `true` if the last boundary was read, `false` otherwise.
+    /// Consume the next boundary.
+    /// Returns `true` if the last boundary was read, `false` otherwise.
     fn consume_boundary(&mut self) -> io::Result<bool> {
         debug!("Consume boundary!");
         self.source.consume_boundary()
@@ -424,30 +420,3 @@ impl AsRef<Path> for SaveDir {
         self.as_path()
     }
 }
-
-#[cfg(feature = "nightly")]
-fn prepend_str(prefix: &str, mut string: String) -> String {
-    string.insert_str(0, prefix);
-    string
-}
-
-#[cfg(not(feature = "nightly"))]
-fn prepend_str(prefix: &str, mut string: String) -> String {
-    string.reserve(prefix.len());
-
-    unsafe {
-        let bytes = string.as_mut_vec();
-
-        // This addition is safe because it was already done in `String::reserve()`
-        // which would have panicked if it overflowed.
-        let old_len = bytes.len();
-        let new_len = bytes.len() + prefix.len();
-        bytes.set_len(new_len);
-
-        ptr::copy(bytes.as_ptr(), bytes[prefix.len()..].as_mut_ptr(), old_len);
-        ptr::copy(prefix.as_ptr(), bytes.as_mut_ptr(), prefix.len());
-    }
-
-    string
-}
-

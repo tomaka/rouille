@@ -8,7 +8,7 @@
 //! Boundary parsing for `multipart` requests.
 
 use super::buf_redux::BufReader;
-use super::memchr::memchr;
+use super::{safemem, twoway};
 
 use log::LogLevel;
 
@@ -31,9 +31,12 @@ pub struct BoundaryReader<R> {
 impl<R> BoundaryReader<R> where R: Read {
     #[doc(hidden)]
     pub fn from_reader<B: Into<Vec<u8>>>(reader: R, boundary: B) -> BoundaryReader<R> {
+        let mut boundary = boundary.into();
+        safemem::prepend(b"--", &mut boundary);
+
         BoundaryReader {
             source: BufReader::new(reader),
-            boundary: boundary.into(),
+            boundary: boundary,
             search_idx: 0,
             boundary_read: false,
             at_end: false,
@@ -45,7 +48,9 @@ impl<R> BoundaryReader<R> where R: Read {
         let min_len = self.search_idx + (self.boundary.len() * 2);
 
         let buf = try!(fill_buf_min(&mut self.source, min_len));
-        
+
+        self.at_end = buf.len() == 0;
+
         if log_enabled!(LogLevel::Trace) {
             trace!("Buf: {:?}", String::from_utf8_lossy(buf));
         }
@@ -55,34 +60,20 @@ impl<R> BoundaryReader<R> where R: Read {
             buf.len(), self.search_idx, self.boundary_read
         );
 
-        while !self.boundary_read && self.search_idx < buf.len() {
+        if !self.boundary_read && self.search_idx < buf.len() {
             let lookahead = &buf[self.search_idx..];
 
-            // Find the first byte of the candidate boundary, quickly.
-            self.search_idx = match memchr(self.boundary[0], lookahead) {
-                Some(boundary_start) => self.search_idx + boundary_start,
-                None => buf.len(),
-            };
+            debug!("Find boundary loop! Lookahead len: {}", lookahead.len());
 
-            if log_enabled!(LogLevel::Trace) {
-                let len = cmp::min(lookahead.len(), self.boundary.len());
-                trace!("Possible boundary: {:?}", String::from_utf8_lossy(&lookahead[..len]));
-            }
-
-            // See if the candidate is actually our boundary
-            match first_nonmatching_idx(lookahead, &self.boundary) {
-                Some(idx) => {
-                    debug!("First nonmatching idx: {}", idx);
-                    // Skip the nonmatching bit of the candidate
-                    self.search_idx += idx;
+            // Look for the boundary, or if it isn't found, stop near the end.
+            match twoway::find_bytes(lookahead, &self.boundary) {
+                Some(found_idx) => {
+                    self.search_idx += found_idx;
+                    self.boundary_read = true;
                 },
-                // We've only positively read the boundary if we have seen all of the candidate.
-                None => self.boundary_read = lookahead.len() >= self.boundary.len(),
-            }
-
-            // We can still return the part of the buffer that didn't match a boundary.
-            if lookahead.len() < self.boundary.len() {
-                break;
+                None => {
+                    self.search_idx += lookahead.len().saturating_sub(self.boundary.len() + 2);
+                }
             }
         }        
         
@@ -93,7 +84,7 @@ impl<R> BoundaryReader<R> where R: Read {
 
         // If the two bytes before the boundary are a CR-LF, we need to back up
         // the cursor so we don't yield bytes that client code isn't expecting.
-        if self.search_idx >= 2 {
+        if self.boundary_read && self.search_idx >= 2 {
             let two_bytes_before = &buf[self.search_idx - 2 .. self.search_idx];
 
             debug!("Two bytes before: {:?} ({:?}) (\"\\r\\n\": {:?})",
@@ -120,8 +111,12 @@ impl<R> BoundaryReader<R> where R: Read {
             return Ok(true);
         }
 
-        while !self.boundary_read {
+        while !(self.boundary_read || self.at_end){
+            debug!("Boundary not found yet");
+
             let buf_len = try!(self.read_to_boundary()).len();
+
+            debug!("Discarding {} bytes", buf_len);
 
             if buf_len == 0 {
                 break;
@@ -141,8 +136,7 @@ impl<R> BoundaryReader<R> where R: Read {
 
         let consume_amt = {
             let buf = self.source.get_buf();
-
-            self.boundary.len() + if buf[..2] == *b"\r\n" { 2 } else { 0 }
+            self.boundary.len() + if buf.len() >=2 && buf[..2] == *b"\r\n" { 2 } else { 0 }
         };
 
         self.source.consume(consume_amt);
@@ -222,18 +216,6 @@ fn fill_buf_min<R: Read>(buf: &mut BufReader<R>, min: usize) -> io::Result<&[u8]
     Ok(buf.get_buf())
 }
 
-// Returns the first index which `left` and `right` don't match, None otherwise.
-// If they are different lengths and they match up to the end of the shorter one, returns None.
-fn first_nonmatching_idx(left: &[u8], right: &[u8]) -> Option<usize> {
-    for (idx, (lb, rb)) in left.iter().zip(right).enumerate() {
-        if lb != rb {
-            return Some(idx);
-        }
-    }
-
-    None
-}
-
 #[cfg(test)]
 mod test {
     use super::BoundaryReader;
@@ -241,7 +223,7 @@ mod test {
     use std::io;
     use std::io::prelude::*;
 
-    const BOUNDARY: &'static str = "--boundary";
+    const BOUNDARY: &'static str = "boundary";
     const TEST_VAL: &'static str = "--boundary\r
 dashed-value-1\r
 --boundary\r
