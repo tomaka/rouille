@@ -123,8 +123,8 @@ impl CgiRun for Command {
             .env("REMOTE_ADDR", &request.remote_addr().to_string())
             .env("AUTH_TYPE", "")                       // FIXME:
             .env("REMOTE_USER", "")                     // FIXME:
-            .env("CONTENT_TYPE", &request.header("Content-Type").unwrap_or(String::new()))
-            .env("CONTENT_LENGTH", &request.header("Content-Length").unwrap_or(String::new()))
+            .env("CONTENT_TYPE", &request.header("Content-Type").unwrap_or(""))
+            .env("CONTENT_LENGTH", &request.header("Content-Length").unwrap_or(""))
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .stdin(Stdio::piped());

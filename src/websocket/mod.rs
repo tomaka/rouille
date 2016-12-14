@@ -156,7 +156,7 @@ pub fn start<S>(request: &Request, subprotocol: Option<S>)
     // TODO: there are some version shanigans to handle
     // see https://tools.ietf.org/html/rfc6455#section-4.4
     match request.header("Sec-WebSocket-Version") {
-        Some(ref h) if h == "13" => (),
+        Some(h) if h == "13" => (),
         _ => return Err(WebsocketError::InvalidWebsocketRequest),
     }
 
