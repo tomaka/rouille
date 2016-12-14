@@ -474,13 +474,6 @@ pub struct ResponseBody {
 }
 
 impl ResponseBody {
-    /// UNSTABLE. Extracts the content of the response. Do not use.
-    #[doc(hidden)]
-    #[inline]
-    pub fn into_inner(self) -> (Box<Read + Send>, Option<usize>) {
-        (self.data, self.data_length)
-    }
-
     /// Builds a `ResponseBody` that doesn't return any data.
     ///
     /// # Example
@@ -570,5 +563,14 @@ impl ResponseBody {
     #[inline]
     pub fn from_string<S>(data: S) -> ResponseBody where S: Into<String> {
         ResponseBody::from_data(data.into().into_bytes())
+    }
+
+    /// Extracts the content of the response.
+    ///
+    /// Returns the size of the body and the body itself. If the size is `None`, then it is
+    /// unknown.
+    #[inline]
+    pub fn into_reader_and_size(self) -> (Box<Read + Send>, Option<usize>) {
+        (self.data, self.data_length)
     }
 }
