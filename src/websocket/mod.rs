@@ -80,7 +80,6 @@ use rustc_serialize::base64::Config;
 use rustc_serialize::base64::Standard;
 use rustc_serialize::base64::Newline;
 use rustc_serialize::base64::ToBase64;
-use tiny_http::HTTPVersion;
 
 use Request;
 use Response;

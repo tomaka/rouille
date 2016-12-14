@@ -184,8 +184,8 @@ impl Iterator for Websocket {
                                                 Ok(s) => s,
                                                 Err(_) => {
                                                     // Closing connection because text wasn't UTF-8
-                                                    send(b"1007 Invalid UTF-8 encoding",
-                                                         Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                                                    let _ = send(b"1007 Invalid UTF-8 encoding",
+                                                                 Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
                                                     self.socket = None;
                                                     return None;
                                                 },
@@ -201,8 +201,8 @@ impl Iterator for Websocket {
                                     // If we're in the middle of a message, this frame is invalid
                                     // and we need to close.
                                     if !self.current_message_payload.is_empty() {
-                                        send(b"1002 Expected continuation frame",
-                                             Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                                        let _ = send(b"1002 Expected continuation frame",
+                                                     Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
                                         self.socket = None;
                                         return None;
                                     }
@@ -213,11 +213,11 @@ impl Iterator for Websocket {
                                                                   Vec::new());
                                         let string = match String::from_utf8(binary) {
                                             Ok(s) => s,
-                                            Err(err) => {
+                                            Err(_err) => {
                                                 // Closing connection because text wasn't UTF-8
-                                                send(b"1007 Invalid UTF-8 encoding",
-                                                     Write::by_ref(self.socket.as_mut().unwrap()),
-                                                     0x8);
+                                                let _ = send(b"1007 Invalid UTF-8 encoding",
+                                                             Write::by_ref(self.socket.as_mut().unwrap()),
+                                                             0x8);
                                                 self.socket = None;
                                                 return None;
                                             },
@@ -237,8 +237,8 @@ impl Iterator for Websocket {
                                     // If we're in the middle of a message, this frame is invalid
                                     // and we need to close.
                                     if !self.current_message_payload.is_empty() {
-                                        send(b"1002 Expected continuation frame",
-                                             Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                                        let _ = send(b"1002 Expected continuation frame",
+                                                     Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
                                         self.socket = None;
                                         return None;
                                     }
@@ -257,8 +257,8 @@ impl Iterator for Websocket {
                                 // Close request.
                                 0x8 => {
                                     // We need to send a confirmation.
-                                    send(&self.current_frame_payload,
-                                         Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                                    let _ = send(&self.current_frame_payload,
+                                                 Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
                                     // Since the packets are always received in order, and since
                                     // the server is considered dead as soon as it sends the
                                     // confirmation, we have no risk of losing packets.
@@ -269,8 +269,8 @@ impl Iterator for Websocket {
                                 // Ping.
                                 0x9 => {
                                     // Send the pong.
-                                    send(&self.current_frame_payload,
-                                         Write::by_ref(self.socket.as_mut().unwrap()), 0xA);
+                                    let _ = send(&self.current_frame_payload,
+                                                 Write::by_ref(self.socket.as_mut().unwrap()), 0xA);
                                 },
 
                                 // Pong. We ignore this as there's nothing to do.
@@ -278,8 +278,8 @@ impl Iterator for Websocket {
 
                                 // Unknown opcode means error and close.
                                 _ => {
-                                    send(b"Unknown opcode",
-                                         Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                                    let _ = send(b"Unknown opcode",
+                                                 Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
                                     self.socket = None;
                                     return None;
                                 },
@@ -291,7 +291,7 @@ impl Iterator for Websocket {
 
                     low_level::Element::Error { desc } => {
                         // The low level layer signaled an error. Sending it to client and closing.
-                        send(desc.as_bytes(), Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                        let _ = send(desc.as_bytes(), Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
                         self.socket = None;
                         return None;
                     },
