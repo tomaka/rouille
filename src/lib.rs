@@ -445,7 +445,7 @@ impl Request {
     ///
     /// fn handle(request: &Request) -> Response {
     ///     if !request.is_secure() {
-    ///         return Response::redirect(format!("https://example.com"));
+    ///         return Response::redirect_303(format!("https://example.com"));
     ///     }
     ///
     ///     // ...

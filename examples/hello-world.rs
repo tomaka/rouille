@@ -32,7 +32,7 @@ fn main() {
             (GET) (/) => {
                 // If the request's URL is `/`, we jump here.
                 // This block builds a `Response` object that redirects to the `/hello/world`.
-                rouille::Response::redirect("/hello/world")
+                rouille::Response::redirect_302("/hello/world")
             },
 
             (GET) (/hello/world) => {
