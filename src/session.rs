@@ -45,7 +45,7 @@ use input;
 pub fn session<F>(request: &Request, cookie_name: &str, timeout_s: u64, inner: F) -> Response
     where F: FnOnce(&Session) -> Response
 {
-    let mut cookie = input::get_cookies(request).into_iter();
+    let mut cookie = input::cookies(request).into_iter();
     let cookie = cookie.find(|&(ref k, _)| k == &cookie_name);
     let cookie = cookie.map(|(_, v)| v);
 

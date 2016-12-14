@@ -27,7 +27,7 @@
 //!         field2: i32,
 //!     }
 //!
-//!     let json: Json = try_or_400!(rouille::input::get_json_input(request));
+//!     let json: Json = try_or_400!(rouille::input::json_input(request));
 //!     Response::text(format!("field1's value is {}", json.field1))
 //! }
 //! ```
@@ -124,12 +124,12 @@ impl fmt::Display for JsonError {
 ///         field2: i32,
 ///     }
 /// 
-///     let json: Json = try_or_400!(rouille::input::get_json_input(request));
+///     let json: Json = try_or_400!(rouille::input::json_input(request));
 ///     Response::text(format!("field1's value is {}", json.field1))
 /// }
 /// ```
 ///
-pub fn get_json_input<O>(request: &Request) -> Result<O, JsonError> where O: Decodable {
+pub fn json_input<O>(request: &Request) -> Result<O, JsonError> where O: Decodable {
     // TODO: add an optional bytes limit
 
     if let Some(header) = request.header("Content-Type") {
