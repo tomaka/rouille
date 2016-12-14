@@ -251,8 +251,6 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
             self.inner.write_all(b"\r\n\r\n")
         };
 
-        self.data_written = true;
-
         res
     }
 
