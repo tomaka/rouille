@@ -548,8 +548,8 @@ impl Request {
     ///
     /// Returns `None` if no such header could be found.
     #[inline]
-    pub fn header(&self, key: &str) -> Option<String> {
-        self.headers.iter().find(|&&(ref k, _)| k.eq_ignore_ascii_case(key)).map(|&(_, ref v)| v.clone())
+    pub fn header(&self, key: &str) -> Option<&str> {
+        self.headers.iter().find(|&&(ref k, _)| k.eq_ignore_ascii_case(key)).map(|&(_, ref v)| &v[..])
     }
 
     /// Returns the state of the `DNT` (Do Not Track) header.
@@ -574,8 +574,8 @@ impl Request {
     /// ```
     pub fn do_not_track(&self) -> Option<bool> {
         match self.header("DNT") {
-            Some(ref h) if h == "1" => Some(true),
-            Some(ref h) if h == "0" => Some(false),
+            Some(h) if h == "1" => Some(true),
+            Some(h) if h == "0" => Some(false),
             _ => None
         }
     }
@@ -651,8 +651,8 @@ mod tests {
     #[test]
     fn header() {
         let request = Request::fake_http("GET", "/", vec![("Host".to_owned(), "localhost".to_owned())], vec![]);
-        assert_eq!(request.header("Host"), Some("localhost".to_owned()));
-        assert_eq!(request.header("host"), Some("localhost".to_owned()));
+        assert_eq!(request.header("Host"), Some("localhost"));
+        assert_eq!(request.header("host"), Some("localhost"));
     }
 
     #[test]

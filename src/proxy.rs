@@ -26,14 +26,14 @@
 //!
 //! fn handle_request(request: &Request) -> Response {
 //!     let config = match request.header("Host") {
-//!         Some(ref h) if h == "domain1.com" => {
+//!         Some(h) if h == "domain1.com" => {
 //!             proxy::ProxyConfig {
 //!                 addr: "domain1.handler.localnetwork",
 //!                 replace_host: None,
 //!             }
 //!         },
 //!
-//!         Some(ref h) if h == "domain2.com" => {
+//!         Some(h) if h == "domain2.com" => {
 //!             proxy::ProxyConfig {
 //!                 addr: "domain2.handler.localnetwork",
 //!                 replace_host: None,
