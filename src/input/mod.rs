@@ -20,7 +20,7 @@
 use rustc_serialize::base64::FromBase64;
 use Request;
 
-pub use self::json::get_json_input;
+pub use self::json::json_input;
 pub use self::plain::plain_text_body;
 pub use self::plain::plain_text_body_with_limit;
 
@@ -30,7 +30,7 @@ pub mod post;
 
 mod plain;
 
-/// Credentials returned by `get_basic_http_auth`.
+/// Credentials returned by `basic_http_auth`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HttpAuthCredentials {
     /// Login provided by the client.
@@ -51,7 +51,7 @@ pub struct HttpAuthCredentials {
 /// use rouille::Response;
 ///
 /// fn handle(request: &Request) -> Response {
-///     let auth = match input::get_basic_http_auth(request) {
+///     let auth = match input::basic_http_auth(request) {
 ///         Some(a) => a,
 ///         None => return Response::basic_http_auth_login_required("realm")
 ///     };
@@ -67,7 +67,7 @@ pub struct HttpAuthCredentials {
 ///     Response::text("You are in a secret area")
 /// }
 /// ```
-pub fn get_basic_http_auth(request: &Request) -> Option<HttpAuthCredentials> {
+pub fn basic_http_auth(request: &Request) -> Option<HttpAuthCredentials> {
     let header = match request.header("Authorization") {
         None => return None,
         Some(h) => h,
@@ -102,7 +102,7 @@ pub fn get_basic_http_auth(request: &Request) -> Option<HttpAuthCredentials> {
 /// `Vec` is returned.
 // TODO: should an error be returned if the header is malformed?
 // TODO: be less tolerent to what is accepted?
-pub fn get_cookies(request: &Request) -> Vec<(String, String)> {
+pub fn cookies(request: &Request) -> Vec<(String, String)> {
     let header = match request.header("Cookie") {
         None => return Vec::new(),
         Some(h) => h,
@@ -127,13 +127,13 @@ pub fn get_cookies(request: &Request) -> Vec<(String, String)> {
 mod test {
     use Request;
     use super::HttpAuthCredentials;
-    use super::get_basic_http_auth;
-    use super::get_cookies;
+    use super::basic_http_auth;
+    use super::cookies;
 
     #[test]
     fn basic_http_auth_no_header() {
         let request = Request::fake_http("GET", "/", vec![], Vec::new());
-        assert_eq!(get_basic_http_auth(&request), None);
+        assert_eq!(basic_http_auth(&request), None);
     }
 
     #[test]
@@ -142,13 +142,13 @@ mod test {
                                          vec![("Authorization".to_owned(),
                                                "hello world".to_owned())],
                                          Vec::new());
-        assert_eq!(get_basic_http_auth(&request), None);
+        assert_eq!(basic_http_auth(&request), None);
 
         let request = Request::fake_http("GET", "/",
                                          vec![("Authorization".to_owned(),
                                                "Basic \0\0".to_owned())],
                                          Vec::new());
-        assert_eq!(get_basic_http_auth(&request), None);
+        assert_eq!(basic_http_auth(&request), None);
     }
 
     #[test]
@@ -158,7 +158,7 @@ mod test {
                                                "Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==".to_owned())],
                                          Vec::new());
 
-        assert_eq!(get_basic_http_auth(&request), Some(HttpAuthCredentials {
+        assert_eq!(basic_http_auth(&request), Some(HttpAuthCredentials {
             login: "Aladdin".to_owned(),
             password: "open sesame".to_owned(),
         }));
@@ -171,7 +171,7 @@ mod test {
                                                "a=b; hello=world".to_owned())],
                                          Vec::new());
 
-        assert_eq!(get_cookies(&request), vec![
+        assert_eq!(cookies(&request), vec![
             ("a".to_owned(), "b".to_owned()),
             ("hello".to_owned(), "world".to_owned())
         ]);
