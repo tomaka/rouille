@@ -179,13 +179,14 @@ macro_rules! assert_or_400 {
 /// The handler must also be thread-safe (`Send` and `Sync`).
 /// For example this handler isn't thread-safe:
 ///
-/// ```ignore
+/// ```should_fail
 /// let mut requests_counter = 0;
 ///
 /// rouille::start_server("localhost:80", move |request| {
 ///     requests_counter += 1;
 ///
-///     // rest of the handler
+///     // ... rest of the handler ...
+/// # panic!()
 /// })
 /// ```
 ///
