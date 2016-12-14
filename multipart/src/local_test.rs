@@ -19,7 +19,7 @@ struct TestFields {
     files: HashMap<String, Vec<u8>>,
 }
 
-//#[test]
+#[test]
 fn local_test() {
     do_test(test_client, "Regular");
 }
@@ -32,11 +32,13 @@ fn local_test_lazy() {
 fn do_test(client: fn(&TestFields) -> HttpBuffer, name: &str) {
     let _ = ::env_logger::init();
 
+    info!("Testing {} client", name);
+
     let test_fields = gen_test_fields();
 
-    let buf = client(&test_fields);
+    trace!("Fields for test: {:?}", test_fields);
 
-    info!("Testing {} client", name);
+    let buf = client(&test_fields);
 
     trace!(
         "\n==Test Buffer Begin==\n{}\n==Test Buffer End==",
@@ -128,7 +130,7 @@ fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
         multipart.add_stream(&**file_name, Cursor::new(file), None as Option<&str>, None);
     }
 
-    let mut prepared = multipart.prepare().unwrap();
+    let mut prepared = multipart.prepare_threshold(None).unwrap();
 
     let mut buf = Vec::new();
 
@@ -151,8 +153,6 @@ fn test_server(buf: HttpBuffer, mut fields: TestFields) {
 
     let mut multipart = Multipart::from_request(server_buf)
         .unwrap_or_else(|_| panic!("Buffer should be multipart!"));
-
-    trace!("Fields for server test: {:?}", fields);
 
     while let Ok(Some(mut field)) = multipart.read_entry() {
         match field.data {

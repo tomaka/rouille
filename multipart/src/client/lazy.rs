@@ -1,5 +1,7 @@
 //! Multipart requests which write out their data in one fell swoop.
 
+use log::LogLevel;
+
 use mime::Mime;
 
 use std::borrow::Cow;
@@ -8,6 +10,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use std::io::prelude::*;
+use std::io::Cursor;
 use std::{fmt, io, mem, vec};
 
 use super::{HttpRequest, HttpStream, MultipartWriter};
@@ -163,7 +166,7 @@ impl<'n, 'd> Multipart<'n, 'd> {
 
     /// Convert `req` to `HttpStream`, write out the fields in this request, and finish the
     /// request, returning the response if successful, or the first error encountered.
-    pub fn send<R: HttpRequest>(&mut self, req: R) -> Result<<R::Stream as HttpStream>::Response, LazyError<'n, <R::Stream as HttpStream>::Error>> {
+    pub fn send<R: HttpRequest>(&mut self, req: R) -> Result<< R::Stream as HttpStream >::Response, LazyError<'n, < R::Stream as HttpStream >::Error>> {
         let (boundary, stream) = try_lazy!(super::open_stream(req, None));
         let mut writer = MultipartWriter::new(stream, boundary);
 
@@ -179,7 +182,7 @@ impl<'n, 'd> Multipart<'n, 'd> {
     /// A certain amount of field data will be buffered. See
     /// [`prepare_threshold()`](#method.prepare_threshold) for more information on this behavior.
     pub fn prepare(&mut self) -> LazyIoResult<'n, PreparedFields<'d>> {
-       self.prepare_threshold(Some(DEFAULT_BUFFER_THRESHOLD)) 
+        self.prepare_threshold(Some(DEFAULT_BUFFER_THRESHOLD))
     }
 
     /// Export the multipart data contained in this lazy request to an adaptor which implements `Read`.
@@ -187,8 +190,6 @@ impl<'n, 'd> Multipart<'n, 'd> {
     /// #### Buffering
     /// For efficiency, text and file fields smaller than `buffer_threshold` are copied to an in-memory buffer. If `None`,
     /// all fields are copied to memory.
-    ///
-    ///
     pub fn prepare_threshold(&mut self, buffer_threshold: Option<u64>) -> LazyIoResult<'n, PreparedFields<'d>> {
         let boundary = super::gen_boundary();
         PreparedFields::from_fields(&mut self.fields, boundary.into(), buffer_threshold)
@@ -208,10 +209,10 @@ impl<'n, 'd> Field<'n, 'd> {
         match self.data {
             Data::Text(ref text) => writer.write_text(&self.name, text),
             Data::File(ref path) => writer.write_file(&self.name, path),
-            Data::Stream(ref mut stream) => 
+            Data::Stream(ref mut stream) =>
                 writer.write_stream(
-                    &mut stream.stream, 
-                    &self.name, 
+                    &mut stream.stream,
+                    &self.name,
                     stream.filename.as_ref().map(|f| &**f),
                     stream.content_type.clone(),
                 ),
@@ -226,8 +227,8 @@ enum Data<'n, 'd> {
 }
 
 impl<'n, 'd> fmt::Debug for Data<'n, 'd> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {        
-        match *self { 
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
             Data::Text(ref text) => write!(f, "Data::Text({:?})", text),
             Data::File(ref path) => write!(f, "Data::File({:?})", path),
             Data::Stream(_) => f.write_str("Data::Stream(Box<Read>"),
@@ -246,50 +247,38 @@ struct Stream<'n, 'd> {
 pub struct PreparedFields<'d> {
     fields: vec::IntoIter<PreparedField<'d>>,
     next_field: Option<PreparedField<'d>>,
-    #[cfg_attr(not(feature = "hyper"), allow(dead_code))]
     boundary: String,
     content_len: Option<u64>,
 }
 
 impl<'d> PreparedFields<'d> {
     fn from_fields<'n>(fields: &mut Vec<Field<'n, 'd>>, boundary: String, buffer_threshold: Option<u64>) -> Result<Self, LazyIoError<'n>> {
-        let buffer_threshold = buffer_threshold.unwrap_or(0);
+        let buffer_threshold = buffer_threshold.unwrap_or(::std::u64::MAX);
 
-        let mut prep_fields = Vec::with_capacity(fields.len());
+        debug!("Field count: {}", fields.len());
+
+        let mut prep_fields = Vec::new();
 
         let mut fields = fields.drain(..).peekable();
 
-        let mut contiguous = Vec::new();
+        {
+            let mut writer = MultipartWriter::new(Vec::new(), &*boundary);
 
-        while fields.peek().is_some() {
-            let remainder = {
-                let writer = MultipartWriter::new(&mut contiguous, &*boundary);
-                try!(write_fields(writer, &mut fields, buffer_threshold))
-            };
-
-            let contiguous = io::Cursor::new(mem::replace(&mut contiguous, Vec::new()));
-
-            if let Some(rem) = remainder {
-                prep_fields.push(PreparedField::Partial(contiguous.chain(rem)));
-            } else {
-                prep_fields.push(PreparedField::Contiguous(contiguous));
+            while fields.peek().is_some() {
+                if let Some(rem) = try!(write_fields(&mut writer, &mut fields, buffer_threshold)) {
+                    let contiguous = mem::replace(writer.inner_mut(), Vec::new());
+                    prep_fields.push(PreparedField::Partial(Cursor::new(contiguous), rem));
+                }
             }
-        }
 
-        // FIXME: when non-lexical borrow scopes land, convert this to a single if-let/else
-        let mut end_written = false;
-        
-        if let Some(&mut PreparedField::Contiguous(ref mut vec)) = prep_fields.last_mut() {
-            try_lazy!(write!(vec, "\r\n--{}--", boundary));
-            end_written = true;
-        } 
-        
-        if !end_written {
-            let vec = format!("\r\n--{}--", boundary).into_bytes();
-            prep_fields.push(PreparedField::Contiguous(io::Cursor::new(vec)));
+            let contiguous = writer.finish().unwrap();
+
+            prep_fields.push(PreparedField::Contiguous(Cursor::new(contiguous)));
         }
 
         let content_len = get_content_len(&prep_fields);
+
+        debug!("Prepared fields len: {}", prep_fields.len());
 
         Ok(PreparedFields {
             fields: prep_fields.into_iter(),
@@ -308,7 +297,7 @@ impl<'d> PreparedFields<'d> {
     /// Get the boundary that was used to serialize the request.
     pub fn boundary(&self) -> &str {
         &self.boundary
-    } 
+    }
 }
 
 impl<'d> Read for PreparedFields<'d> {
@@ -333,6 +322,8 @@ impl<'d> Read for PreparedFields<'d> {
             if num_read == 0 {
                 self.next_field = None;
             }
+
+            total_read += num_read;
         }
 
         Ok(total_read)
@@ -345,18 +336,18 @@ fn get_content_len(fields: &[PreparedField]) -> Option<u64> {
     for field in fields {
         match *field {
             PreparedField::Contiguous(ref vec) => content_len += vec.get_ref().len() as u64,
-            PreparedField::Partial(_) => return None,
+            PreparedField::Partial(..) => return None,
         }
     }
 
     Some(content_len)
 }
 
-fn write_fields<'n, 'd, I: Iterator<Item = Field<'n, 'd>>>(mut writer: MultipartWriter<&mut Vec<u8>>, fields: I, buffer_threshold: u64)
--> LazyIoResult<'n, Option<Box<Read + 'd>>> {
+fn write_fields<'n, 'd, I: Iterator<Item = Field<'n, 'd>>>(writer: &mut MultipartWriter<Vec<u8>>, fields: I, buffer_threshold: u64)
+    -> LazyIoResult<'n, Option<Box<Read + 'd>>> {
     for field in fields {
         match field.data {
-            Data::Text(text) => if text.len() as u64 <= buffer_threshold  {
+            Data::Text(text) => if text.len() as u64 <= buffer_threshold {
                 try_lazy!(field.name, writer.write_text(&field.name, &*text));
             } else {
                 try_lazy!(field.name, writer.write_field_headers(&field.name, None, None));
@@ -370,13 +361,13 @@ fn write_fields<'n, 'd, I: Iterator<Item = Field<'n, 'd>>>(mut writer: Multipart
                 if len <= buffer_threshold {
                     try_lazy!(field.name, writer.write_stream(&mut file, &field.name, filename, Some(content_type)));
                 } else {
-                    try_lazy!(field.name, writer.write_field_headers(&field.name, filename, Some(content_type)));
                     return Ok(Some(Box::new(file)));
                 }
             },
             Data::Stream(stream) => {
+                let content_type = stream.content_type.or_else(|| Some(::mime_guess::octet_stream()));
                 let filename = stream.filename.as_ref().map(|f| &**f);
-                try_lazy!(field.name, writer.write_field_headers(&field.name, filename, stream.content_type));
+                try_lazy!(field.name, writer.write_field_headers(&field.name, filename, content_type));
                 return Ok(Some(stream.stream));
             },
         }
@@ -388,14 +379,40 @@ fn write_fields<'n, 'd, I: Iterator<Item = Field<'n, 'd>>>(mut writer: Multipart
 #[doc(hidden)]
 pub enum PreparedField<'d> {
     Contiguous(io::Cursor<Vec<u8>>),
-    Partial(io::Chain<io::Cursor<Vec<u8>>, Box<Read + 'd>>),
+    Partial(io::Cursor<Vec<u8>>, Box<Read + 'd>),
 }
 
 impl<'d> Read for PreparedField<'d> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match *self {
             PreparedField::Contiguous(ref mut vec) => vec.read(buf),
-            PreparedField::Partial(ref mut chain) => chain.read(buf),
+            PreparedField::Partial(ref mut cursor, ref mut remainder) => {
+                match cursor.read(buf) {
+                    Ok(0) => remainder.read(buf),
+                    res => res,
+                }
+            },
+        }
+    }
+}
+
+impl<'d> fmt::Debug for PreparedField<'d> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            PreparedField::Contiguous(ref bytes) => {
+                if log_enabled!(LogLevel::Trace) {
+                    write!(f, "PreparedField::Contiguous(\n{:?}\n)", String::from_utf8_lossy(bytes.get_ref()))
+                } else {
+                    write!(f, "PreparedField::Contiguous(len: {})", bytes.get_ref().len())
+                }
+            },
+            PreparedField::Partial(ref bytes, _) => {
+                if log_enabled!(LogLevel::Trace) {
+                    write!(f, "PreparedField::Partial(\n{:?}\n, Box<Read>)", String::from_utf8_lossy(bytes.get_ref()))
+                } else {
+                    write!(f, "PreparedField::Partial(len: {}, Box<Read>)", bytes.get_ref().len())
+                }
+            }
         }
     }
 }
@@ -457,7 +474,7 @@ mod hyper {
         /// Supplies the fields in the body, optionally setting the content-length header if
         /// applicable (all added fields were text or files, i.e. no streams).
         pub fn client_request<U: IntoUrl>(&mut self, client: &Client, url: U) -> HyperResult<Response> {
-            self.client_request_mut(client, url, |r| r)        
+            self.client_request_mut(client, url, |r| r)
         }
 
         /// #### Feature: `hyper`
@@ -467,8 +484,7 @@ mod hyper {
         /// Note that the body, and the `ContentType` and `ContentLength` headers will be
         /// overwritten, either by this method or by Hyper.
         pub fn client_request_mut<U: IntoUrl, F: FnOnce(RequestBuilder) -> RequestBuilder>(&mut self, client: &Client, url: U,
-                                                                                                   mut_fn: F) -> HyperResult<Response> {
-
+                                                                                           mut_fn: F) -> HyperResult<Response> {
             let mut fields = match self.prepare() {
                 Ok(fields) => fields,
                 Err(err) => {
@@ -476,12 +492,12 @@ mod hyper {
                     return Err(err.error.into());
                 },
             };
-            
-            
+
+
             mut_fn(client.post(url))
                 .header(::client::hyper::content_type(fields.boundary()))
                 .body(fields.to_body())
-                .send() 
+                .send()
         }
     }
 
