@@ -88,8 +88,13 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
     };
 
     // The potential location of the file on the disk.
-    // TODO: remove GET parameters from URL
-    let potential_file = path.join(&request.url()[1..]);        // TODO: handle the leading `/` more cleanly
+    let potential_file = {
+        let mut path = path.to_path_buf();
+        for component in request.url().split('/') {
+            path.push(component);
+        }
+        path
+    };
 
     // We try to canonicalize the file. If this fails, then the file doesn't exist.
     let potential_file = match potential_file.canonicalize() {
