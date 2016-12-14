@@ -71,7 +71,8 @@ impl HttpBuffer {
 impl Write for HttpBuffer {
     fn write(&mut self, out: &[u8]) -> io::Result<usize> {
         if out.len() == 0 {
-            return Err(io::ErrorKind::WriteZero.into());
+            debug!("Passed a zero-sized buffer.");
+            return Ok(0);
         }
 
         // Simulate the randomness of a network connection by not always reading everything
@@ -114,7 +115,8 @@ pub struct ServerRequest<'a> {
 impl<'a> Read for ServerRequest<'a> {
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
         if out.len() == 0 {
-            return Err(io::ErrorKind::WriteZero.into());
+            debug!("Passed a zero-sized buffer.");
+            return Ok(0);
         }
 
         // Simulate the randomness of a network connection by not always reading everything

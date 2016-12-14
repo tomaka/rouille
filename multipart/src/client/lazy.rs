@@ -302,7 +302,9 @@ impl<'d> PreparedFields<'d> {
 
 impl<'d> Read for PreparedFields<'d> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if buf.len() == 0 { return Err(io::ErrorKind::WriteZero.into()) }
+        if buf.len() == 0 {
+            return Ok(0);
+        }
 
         let mut total_read = 0;
 
