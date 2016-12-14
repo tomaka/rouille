@@ -52,6 +52,9 @@ extern crate nickel;
 #[cfg(feature = "tiny_http")]
 extern crate tiny_http;
 
+#[cfg(any(feature = "mock", test))]
+pub mod mock;
+
 use rand::Rng;
 
 /// Chain a series of results together, with or without previous results.

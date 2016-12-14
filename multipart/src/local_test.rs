@@ -4,15 +4,13 @@
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
-use client::HttpRequest as ClientRequest;
-use client::HttpStream as ClientStream;
-
-use server::HttpRequest as ServerRequest;
+use mock::{ClientRequest, HttpBuffer, ServerRequest};
 
 use rand::{self, Rng, ThreadRng};
 
 use std::collections::HashMap;
 use std::io::prelude::*;
+use std::io::Cursor;
 use std::{io, iter};
 
 #[derive(Debug)]
@@ -21,16 +19,27 @@ struct TestFields {
     files: HashMap<String, Vec<u8>>,
 }
 
-#[test]
+//#[test]
 fn local_test() {
-    let _ = ::env_logger::init(); 
+    do_test(test_client, "Regular");
+}
+
+#[test]
+fn local_test_lazy() {
+    do_test(test_client_lazy, "Lazy");
+}
+
+fn do_test(client: fn(&TestFields) -> HttpBuffer, name: &str) {
+    let _ = ::env_logger::init();
 
     let test_fields = gen_test_fields();
 
-    let buf = test_client(&test_fields);
+    let buf = client(&test_fields);
+
+    info!("Testing {} client", name);
 
     trace!(
-        "\n--Test Buffer Begin--\n{}\n--Test Buffer End--", 
+        "\n==Test Buffer Begin==\n{}\n==Test Buffer End==",
         String::from_utf8_lossy(&buf.buf)
     );
 
@@ -77,7 +86,7 @@ fn gen_bytes() -> Vec<u8> {
 fn test_client(test_fields: &TestFields) -> HttpBuffer {
     use client::Multipart;
 
-    let request = MockClientRequest::default();
+    let request = ClientRequest::default();
 
     let mut test_files = test_fields.files.iter();
 
@@ -85,7 +94,7 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
    
     // Intersperse file fields amongst text fields
     for (name, text) in &test_fields.texts {
-        if let Some((file_name, file)) = test_files.next() {
+        for (file_name, file) in &mut test_files {
             multipart.write_stream(file_name, &mut &**file, Some(file_name), None).unwrap();
         }
 
@@ -98,6 +107,37 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
     }
 
     multipart.send().unwrap()
+}
+
+fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
+    use client::lazy::Multipart;
+
+    let mut multipart = Multipart::new();
+
+    let mut test_files = test_fields.files.iter();
+
+    for (name, text) in &test_fields.texts {
+        for (file_name, file) in &mut test_files {
+            multipart.add_stream(&**file_name, Cursor::new(file), Some(&**file_name), None);
+        }
+
+        multipart.add_text(&**name, &**text);
+    }
+
+    for (file_name, file) in test_files {
+        multipart.add_stream(&**file_name, Cursor::new(file), None as Option<&str>, None);
+    }
+
+    let mut prepared = multipart.prepare().unwrap();
+
+    let mut buf = Vec::new();
+
+    let boundary = prepared.boundary().to_owned();
+    let content_len = prepared.content_len();
+
+    prepared.read_to_end(&mut buf).unwrap();
+
+    HttpBuffer::with_buf(buf, boundary, content_len)
 }
 
 fn test_server(buf: HttpBuffer, mut fields: TestFields) {
@@ -151,94 +191,5 @@ fn test_server(buf: HttpBuffer, mut fields: TestFields) {
     assert!(fields.files.is_empty(), "File fields were not exhausted! File fields: {:?}", fields.files);
 }
 
-#[derive(Default, Debug)]
-pub struct MockClientRequest {
-    boundary: Option<String>,
-    content_len: Option<u64>,
-}
 
-impl ClientRequest for MockClientRequest {
-    type Stream = HttpBuffer;
-    type Error = io::Error;
-    
-    fn apply_headers(&mut self, boundary: &str, content_len: Option<u64>) -> bool {
-        self.boundary = Some(boundary.into());
-        self.content_len = content_len;
-        true
-    }
-
-    fn open_stream(self) -> Result<HttpBuffer, io::Error> {
-        debug!("MockClientRequest::open_stream called! {:?}", self);
-        let boundary = self.boundary.expect("HttpRequest::set_headers() was not called!");
-        
-        Ok(HttpBuffer { buf: Vec::new(), boundary: boundary, content_len: self.content_len })
-    }
-}
-
-#[derive(Debug)]
-pub struct HttpBuffer {
-    buf: Vec<u8>,
-    boundary: String,
-    content_len: Option<u64>,
-}
-
-impl HttpBuffer {
-    pub fn for_server(&self) -> ServerBuffer {
-        ServerBuffer {
-            data: &self.buf,
-            boundary: &self.boundary,
-            content_len: self.content_len,
-            rng: rand::thread_rng(),
-        }
-    }
-}
-
-impl Write for HttpBuffer {
-    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
-        self.buf.write(data)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.buf.flush()
-    }
-}
-
-impl Read for HttpBuffer {
-    fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
-        unimplemented!()
-    }
-}
-
-impl ClientStream for HttpBuffer {
-    type Request = MockClientRequest;
-    type Response = HttpBuffer;
-    type Error = io::Error;
-
-    fn finish(self) -> Result<Self, io::Error> { Ok(self) }
-}
-
-pub struct ServerBuffer<'a> {
-    data: &'a [u8],
-    boundary: &'a str,
-    content_len: Option<u64>,
-    rng: ThreadRng,
-}
-
-impl<'a> Read for ServerBuffer<'a> {
-    fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
-        // Simulate the randomness of a network connection by not always reading everything
-        let len = self.rng.gen_range(1, out.len());
-        self.data.read(&mut out[..len])
-    }
-}
-
-impl<'a> ServerRequest for ServerBuffer<'a> {
-    type Body = Self;
-
-    fn multipart_boundary(&self) -> Option<&str> { Some(&self.boundary) }
-
-    fn body(self) -> Self::Body {
-        self
-    }
-}
 
