@@ -75,7 +75,7 @@ impl Write for HttpBuffer {
         }
 
         // Simulate the randomness of a network connection by not always reading everything
-        let len = self.rng.gen_range(1, out.len());
+        let len = self.rng.gen_range(1, out.len() + 1);
 
         self.buf.write(&out[..len])
     }
@@ -113,8 +113,12 @@ pub struct ServerRequest<'a> {
 
 impl<'a> Read for ServerRequest<'a> {
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
+        if out.len() == 0 {
+            return Err(io::ErrorKind::WriteZero.into());
+        }
+
         // Simulate the randomness of a network connection by not always reading everything
-        let len = self.rng.gen_range(1, out.len());
+        let len = self.rng.gen_range(1, out.len() + 1);
         self.data.read(&mut out[..len])
     }
 }
