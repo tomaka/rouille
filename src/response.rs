@@ -407,7 +407,7 @@ impl Response {
     pub fn with_etag<E>(mut self, request: &Request, etag: E) -> Response
         where E: Into<Cow<'static, str>>
     {
-        if !self.is_success() {
+        if self.status_code < 200 || self.status_code >= 300 {
             return self;
         }
 
