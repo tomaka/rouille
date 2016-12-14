@@ -50,6 +50,22 @@ in the Rust ecosystem.
 Once async I/O has been figured out, rouille will be (hopefully transparently) updated to take it
 into account.
 
+### But is it fast?
+
+On the author's old Linux machine, some basic benchmarking with `wrk -t 4 -c 4` shows the
+following results:
+
+- The hello-world example of rouille yields ~22k requests/sec.
+- A hello world in nodejs (with `http.createServer`) yields ~14k requests/sec.
+- The hello-world example of [tokio-minihttp](https://github.com/tokio-rs/tokio-minihttp) (which is
+  supposedly the fastest HTTP server that currently exists) yields ~77k requests/sec. 
+- The hello example of [hyper](https://github.com/hyperium/hyper) (which uses async I/O with mio
+  as well) yields ~53k requests/sec.
+- A hello world in Go yields ~51k requests/sec.
+- The default installation of nginx yields ~39k requests/sec.
+
+While not the fastest, rouille has *reasonable* performances.
+
 ### Are there plugins for features such as database connection, templating, etc.
 
 It should be trivial to integrate a database or templates to your web server written with
