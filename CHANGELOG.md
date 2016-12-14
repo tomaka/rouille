@@ -1,5 +1,29 @@
 # Changelog
 
+## Version 0.4.0
+
+- Added support for websockets with the `websocket` module.
+- Added `Request::do_not_track()` to query the DNT header.
+- Renamed `get_json_input()` to `json_input()`.
+- Renamed `get_cookies()` to `cookies()`.
+- Renamed `get_basic_http_auth()` to `basic_http_auth()`.
+- The logs now show the time of the start of the request processing. 
+- `Request::header()` now returns a `Option<&str>` instead of `Option<String>`.
+- `Response::svg()` and `Response::html()` now take a `Into<String>` instead of a `Into<Vec<u8>>`.
+- Renamed `Response::error()` and `success()` to `is_error()` and `is_success()`.
+- The `headers` field of `Response` are now `Vec<(Cow<'static, str>, Cow<'static, str>)>` instead
+  of `Vec<(String, String)>`.
+- Removed `Response::redirect` and replaced it with `redirect_301`, `redirect_302`, etc.
+- Added `Response::with_etag()` to add an ETag header to a response.
+- Added an `upgrade` field to `Response`, necessary for websockets.
+- Fixed being able to set the value of the Content-Length and Transfer-Encoding headers.
+- `plain_text_body` now has a limit of 1 MB of data before returning an error.
+- Added `plain_text_body_with_limit` which does the same as `plain_text_body` but with a
+  customizable limit.
+- Implemented the `std::error::Error` trait on all error types.
+- Added `Response::into_reader_and_size()` to retreive a `Read` object from a `ResponseBody`.
+- Fixed issue with static files not being found on Windows because of `/` and `\` mismatch.
+
 ## Version 0.3.3
 
 - Added the `proxy` module with basic reverse proxy.
