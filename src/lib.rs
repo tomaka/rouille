@@ -67,6 +67,7 @@ pub use log::log;
 pub use response::{Response, ResponseBody};
 pub use tiny_http::ReadWrite;
 
+use std::error::Error;
 use std::io::Cursor;
 use std::io::Result as IoResult;
 use std::io::Read;
@@ -171,6 +172,9 @@ macro_rules! assert_or_400 {
 ///
 /// The request handler takes a `&Request` and must return a `Response` to send to the user.
 ///
+/// > **Note**: `start_server` is meant to be an easy-to-use function. If you want more control,
+/// > see [the `Server` struct](struct.Server.html).
+///
 /// # Common mistakes
 ///
 /// The handler must capture its environment by value and not by reference (`'static`). If you
@@ -207,20 +211,97 @@ macro_rules! assert_or_400 {
 /// })
 /// ```
 ///
-/// # Panic handling
+/// # Panic handling in the handler
 ///
 /// If your request handler panicks, a 500 error will automatically be sent to the client.
 ///
+/// # Panic
+///
+/// This function will panic if the server starts to fail (for example if you use a port that is
+/// already occupied) or if the socket is force-closed by the operating system.
+///
+/// If you need to handle these situations, please see `Server`.
 pub fn start_server<A, F>(addr: A, handler: F) -> !
                           where A: ToSocketAddrs,
                                 F: Send + Sync + 'static + Fn(&Request) -> Response
 {
-    let server = tiny_http::Server::http(addr).unwrap();
-    let handler = Arc::new(AssertUnwindSafe(handler));      // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
+    Server::new(addr, handler).expect("Failed to start server").run();
+    panic!("The server socket closed unexpectedly")
+}
 
-    for request in server.incoming_requests() {
+/// A listening server.
+///
+/// This struct is the more manual server creation API of rouille and can be used as an alternative
+/// to the `start_server` function.
+///
+/// The `start_server` function is just a shortcut for `Server::new` followed with `run`. See the
+/// documentation of the `start_server` function for more details about the handler.
+///
+/// # Example
+///
+/// ```no_run
+/// use rouille::Server;
+/// use rouille::Response;
+///
+/// let server = Server::new("localhost:0", |request| {
+///     Response::text("hello world")
+/// }).unwrap();
+/// println!("Listening on {:?}", server.server_addr());
+/// server.run();
+/// ```
+pub struct Server<F> {
+    server: tiny_http::Server,
+    handler: Arc<AssertUnwindSafe<F>>,
+}
+
+impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
+    /// Builds a new `Server` object.
+    ///
+    /// After this function returns, the HTTP server is listening.
+    ///
+    /// Returns an error if there was an error while creating the listening socket, for example if
+    /// the port is already in use.
+    pub fn new<A>(addr: A, handler: F) -> Result<Server<F>, Box<Error + Send + Sync>>
+        where A: ToSocketAddrs
+    {
+        let server = try!(tiny_http::Server::http(addr));
+
+        Ok(Server {
+            server: server,
+            handler: Arc::new(AssertUnwindSafe(handler)),       // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
+        })
+    }
+
+    /// Returns the address of the listening socket.
+    #[inline]
+    pub fn server_addr(&self) -> SocketAddr {
+        self.server.server_addr()
+    }
+
+    /// Runs the server forever, or until the listening socket is somehow force-closed by the
+    /// operating system.
+    #[inline]
+    pub fn run(self) {
+        for request in self.server.incoming_requests() {
+            self.process(request);
+        }
+    }
+
+    /// Processes all the client requests waiting to be processed, then returns.
+    ///
+    /// This function executes very quickly, as each client requests that needs to be processed
+    /// is processed in a separate thread.
+    #[inline]
+    pub fn poll(&self) {
+        while let Ok(Some(request)) = self.server.try_recv() {
+            self.process(request);
+        }
+    }
+
+    // Internal function, called when we got a request from tiny-http that needs to be processed.
+    fn process(&self, request: tiny_http::Request) {
         // We spawn a thread so that requests are processed in parallel.
-        let handler = handler.clone();
+        let handler = self.handler.clone();
         thread::spawn(move || {
             // Small helper struct that makes it possible to put
             // a `tiny_http::Request` inside a `Box<Read>`.
@@ -313,8 +394,6 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
             }
         });
     }
-
-    unreachable!()
 }
 
 /// Trait for objects that can take ownership of a raw connection to the client data.
