@@ -31,7 +31,6 @@ pub struct Response {
     ///
     /// - Accept-Ranges
     /// - Connection
-    /// - Content-Encoding
     /// - Content-Length
     /// - Content-Range
     /// - Trailer
