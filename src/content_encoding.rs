@@ -80,7 +80,7 @@ fn response_is_text(response: &Response) -> bool {
 
         // TODO: perform case-insensitive comparison
         value.starts_with("text/") || value.contains("javascript") || value.contains("json") ||
-        value.contains("xml")
+            value.contains("xml") || value.contains("font")
     })
 }
 
