@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.4.1
+
+- Added a `Server` struct as an alternative to `start_server` for manual control over the behavior.
+- Added a `content_encoding::apply` function that applies `Content-Encoding` to a response.
+- The `try_or_400!` macro now returns a response whose body describes the error in JSON.
+- The `try_or_400!` macro now requires the error to implement the `std::error::Error` trait.
+
 ## Version 0.4.0
 
 - Added support for websockets with the `websocket` module.
