@@ -14,6 +14,7 @@ use std::io::Cursor;
 use std::io::Read;
 use std::fs::File;
 use rustc_serialize;
+use url::percent_encoding;
 use Request;
 use Upgrade;
 
@@ -437,7 +438,7 @@ impl Response {
     pub fn with_etag_keep<E>(mut self, etag: E) -> Response
         where E: Into<Cow<'static, str>>
     {
-        // TODO: if you find a more elegant way to do that, don't hesitate to open a PR
+        // If you find a more elegant way to do that, don't hesitate to open a PR
 
         let mut etag = Some(etag);
 
@@ -450,6 +451,48 @@ impl Response {
 
         if let Some(etag) = etag {
             self.headers.push(("ETag".into(), etag.into()));
+        }
+
+        self
+    }
+
+    /// Adds or replace a `Content-Disposition` header of the response. Tells the browser that the
+    /// body of the request should fire a download popup instead of being shown in the browser.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use rouille::Request;
+    /// use rouille::Response;
+    ///
+    /// fn handle(request: &Request) -> Response {
+    ///     Response::text("hello world").with_content_disposition_attachment("book.txt")
+    /// }
+    /// ```
+    ///
+    /// When the response is sent back to the browser, it will show a popup asking the user to
+    /// download the file "book.txt" whose content will be "hello world".
+    pub fn with_content_disposition_attachment(mut self, filename: &str) -> Response {
+        // The name must be percent-encoded.
+        let name = percent_encoding::percent_encode(filename.as_bytes(),
+                                                    percent_encoding::DEFAULT_ENCODE_SET);
+
+        // If you find a more elegant way to do the thing below, don't hesitate to open a PR
+
+        // Support for this format varies browser by browser, so this may not be the most
+        // ideal thing.
+        // TODO: it's maybe possible to specify multiple file names
+        let mut header = Some(format!("attachment; filename*=UTF8''{}", name).into());
+
+        for &mut (ref key, ref mut val) in self.headers.iter_mut() {
+            if key.eq_ignore_ascii_case("Content-Disposition") {
+                *val = header.take().unwrap();
+                break;
+            }
+        }
+
+        if let Some(header) = header {
+            self.headers.push(("Content-Disposition".into(), header.into()));
         }
 
         self
