@@ -228,6 +228,50 @@ impl Response {
         }
     }
 
+    /// Builds a 200 `Response` with data.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::Response;
+    /// let response = Response::from_data("application/octet-stream", vec![1, 2, 3, 4]);
+    /// ```
+    #[inline]
+    pub fn from_data<C, D>(content_type: C, data: D) -> Response
+        where C: Into<Cow<'static, str>>,
+              D: Into<Vec<u8>>
+    {
+        Response {
+            status_code: 200,
+            headers: vec![("Content-Type".into(), content_type.into())],
+            data: ResponseBody::from_data(data),
+            upgrade: None,
+        }
+    }
+
+    /// Builds a 200 `Response` with the content of a file.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use std::fs::File;
+    /// use rouille::Response;
+    ///
+    /// let file = File::open("image.png").unwrap();
+    /// let response = Response::from_file("image/png", file);
+    /// ```
+    #[inline]
+    pub fn from_file<C>(content_type: C, file: File) -> Response
+        where C: Into<Cow<'static, str>>
+    {
+        Response {
+            status_code: 200,
+            headers: vec![("Content-Type".into(), content_type.into())],
+            data: ResponseBody::from_file(file),
+            upgrade: None,
+        }
+    }
+
     /// Builds a `Response` that outputs HTML.
     ///
     /// # Example

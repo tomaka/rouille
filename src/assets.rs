@@ -126,6 +126,8 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
         .unwrap_or(time::now().tm_nsec as u64)
         ^ 0xd3f40305c9f8e911u64).to_string();
 
+    // TODO: use Response::from_file
+
     Response {
         status_code: 200,
         headers: vec![
