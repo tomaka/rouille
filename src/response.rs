@@ -428,6 +428,62 @@ impl Response {
         self
     }
 
+    /// Removes all headers from the response that match `header`.
+    pub fn without_header(mut self, header: &str) -> Response {
+        self.headers.retain(|&(ref h, _)| !h.eq_ignore_ascii_case(header));
+        self
+    }
+
+    /// Adds an additional header to the response.
+    #[inline]
+    pub fn with_additional_header<H, V>(mut self, header: H, value: V) -> Response
+        where H: Into<Cow<'static, str>>,
+              V: Into<Cow<'static, str>>
+    {
+        self.headers.push((header.into(), value.into()));
+        self
+    }
+
+    /// Removes all headers from the response whose names are `header`, and replaces them .
+    pub fn with_unique_header<H, V>(mut self, header: H, value: V) -> Response
+        where H: Into<Cow<'static, str>>,
+              V: Into<Cow<'static, str>>
+    {
+        // If Vec::retain provided a mutable reference this code would be much simpler and would
+        // only need to iterate once.
+        // See https://github.com/rust-lang/rust/issues/25477
+
+        // TODO: if the response already has a matching header we shouldn't have to build a Cow
+        // from the header
+
+        let header = header.into();
+
+        let mut found_one = false;
+        self.headers.retain(|&(ref h, _)| {
+            if h.eq_ignore_ascii_case(&header) {
+                if !found_one {
+                    found_one = true;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                true
+            }
+        });
+
+        if found_one {
+            for &mut (ref h, ref mut v) in self.headers.iter_mut() {
+                if !h.eq_ignore_ascii_case(&header) { continue; }
+                *v = value.into();
+                break;
+            }
+            self
+        } else {
+            self.with_additional_header(header, value)
+        }
+    }
+
     /// Adds or replaces a `ETag` header to the response, and turns the response into an empty 304
     /// response if the ETag matches a `If-None-Match` header of the request.
     ///
@@ -479,25 +535,10 @@ impl Response {
     ///
     /// > **Note**: Contrary to `with_etag`, this function doesn't try to turn the response into
     /// > a 304 response. If you're unsure of what to do, prefer `with_etag`.
-    pub fn with_etag_keep<E>(mut self, etag: E) -> Response
+    pub fn with_etag_keep<E>(self, etag: E) -> Response
         where E: Into<Cow<'static, str>>
     {
-        // If you find a more elegant way to do that, don't hesitate to open a PR
-
-        let mut etag = Some(etag);
-
-        for &mut (ref key, ref mut val) in self.headers.iter_mut() {
-            if key.eq_ignore_ascii_case("ETag") {
-                *val = etag.take().unwrap().into();
-                break;
-            }
-        }
-
-        if let Some(etag) = etag {
-            self.headers.push(("ETag".into(), etag.into()));
-        }
-
-        self
+        self.with_unique_header("ETag", etag)
     }
 
     /// Adds or replace a `Content-Disposition` header of the response. Tells the browser that the
@@ -658,5 +699,54 @@ impl ResponseBody {
     #[inline]
     pub fn into_reader_and_size(self) -> (Box<Read + Send>, Option<usize>) {
         (self.data, self.data_length)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use Response;
+
+    #[test]
+    fn unique_header_adds() {
+        let r = Response {
+            headers: vec![],
+            .. Response::empty_400()
+        };
+
+        let r = r.with_unique_header("Foo", "Bar");
+
+        assert_eq!(r.headers.len(), 1);
+        assert_eq!(r.headers[0], ("Foo".into(), "Bar".into()));
+    }
+
+    #[test]
+    fn unique_header_adds_without_touching() {
+        let r = Response {
+            headers: vec![("Bar".into(), "Foo".into())],
+            .. Response::empty_400()
+        };
+
+        let r = r.with_unique_header("Foo", "Bar");
+
+        assert_eq!(r.headers.len(), 2);
+        assert_eq!(r.headers[0], ("Bar".into(), "Foo".into()));
+        assert_eq!(r.headers[1], ("Foo".into(), "Bar".into()));
+    }
+
+    #[test]
+    fn unique_header_replaces() {
+        let r = Response {
+            headers: vec![
+                ("foo".into(), "A".into()),
+                ("fOO".into(), "B".into()),
+                ("Foo".into(), "C".into()),
+            ],
+            .. Response::empty_400()
+        };
+
+        let r = r.with_unique_header("Foo", "Bar");
+
+        assert_eq!(r.headers.len(), 1);
+        assert_eq!(r.headers[0], ("foo".into(), "Bar".into()));
     }
 }
