@@ -4,12 +4,15 @@
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
-//!
+//! Mocked types for client-side and server-side APIs.
 use std::io::{self, Read, Write};
 use std::fmt;
 
 use rand::{self, Rng, ThreadRng};
 
+/// A mock implementation of `client::HttpRequest` which can spawn an `HttpBuffer`.
+///
+/// `client::HttpRequest` impl requires the `client` feature.
 #[derive(Default, Debug)]
 pub struct ClientRequest {
     boundary: Option<String>,
@@ -30,25 +33,34 @@ impl ::client::HttpRequest for ClientRequest {
     /// ##Panics
     /// If `apply_headers()` was not called.
     fn open_stream(self) -> Result<HttpBuffer, io::Error> {
-        debug!("MockClientRequest::open_stream called! {:?}", self);
-        let boundary = self.boundary.expect("HttpRequest::set_headers() was not called!");
+        debug!("ClientRequest::open_stream called! {:?}", self);
+        let boundary = self.boundary.expect("ClientRequest::set_headers() was not called!");
 
         Ok(HttpBuffer::new_empty(boundary, self.content_len))
     }
 }
 
+
+/// A writable buffer which stores the boundary and content-length, if provided.
+///
+/// Implements `client::HttpStream` if the `client` feature is enabled.
 pub struct HttpBuffer {
+    /// The buffer containing the raw bytes.
     pub buf: Vec<u8>,
+    /// The multipart boundary.
     pub boundary: String,
+    /// The value of the content-length header, if set.
     pub content_len: Option<u64>,
     rng: ThreadRng,
 }
 
 impl HttpBuffer {
+    /// Create an empty buffer with the given boundary and optional content-length.
     pub fn new_empty(boundary: String, content_len: Option<u64>) -> HttpBuffer {
         Self::with_buf(Vec::new(), boundary, content_len)
     }
 
+    /// Wrap the given buffer with the given boundary and optional content-length.
     pub fn with_buf(buf: Vec<u8>, boundary: String, content_len: Option<u64>) -> Self {
         HttpBuffer {
             buf: buf,
@@ -58,6 +70,7 @@ impl HttpBuffer {
         }
     }
 
+    /// Get a `ServerRequest` wrapping the data in this buffer.
     pub fn for_server(&self) -> ServerRequest {
         ServerRequest {
             data: &self.buf,
@@ -69,16 +82,18 @@ impl HttpBuffer {
 }
 
 impl Write for HttpBuffer {
-    fn write(&mut self, out: &[u8]) -> io::Result<usize> {
-        if out.len() == 0 {
+    /// To simulate a network connection, this will copy a random number of bytes
+    /// from `buf` to the buffer.
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if buf.len() == 0 {
             debug!("HttpBuffer::write() was passed a zero-sized buffer.");
             return Ok(0);
         }
 
         // Simulate the randomness of a network connection by not always reading everything
-        let len = self.rng.gen_range(1, out.len() + 1);
+        let len = self.rng.gen_range(1, buf.len() + 1);
 
-        self.buf.write(&out[..len])
+        self.buf.write(&buf[..len])
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -92,6 +107,7 @@ impl ::client::HttpStream for HttpBuffer {
     type Response = HttpBuffer;
     type Error = io::Error;
 
+    /// Returns `Ok(self)`.
     fn finish(self) -> Result<Self, io::Error> { Ok(self) }
 }
 
@@ -105,14 +121,22 @@ impl fmt::Debug for HttpBuffer {
     }
 }
 
+/// A mock implementation of `server::HttpRequest` that can be read.
+///
+/// Implements `server::HttpRequest` if the `server` feature is enabled.
 pub struct ServerRequest<'a> {
+    /// Slice of the source `HttpBuffer::buf`
     pub data: &'a [u8],
+    /// The multipart boundary.
     pub boundary: &'a str,
+    /// The value of the content-length header, if set.
     pub content_len: Option<u64>,
     rng: ThreadRng,
 }
 
 impl<'a> Read for ServerRequest<'a> {
+    /// To simulate a network connection, this will copy a random number of bytes
+    /// from the buffer to `out`.
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
         if out.len() == 0 {
             debug!("ServerRequest::read() was passed a zero-sized buffer.");
