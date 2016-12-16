@@ -78,6 +78,7 @@ use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::panic;
 use std::panic::AssertUnwindSafe;
+use std::slice::Iter as SliceIter;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
@@ -601,6 +602,12 @@ impl Request {
         self.headers.iter().find(|&&(ref k, _)| k.eq_ignore_ascii_case(key)).map(|&(_, ref v)| &v[..])
     }
 
+    /// Returns a list of all the headers of the request.
+    #[inline]
+    pub fn headers(&self) -> HeadersIter {
+        HeadersIter { iter: self.headers.iter() }
+    }
+
     /// Returns the state of the `DNT` (Do Not Track) header.
     ///
     /// If the header is missing or is malformed, `None` is returned. If the header exists,
@@ -676,6 +683,29 @@ impl Request {
     pub fn remote_addr(&self) -> &SocketAddr {
         &self.remote_addr
     }
+}
+
+/// Iterator to the list of headers in a request.
+#[derive(Debug, Clone)]
+pub struct HeadersIter<'a> {
+    iter: SliceIter<'a, (String, String)>
+}
+
+impl<'a> Iterator for HeadersIter<'a> {
+    type Item = (&'a str, &'a str);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|&(ref k, ref v)| (&k[..], &v[..]))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
+impl<'a> ExactSizeIterator for HeadersIter<'a> {
 }
 
 /// Gives access to the body of a request.
