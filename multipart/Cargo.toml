@@ -1,7 +1,7 @@
 [package]
 name = "multipart"
 
-version = "0.9.0-alpha.6"
+version = "0.9.0-alpha.7"
 
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
@@ -45,9 +45,9 @@ env_logger = "0.3"
 
 [features]
 client = []
-default = ["hyper", "server", "client"]
+default = ["all"]
 server = ["buf_redux", "httparse", "safemem", "twoway"]
 mock = []
 nickel_ = ["nickel", "hyper"]
 nightly = []
-all = ["iron", "nickel_", "tiny_http"]
+all = ["client", "server", "hyper", "iron", "nickel_", "tiny_http", "mock"]
