@@ -4,8 +4,7 @@
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
-//! The client-side abstraction for multipart requests. Enabled with the `client` feature (on by
-//! default).
+//! The client-side abstraction for multipart requests. Enabled with the `client` feature.
 //!
 //! Use this when sending POST requests with files to a server.
 use mime::Mime;

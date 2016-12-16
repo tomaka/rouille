@@ -4,8 +4,7 @@
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
-//! The server-side abstraction for multipart requests. Enabled with the `server` feature (on by
-//! default).
+//! The server-side abstraction for multipart requests. Enabled with the `server` feature.
 //!
 //! Use this when you are implementing an HTTP server and want to
 //! to accept, parse, and serve HTTP `multipart/form-data` requests (file uploads).

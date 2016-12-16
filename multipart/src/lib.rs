@@ -6,24 +6,26 @@
 // copied, modified, or distributed except according to those terms.
 //! Client- and server-side abstractions for HTTP `multipart/form-data` requests.
 //!
-//! Features: 
-//! 
-//! * `client` (default): Enable the client-side abstractions for multipart requests. If the
-//! `hyper` feature is also set, enables integration with the Hyper HTTP client API.
+//! ###Features:
+//! This documentation is built with all features enabled.
 //!
-//! * `server` (default): Enable the server-side abstractions for multipart requests. If the
-//! `hyper` feature is also set, enables integration with the Hyper HTTP server API.
+//! * `client`: The client-side abstractions for generating multipart requests.
 //!
-//! * `hyper` (default): Enable integration with the [Hyper](https://github.com/hyperium/hyper) HTTP library 
+//! * `server`: The server-side abstractions for parsing multipart requests.
+//!
+//! * `mock`: Provides mock implementations of core `client` and `server` traits for debugging
+//! or non-standard use.
+//!
+//! * `hyper`: Integration with the [Hyper](https://github.com/hyperium/hyper) HTTP library
 //! for client and/or server depending on which other feature flags are set.
 //!
-//! * `iron`: Enable integration with the [Iron](http://ironframework.io) web application
+//! * `iron`: Integration with the [Iron](http://ironframework.io) web application
 //! framework. See the [`server::iron`](server/iron/index.html) module for more information.
 //!
-//! * `tiny_http`: Enable integration with the [`tiny_http`](https://github.com/frewsxcv/tiny-http)
+//! * `tiny_http`: Integration with the [`tiny_http`](https://github.com/frewsxcv/tiny-http)
 //! crate. See the [`server::tiny_http`](server/tiny_http/index.html) module for more information.
 //!
-//! * `nickel_`: Enable integration with the [Nickel](http://nickel.rs) web application framework.
+//! * `nickel_`: Integration with the [Nickel](http://nickel.rs) web application framework.
 //! See the [`server::nickel`](server/nickel/index.html) module for more information. Enables the `hyper`
 //! feature.
 #![warn(missing_docs)]
