@@ -1,13 +1,16 @@
+#[macro_use] extern crate log;
 extern crate multipart;
-
-extern crate log;
+extern crate rand;
 
 use log::{LogRecord, LogMetadata, LogLevelFilter};
 
 use multipart::server::Multipart;
 
+use rand::{Rng, ThreadRng};
+
 use std::fs::File;
 use std::env;
+use std::io::{self, Read};
 
 const LOG_LEVEL: LogLevelFilter = LogLevelFilter::Debug;
 
@@ -40,11 +43,34 @@ fn main() {
 
     let file = File::open(file).expect("Could not open file");
 
-    let mut multipart = Multipart::with_body(file, boundary);
+    let reader = RandomReader {
+        inner: file,
+        rng: rand::thread_rng()
+    };
+
+    let mut multipart = Multipart::with_body(reader, boundary);
 
     while let Some(field) = multipart.read_entry().unwrap() {
         println!("Read field: {:?}", field.name);
     }
 
     println!("All entries read!");
+}
+
+struct RandomReader<R> {
+    inner: R,
+    rng: ThreadRng,
+}
+
+impl<R: Read> Read for RandomReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if buf.len() == 0 {
+            debug!("RandomReader::read() passed a zero-sized buffer.");
+            return Ok(0);
+        }
+
+        let len = self.rng.gen_range(1, buf.len() + 1);
+
+        self.inner.read(&mut buf[..len])
+    }
 }
