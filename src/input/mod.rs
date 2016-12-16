@@ -20,6 +20,7 @@
 pub use self::basic_http_auth::HttpAuthCredentials;
 pub use self::basic_http_auth::basic_http_auth;
 pub use self::cookies::cookies;
+pub use self::cookies::CookiesIter;
 pub use self::json::json_input;
 pub use self::plain::plain_text_body;
 pub use self::plain::plain_text_body_with_limit;

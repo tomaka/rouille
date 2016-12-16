@@ -17,33 +17,71 @@
 //! - In order to read a plain text body, see
 //!   [the `plain_text_body` function](fn.plain_text_body.html).
 
+use std::str::Split;
 use Request;
 
 /// Attempts to parse the list of cookies from the request.
 ///
-/// Returns a pair of `(key, value)`. If the header is missing or malformed, an empty
-/// `Vec` is returned.
+/// Returns an iterator that produces a pair of `(key, value)`. If the header is missing or
+/// malformed, an empty iterator is returned.
+///
+/// # Example
+///
+/// ```
+/// use rouille::Request;
+/// use rouille::input;
+///
+/// # let request: Request = return;
+/// if let Some((_, val)) = input::cookies(&request).find(|&(n, _)| n == "cookie-name") {
+///     println!("Value of cookie = {:?}", val);
+/// }
+/// ```
 // TODO: should an error be returned if the header is malformed?
 // TODO: be less tolerent to what is accepted?
-pub fn cookies(request: &Request) -> Vec<(String, String)> {
+pub fn cookies(request: &Request) -> CookiesIter {
     let header = match request.header("Cookie") {
-        None => return Vec::new(),
+        None => "",
         Some(h) => h,
     };
 
-    header
-        .split(|c| c == ';')
-        .filter_map(|cookie| {
+    CookiesIter {
+        iter: header.split(';')
+    }
+}
+
+/// Iterator that returns the list of cookies of a request.
+///
+/// See [the `cookies` functions](fn.cookies.html).
+pub struct CookiesIter<'a> {
+    iter: Split<'a, char>,
+}
+
+impl<'a> Iterator for CookiesIter<'a> {
+    type Item = (&'a str, &'a str);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let cookie = match self.iter.next() {
+                Some(c) => c,
+                None => return None
+            };
+            
             let mut splits = cookie.splitn(2, |c| c == '=');
-            let key = match splits.next() { None => return None, Some(v) => v };
-            let value = match splits.next() { None => return None, Some(v) => v };
+            let key = match splits.next() { None => continue, Some(v) => v };
+            let value = match splits.next() { None => continue, Some(v) => v };
 
-            let key = key.trim().to_owned();
-            let value = value.trim().trim_matches(|c| c == '"').to_owned();
+            let key = key.trim();
+            let value = value.trim().trim_matches(|c| c == '"');
 
-            Some((key, value))
-        })
-        .collect()
+            return Some((key, value));
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (_, len) = self.iter.size_hint();
+        (0, len)
+    }
 }
 
 #[cfg(test)]
@@ -52,15 +90,21 @@ mod test {
     use super::cookies;
 
     #[test]
+    fn no_cookie() {
+        let request = Request::fake_http("GET", "/", vec![], Vec::new());
+        assert_eq!(cookies(&request).count(), 0);
+    }
+
+    #[test]
     fn cookies_ok() {
         let request = Request::fake_http("GET", "/",
                                          vec![("Cookie".to_owned(),
                                                "a=b; hello=world".to_owned())],
                                          Vec::new());
 
-        assert_eq!(cookies(&request), vec![
-            ("a".to_owned(), "b".to_owned()),
-            ("hello".to_owned(), "world".to_owned())
+        assert_eq!(cookies(&request).collect::<Vec<_>>(), vec![
+            ("a".into(), "b".into()),
+            ("hello".into(), "world".into())
         ]);
     }
 }
