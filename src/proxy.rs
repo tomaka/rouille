@@ -15,6 +15,17 @@
 //! This function call will return immediately after the remote server has finished sending its
 //! headers. The socket to the remote will be stored in the `ResponseBody` of the response.
 //!
+//! # Proxy() vs full_proxy()
+//!
+//! The difference between `proxy()` and `full_proxy()` is that if the target server fails to
+//! return a proper error, the `proxy()` function will return an error (in the form of a
+//! `ProxyError`) while the `full_proxy()` will return a `Response` with a status code indicating
+//! an error.
+//!
+//! The `full_proxy()` function will only return an error if the body was already extracted from
+//! the request before it was called. Since this indicates a logic error in the code, it is a good
+//! idea to `unwrap()` the `Result` returned by `full_proxy()`.
+//!
 //! # Example
 //!
 //! You can for example dispatch to a different server depending on the host requested by the
@@ -43,10 +54,7 @@
 //!         _ => return Response::empty_404()
 //!     };
 //!
-//!     match proxy::proxy(request, config) {
-//!         Ok(r) => r,
-//!         Err(_) => Response::text("Bad gateway").with_status_code(500),
-//!     }
+//!     proxy::full_proxy(request, config).unwrap()
 //! }
 //! ```
 
@@ -129,6 +137,10 @@ pub struct ProxyConfig<A> {
 
 /// Sends the request to another HTTP server using the configuration.
 ///
+/// If the function fails to get a response from the target, an error is returned. If you want
+/// to instead return a response with a status code such as 502 (`Bad Gateway`) or 504
+/// (`Gateway Time-out`), see `full_proxy`.
+///
 /// > **Note**: Implementation is very hacky for the moment.
 ///
 /// > **Note**: SSL is not supported.
@@ -209,4 +221,47 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
         data: ResponseBody::from_reader(socket),
         upgrade: None,
     })
+}
+
+/// Error that can happen when calling `full_proxy`.
+#[derive(Debug)]
+pub enum FullProxyError {
+    /// Can't pass through the body of the request because it was already extracted.
+    BodyAlreadyExtracted,
+}
+
+impl error::Error for FullProxyError {
+    #[inline]
+    fn description(&self) -> &str {
+        match *self {
+            FullProxyError::BodyAlreadyExtracted => {
+                "the body of the request was already extracted"
+            },
+        }
+    }
+}
+
+impl fmt::Display for FullProxyError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "{}", error::Error::description(self))
+    }
+}
+
+/// Sends the request to another HTTP server using the configuration.
+///
+/// Contrary to `proxy`, if the server fails to return a proper response then a response is
+/// generated with the status code 502 or 504.
+///
+/// The only possible remaining error is if the body of the request was already extracted. Since
+/// this would be a logic error, it is acceptable to unwrap it.
+pub fn full_proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, FullProxyError>
+    where A: ToSocketAddrs
+{
+    match proxy(request, config) {
+        Ok(r) => Ok(r),
+        Err(ProxyError::IoError(_)) => Ok(Response::text("Gateway Time-out").with_status_code(504)),
+        Err(ProxyError::HttpParseError) => Ok(Response::text("Bad Gateway").with_status_code(502)),
+        Err(ProxyError::BodyAlreadyExtracted) => Err(FullProxyError::BodyAlreadyExtracted),
+    }
 }
