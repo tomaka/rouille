@@ -54,6 +54,11 @@ pub fn apply(request: &Request, response: Response) -> Response {
     // Now let's get the list of content encodings accepted by the request.
     // The list should be ordered from the most desired to the list desired.
     for encoding in accepted_content_encodings(request) {
+        // Try the brotli encoding.
+        if brotli(encoding, &mut response) {
+            return response.take().unwrap();
+        }
+
         // Try the gzip encoding.
         if gzip(encoding, &mut response) {
             return response.take().unwrap();
@@ -158,6 +163,30 @@ fn gzip(e: &str, response: &mut Option<Response>) -> bool {
 #[cfg(not(feature = "gzip"))]
 #[inline]
 fn gzip(e: &str, response: &mut Option<Response>) -> bool {
+    false
+}
+
+#[cfg(feature = "brotli")]
+fn brotli(e: &str, response: &mut Option<Response>) -> bool {
+    use ResponseBody;
+    use std::mem;
+    use brotli2::read::BrotliEncoder;
+
+    if !e.eq_ignore_ascii_case("br") {
+        return false;
+    }
+
+    let mut response = response.as_mut().unwrap();
+    response.headers.push(("Content-Encoding".into(), "br".into()));
+    let previous_body = mem::replace(&mut response.data, ResponseBody::empty());
+    let (raw_data, _) = previous_body.into_reader_and_size();
+    response.data = ResponseBody::from_reader(BrotliEncoder::new(raw_data, 6));
+    true
+}
+
+#[cfg(not(feature = "brotli"))]
+#[inline]
+fn brotli(e: &str, response: &mut Option<Response>) -> bool {
     false
 }
 

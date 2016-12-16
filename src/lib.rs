@@ -52,6 +52,8 @@
 
 #![deny(unsafe_code)]
 
+#[cfg(feature = "brotli2")]
+extern crate brotli2;
 extern crate chrono;
 extern crate filetime;
 #[cfg(feature = "flate2")]

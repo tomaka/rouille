@@ -10,10 +10,12 @@ readme = "README.md"
 keywords = ["web", "framework", "http", "rest"]
 
 [features]
-default = ["gzip"]
+default = ["gzip", "brotli"]
+brotli = ["brotli2"]
 gzip = ["flate2"]
 
 [dependencies]
+brotli2 = { version = "0.2.1", optional = true }
 chrono = "0.2.0"
 filetime = "0.1.10"
 flate2 = { version = "0.2.14", optional = true }
