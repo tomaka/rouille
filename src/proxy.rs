@@ -156,7 +156,7 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
     };
 
     try!(socket.write_all(format!("{} {} HTTP/1.1\n", request.method(), request.raw_url()).as_bytes()));
-    for &(ref header, ref value) in request.headers.iter() {        // TODO: use a getter for headers
+    for (header, value) in request.headers() {
         let value = if header == "Host" {
             if let Some(ref replace) = config.replace_host {
                 &**replace
