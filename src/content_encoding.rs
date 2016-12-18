@@ -53,6 +53,7 @@ pub fn apply(request: &Request, response: Response) -> Response {
 
     // Now let's get the list of content encodings accepted by the request.
     // The list should be ordered from the most desired to the list desired.
+    // TODO: use input::priority_header_preferred instead
     for encoding in accepted_content_encodings(request) {
         // Try the brotli encoding.
         if brotli(encoding, &mut response) {
