@@ -23,6 +23,9 @@ pub use self::cookies::cookies;
 pub use self::json::json_input;
 pub use self::plain::plain_text_body;
 pub use self::plain::plain_text_body_with_limit;
+pub use self::priority_header::parse_priority_header;
+pub use self::priority_header::priority_header_preferred;
+pub use self::priority_header::PriorityHeaderIter;
 
 pub mod json;
 pub mod multipart;
@@ -31,3 +34,4 @@ pub mod post;
 mod basic_http_auth;
 mod cookies;
 mod plain;
+mod priority_header;
