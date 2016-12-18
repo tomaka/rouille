@@ -414,6 +414,24 @@ impl Response {
         }
     }
 
+    /// Builds an empty `Response` with a 406 status code.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::Response;
+    /// let response = Response::empty_406();
+    /// ```
+    #[inline]
+    pub fn empty_406() -> Response {
+        Response {
+            status_code: 406,
+            headers: vec![],
+            data: ResponseBody::empty(),
+            upgrade: None,
+        }
+    }
+
     /// Changes the status code of the response.
     ///
     /// # Example
