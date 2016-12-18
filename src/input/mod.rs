@@ -31,6 +31,7 @@ pub mod json;
 pub mod multipart;
 pub mod post;
 
+mod accept;
 mod basic_http_auth;
 mod cookies;
 mod plain;
