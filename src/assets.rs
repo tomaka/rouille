@@ -15,7 +15,6 @@ use time;
 
 use Request;
 use Response;
-use ResponseBody;
 
 /// Searches inside `path` for a file that matches the given request. If a file is found,
 /// returns a `Response` that would serve this file if returned. If no file is found, a 404
@@ -126,17 +125,9 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
         .unwrap_or(time::now().tm_nsec as u64)
         ^ 0xd3f40305c9f8e911u64).to_string();
 
-    // TODO: use Response::from_file
-
-    Response {
-        status_code: 200,
-        headers: vec![
-            ("Cache-Control".into(), "public, max-age=3600".into()),
-            ("Content-Type".into(), extension_to_mime(extension).into()),
-        ],
-        data: ResponseBody::from_file(file),
-        upgrade: None,
-    }.with_etag(request, etag)
+    Response::from_file(extension_to_mime(extension), file)
+        .with_etag(request, etag)
+        .with_public_cache(3600)        // TODO: is this a good idea? what if the file is private?
 }
 
 /// Returns the mime type of a file based on its extension.

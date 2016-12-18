@@ -600,6 +600,42 @@ impl Response {
 
         self
     }
+
+    /// Adds or replaces a `Cache-Control` header that specifies that the resource is public and
+    /// can be cached for the given number of seconds.
+    ///
+    /// > **Note**: This function doesn't do any caching itself. It just indicates that clients
+    /// > that receive this response are allowed to cache it.
+    #[inline]
+    pub fn with_public_cache(self, max_age_seconds: u64) -> Response {
+        self.with_unique_header("Cache-Control", format!("public, max-age={}", max_age_seconds))
+            .without_header("Expires")
+            .without_header("Pragma")
+    }
+
+    /// Adds or replaces a `Cache-Control` header that specifies that the resource is private and
+    /// can be cached for the given number of seconds.
+    ///
+    /// Only the browser or the final client is authorized to cache the resource. Intermediate
+    /// proxies must not cache it.
+    ///
+    /// > **Note**: This function doesn't do any caching itself. It just indicates that clients
+    /// > that receive this response are allowed to cache it.
+    #[inline]
+    pub fn with_private_cache(self, max_age_seconds: u64) -> Response {
+        self.with_unique_header("Cache-Control", format!("private, max-age={}", max_age_seconds))
+            .without_header("Expires")
+            .without_header("Pragma")
+    }
+
+    /// Adds or replaces a `Cache-Control` header that specifies that the client must not cache
+    /// the resource.
+    #[inline]
+    pub fn with_no_cache(self) -> Response {
+        self.with_unique_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            .with_unique_header("Expires", "0")
+            .with_unique_header("Pragma", "no-cache")
+    }
 }
 
 /// An opaque type that represents the body of a response.
