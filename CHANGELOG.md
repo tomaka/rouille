@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 1.0.0
+
+- `input::cookies` changed to return an iterator that yields `(&str, &str)`.
+
 ## Version 0.4.2
 
 - The `content_encoding` module now supports brotli.
