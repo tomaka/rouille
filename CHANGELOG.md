@@ -1,5 +1,21 @@
 # Changelog
 
+## Version 0.4.2
+
+- The `content_encoding` module now supports brotli.
+- Added an `accept!` macro similar to a `match` expression that chooses a block depending on the
+  value of the `Accept` header of the request.
+- Added `proxy::full_proxy`. It behaves the same as `proxy` but returns more status codes and less
+  errors.
+- Added `Response::from_data`, `from_file`, `with_content_disposition_attachment`, `empty_406`,
+  `with_public_cache`, `with_private_cache`, `with_no_cache`, `without_header`,
+  `with_additional_header` and `with_unique_header` for easier response manipulation.
+- Added `Request::headers()` that provides an iterator to the list of headers.
+- Added `input::priority_header_preferred` and `input::parse_priority_header` to easily parse
+  request headers such as `Accept` or `Accept-Language`.
+- MIME types that contain "font" are now also compressed by the `content_encoding` module.
+- Changed `text/xml` to `application/xml` in the MIME types auto-determination.
+
 ## Version 0.4.1
 
 - Added a `Server` struct as an alternative to `start_server` for manual control over the behavior.
