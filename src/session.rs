@@ -33,6 +33,7 @@
 //! }
 //! ```
 
+use std::borrow::Cow;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use rand;
@@ -42,8 +43,8 @@ use Request;
 use Response;
 use input;
 
-pub fn session<F>(request: &Request, cookie_name: &str, timeout_s: u64, inner: F) -> Response
-    where F: FnOnce(&Session) -> Response
+pub fn session<'r, F>(request: &'r Request, cookie_name: &str, timeout_s: u64, inner: F) -> Response
+    where F: FnOnce(&Session<'r>) -> Response
 {
     let mut cookie = input::cookies(request).into_iter();
     let cookie = cookie.find(|&(ref k, _)| k == &cookie_name);
@@ -53,13 +54,13 @@ pub fn session<F>(request: &Request, cookie_name: &str, timeout_s: u64, inner: F
         Session {
             key_was_retreived: AtomicBool::new(false),
             key_was_given: true,
-            key: cookie,
+            key: cookie.into(),
         }
     } else {
         Session {
             key_was_retreived: AtomicBool::new(false),
             key_was_given: false,
-            key: generate_session_id(),
+            key: generate_session_id().into(),
         }
     };
 
@@ -77,13 +78,13 @@ pub fn session<F>(request: &Request, cookie_name: &str, timeout_s: u64, inner: F
 }
 
 /// Contains the ID of the session.
-pub struct Session {
+pub struct Session<'r> {
     key_was_retreived: AtomicBool,
     key_was_given: bool,
-    key: String,
+    key: Cow<'r, str>,
 }
 
-impl Session {
+impl<'r> Session<'r> {
     /// Returns true if the client gave us a session ID.
     ///
     /// If this returns false, then we are sure that no data is available.
