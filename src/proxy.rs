@@ -68,6 +68,7 @@ use std::io::Read;
 use std::io::Write;
 use std::net::TcpStream;
 use std::net::ToSocketAddrs;
+use std::time::Duration;
 
 use Request;
 use Response;
@@ -149,6 +150,8 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
     where A: ToSocketAddrs
 {
     let mut socket = try!(TcpStream::connect(config.addr));
+    try!(socket.set_read_timeout(Some(Duration::from_secs(60))));
+    try!(socket.set_write_timeout(Some(Duration::from_secs(60))));
 
     let mut data = match request.data() {
         Some(d) => d,
