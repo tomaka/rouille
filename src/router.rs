@@ -73,7 +73,7 @@
 macro_rules! router {
     ($request:expr, $(($method:ident) ($($pat:tt)+) => $value:block,)* _ => $def:expr) => {
         {
-            let ref request = $request;
+            let request = &$request;
 
             // ignoring the GET parameters (everything after `?`)
             let request_url = request.url();
@@ -106,7 +106,7 @@ macro_rules! router {
             let pat_end = url.find('/').unwrap_or(url.len());
             let rest_url = &url[pat_end..];
 
-            if let Some($p) = url[0 .. pat_end].parse().ok() {
+            if let Ok($p) = url[0 .. pat_end].parse() {
                 router!(__check_pattern rest_url $value $($rest)*)
             } else {
                 None
@@ -122,7 +122,7 @@ macro_rules! router {
             let pat_end = url.find('/').unwrap_or(url.len());
             let rest_url = &url[pat_end..];
 
-            if let Some($p) = url[0 .. pat_end].parse().ok() {
+            if let Ok($p) = url[0 .. pat_end].parse() {
                 let $p: $t = $p;
                 router!(__check_pattern rest_url $value $($rest)*)
             } else {
