@@ -171,8 +171,9 @@ impl Intercept {
                     file_count += 1;
                 },
                 MultipartData::Text(text) => {
-                    entries.fields.insert(field.name, text.into());
+                    entries.fields.insert(field.name, text.text);
                 },
+                MultipartData::_Swapping => unreachable!("MultipartData::_Swapping was left in-place somehow"),
             }
         }
 

@@ -9,16 +9,16 @@
 
 use super::httparse::{self, EMPTY_HEADER, Status};
 
-use super::Multipart;
-
-use super::boundary::BoundaryReader;
+use super::{Multipart, ReadEntryResult};
 
 use mime::{Attr, Mime, Value};
 
+use std::borrow::BorrowMut;
 use std::io::{self, Read, BufRead, Write};
 use std::fs::{self, File};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::str;
+use std::{mem, str};
 
 const RANDOM_FILENAME_LEN: usize = 12;
 
@@ -46,16 +46,16 @@ struct StrHeader<'a> {
 }
 
 /// The headers that (may) appear before a `multipart/form-data` field.
-pub struct FieldHeaders {
+struct FieldHeaders {
     /// The `Content-Disposition` header, required.
-    pub cont_disp: ContentDisp,
+    cont_disp: ContentDisp,
     /// The `Content-Type` header, optional.
-    pub cont_type: Option<ContentType>,
+    cont_type: Option<ContentType>,
 }
 
 impl FieldHeaders {
     /// Parse the field headers from the passed `BufRead`, consuming the relevant bytes.
-    pub fn parse<R: BufRead>(r: &mut R) -> io::Result<Option<Self>> {
+    fn read_from<R: BufRead>(r: &mut R) -> io::Result<Option<Self>> {
         const HEADER_LEN: usize = 4;
 
         // These are only written once so they don't need to be `mut` or initialized.
@@ -92,16 +92,16 @@ impl FieldHeaders {
 
         r.consume(consume);
 
-        Ok(Self::read_from(headers))
+        Ok(Self::parse(headers))
     }
 
-    fn read_from(headers: &[StrHeader]) -> Option<FieldHeaders> {
+    fn parse(headers: &[StrHeader]) -> Option<FieldHeaders> {
         let cont_disp = try_opt!(
-                ContentDisp::read_from(headers),
+                ContentDisp::parse(headers),
                 debug!("Failed to read Content-Disposition")
             );
 
-        let cont_type = ContentType::read_from(headers);
+        let cont_type = ContentType::parse(headers);
 
         Some(FieldHeaders {
             cont_disp: cont_disp,
@@ -111,15 +111,15 @@ impl FieldHeaders {
 }
 
 /// The `Content-Disposition` header.
-pub struct ContentDisp {
+struct ContentDisp {
     /// The name of the `multipart/form-data` field.
-    pub field_name: String,
+    field_name: String,
     /// The optional filename for this field.
-    pub filename: Option<String>,
+    filename: Option<String>,
 }
 
 impl ContentDisp {
-    fn read_from(headers: &[StrHeader]) -> Option<ContentDisp> {
+    fn parse(headers: &[StrHeader]) -> Option<ContentDisp> {
         if headers.is_empty() {
             return None;
         }
@@ -165,15 +165,15 @@ impl ContentDisp {
 }
 
 /// The `Content-Type` header.
-pub struct ContentType {
+struct ContentType {
     /// The MIME type of the `multipart` field.
     ///
     /// May contain a sub-boundary parameter.
-    pub val: Mime,
+    val: Mime,
 }
 
 impl ContentType {
-    fn read_from(headers: &[StrHeader]) -> Option<ContentType> {
+    fn parse(headers: &[StrHeader]) -> Option<ContentType> {
         const CONTENT_TYPE: &'static str = "Content-Type";
 
         let header = try_opt!(
@@ -196,18 +196,56 @@ impl ContentType {
 
 /// A field in a multipart request. May be either text or a binary stream (file).
 #[derive(Debug)]
-pub struct MultipartField<'a, B: 'a> {
+pub struct MultipartField<M> {
     /// The field's name from the form
     pub name: String,
     /// The data of the field. Can be text or binary.
-    pub data: MultipartData<'a, B>,
+    pub data: MultipartData<M>,
 }
 
-pub fn read_field<B: Read>(multipart: &mut Multipart<B>) -> io::Result<Option<MultipartField<B>>> {
-    let field_headers =  match multipart.read_field_headers() {
-        Ok(Some(headers)) => headers,
-        Ok(None) => return Ok(None),
-        Err(err) => return Err(err)
+impl<M: ReadField> MultipartField<M> {
+    /// Read the next entry in the request.
+    pub fn next_entry(self) -> ReadEntryResult<M> {
+        self.data.into_inner().read_field()
+    }
+
+    /// Update `self` as the next entry.
+    ///
+    /// Returns `Ok(Some(self))` if another entry was read, `Ok(None)` if the end of the body was
+    /// reached, and `Err(e)` for any errors that occur.
+    pub fn next_entry_inplace(&mut self) -> io::Result<Option<&mut Self>> where for<'a> &'a mut M: ReadField {
+        let entry = match try!(self.read_entry()) {
+            Some(pair) => pair,
+            None => return Ok(None),
+        };
+
+        let multipart = mem::replace(&mut self.data, MultipartData::_Swapping).into_inner();
+
+        *self = entry.set_inner(multipart);
+
+        Ok(Some(self))
+    }
+
+    fn read_entry(&mut self) -> io::Result<Option<MultipartField<()>>> where for<'a> &'a mut M: ReadField {
+        self.data.inner_mut().read_field()
+            .map_err(|e| e.error)
+            .map(|entry| entry.map(|entry| entry.set_inner(())))
+    }
+}
+
+impl<M> MultipartField<M> {
+    fn set_inner<M_>(self, new_inner: M_) -> MultipartField<M_> {
+        MultipartField {
+            name: self.name,
+            data: self.data.set_inner(new_inner).1
+        }
+    }
+}
+
+pub fn read_field<R: Read, M: BorrowMut<Multipart<R>>>(mut multipart: M) -> ReadEntryResult<M> {
+    let field_headers = match try_read_entry!(multipart; FieldHeaders::read_from(&mut multipart.borrow_mut().reader)) {
+        Some(headers) => headers,
+        None => return Ok(None),
     };
 
     let data = match field_headers.cont_type {
@@ -216,13 +254,16 @@ pub fn read_field<B: Read>(multipart: &mut Multipart<B>) -> io::Result<Option<Mu
                 MultipartFile::from_stream(
                     field_headers.cont_disp.filename,
                     content_type.val,
-                    &mut multipart.source,
+                    multipart,
                 )
             )
         },
         None => {
-            let text = try!(multipart.read_to_string());
-            MultipartData::Text(&text)
+            let text = try_read_entry!(multipart; multipart.borrow_mut().read_to_string());
+            MultipartData::Text(MultipartText {
+                text: text,
+                multipart: multipart,
+            })
         },
     };
 
@@ -236,31 +277,91 @@ pub fn read_field<B: Read>(multipart: &mut Multipart<B>) -> io::Result<Option<Mu
 
 /// The data of a field in a `multipart/form-data` request.
 #[derive(Debug)]
-pub enum MultipartData<'a, B: 'a> {
+pub enum MultipartData<M> {
     /// The field's payload is a text string.
-    Text(&'a str),
+    Text(MultipartText<M>),
     /// The field's payload is a binary stream (file).
-    File(MultipartFile<'a, B>),
+    File(MultipartFile<M>),
     // TODO: Support multiple files per field (nested boundaries)
     // MultiFiles(Vec<MultipartFile>),
+    #[doc(hidden)]
+    _Swapping,
 }
 
-impl<'a, B> MultipartData<'a, B> {
+impl<M> MultipartData<M> {
+    /// Return the inner `Multipart`.
+    pub fn into_inner(self) -> M {
+        use self::MultipartData::*;
+
+        match self {
+            Text(text) => text.multipart,
+            File(file) => file.multipart,
+            _Swapping => unreachable!("MultipartData::_Swapping was left in-place somehow"),
+        }
+    }
+
+    fn inner_mut(&mut self) -> &mut M {
+        use self::MultipartData::*;
+
+        match *self {
+            Text(ref mut text) => &mut text.multipart,
+            File(ref mut file) => &mut file.multipart,
+            _Swapping => unreachable!("MultipartData::_Swapping was left in-place somehow"),
+        }
+    }
+
+    fn set_inner<M_>(self, new_inner: M_) -> (M, MultipartData<M_>) {
+        use self::MultipartData::*;
+
+        match self {
+            Text(text) => (text.multipart, Text(MultipartText { text: text.text, multipart: new_inner })),
+            File(file) => (file.multipart, File(MultipartFile {
+                filename: file.filename,
+                content_type: file.content_type,
+                multipart: new_inner
+            })),
+            _Swapping => unreachable!("MultipartData::_Swapping was left in-place somehow"),
+        }
+    }
+
     /// Borrow this payload as a text field, if possible.
     pub fn as_text(&self) -> Option<&str> {
         match *self {
-            MultipartData::Text(ref s) => Some(s),
+            MultipartData::Text(ref text) => Some(&text.text),
             _ => None,
         }
     }
 
     /// Borrow this payload as a file field, if possible.
     /// Mutably borrows so the contents can be read.
-    pub fn as_file(&mut self) -> Option<&mut MultipartFile<'a, B>> {
+    pub fn as_file(&mut self) -> Option<&mut MultipartFile<M>> {
         match *self {
             MultipartData::File(ref mut file) => Some(file),
             _ => None,
         }
+    }
+}
+
+/// A representation of a text field in a `multipart/form-data` body.
+#[derive(Debug)]
+pub struct MultipartText<M> {
+    /// The text of this field.
+    pub text: String,
+    /// The `Multipart` this field was read from.
+    pub multipart: M,
+}
+
+impl<M> Deref for MultipartText<M> {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.text
+    }
+}
+
+impl<M> Into<String> for MultipartText<M> {
+    fn into(self) -> String {
+        self.text
     }
 }
 
@@ -273,30 +374,49 @@ impl<'a, B> MultipartData<'a, B> {
 /// You can read it to EOF, or use one of the `save_*()` methods here
 /// to save it to disk.
 #[derive(Debug)]
-pub struct MultipartFile<'a, B: 'a> {
+pub struct MultipartFile<M> {
     filename: Option<String>,
     content_type: Mime,
-    stream: &'a mut BoundaryReader<B>,
+    /// The `Multipart` this field was read from.
+    pub multipart: M,
 }
 
-impl<'a, B: Read> MultipartFile<'a, B> {
+impl<M> MultipartFile<M> {
     fn from_stream(filename: Option<String>,
                    content_type: Mime,
-                   stream: &'a mut BoundaryReader<B>) -> MultipartFile<'a, B> {
+                   multipart: M) -> MultipartFile<M> {
         MultipartFile {
             filename: filename,
             content_type: content_type,
-            stream: stream,
+            multipart: multipart,
         }
     }
 
+    /// Get the filename of this entry, if supplied.
+    ///
+    /// ##Warning
+    /// You should treat this value as untrustworthy because it is an arbitrary string provided by
+    /// the client. You should *not* blindly append it to a directory path and save the file there,
+    /// as such behavior could easily be exploited by a malicious client.
+    pub fn filename(&self) -> Option<&str> {
+        self.filename.as_ref().map(String::as_ref)
+    }
+
+    /// Get the MIME type (`Content-Type` value) of this file, if supplied by the client,
+    /// or `"applicaton/octet-stream"` otherwise.
+    pub fn content_type(&self) -> &Mime {
+        &self.content_type
+    }
+}
+
+impl<M> MultipartFile<M> where MultipartFile<M>: Read {
     /// Save this file to the given output stream.
     ///
     /// If successful, returns the number of bytes written.
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     pub fn save_to<W: Write>(&mut self, mut out: W) -> io::Result<u64> {
-        retry_on_interrupt(|| io::copy(self.stream, &mut out))
+        retry_on_interrupt(|| io::copy(self, &mut out))
     }
 
     /// Save this file to the given output stream, **truncated** to `limit`
@@ -306,7 +426,7 @@ impl<'a, B: Read> MultipartFile<'a, B> {
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     pub fn save_to_limited<W: Write>(&mut self, mut out: W, limit: u64) -> io::Result<u64> {
-        retry_on_interrupt(|| io::copy(&mut self.stream.take(limit), &mut out))
+        retry_on_interrupt(|| io::copy(&mut self.by_ref().take(limit), &mut out))
     }
 
     /// Save this file to `path`.
@@ -372,37 +492,37 @@ impl<'a, B: Read> MultipartFile<'a, B> {
         let path = dir.as_ref().join(::random_alphanumeric(RANDOM_FILENAME_LEN));
         self.save_as_limited(path, limit)
     }
-
-    /// Get the filename of this entry, if supplied.
-    ///
-    /// ##Warning
-    /// You should treat this value as untrustworthy because it is an arbitrary string provided by
-    /// the client. You should *not* blindly append it to a directory path and save the file there,
-    /// as such behavior could easily be exploited by a malicious client.
-    pub fn filename(&self) -> Option<&str> {
-        self.filename.as_ref().map(String::as_ref)
-    }
-
-    /// Get the MIME type (`Content-Type` value) of this file, if supplied by the client,
-    /// or `"applicaton/octet-stream"` otherwise.
-    pub fn content_type(&self) -> &Mime {
-        &self.content_type
-    }
 }
 
-impl<'a, B: Read> Read for MultipartFile<'a, B> {
+impl<R: Read> Read for MultipartFile<Multipart<R>> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
-        self.stream.read(buf)
+        self.multipart.reader.read(buf)
     }
 }
 
-impl<'a, B: Read> BufRead for MultipartFile<'a, B> {
+impl<R: Read> BufRead for MultipartFile<Multipart<R>> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.stream.fill_buf()
+        self.multipart.reader.fill_buf()
     }
 
     fn consume(&mut self, amt: usize) {
-        self.stream.consume(amt)
+        self.multipart.reader.consume(amt)
+    }
+}
+
+impl<'a, R: Read + 'a> Read for MultipartFile<&'a mut Multipart<R>> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
+        self.multipart.reader.read(buf)
+    }
+}
+
+impl<'a, R: Read + 'a> BufRead for MultipartFile<&'a mut Multipart<R>> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.multipart.reader.fill_buf()
+    }
+
+    fn consume(&mut self, amt: usize) {
+        self.multipart.borrow_mut().reader.consume(amt)
     }
 }
 
@@ -423,8 +543,6 @@ pub struct SavedFile {
     /// The number of bytes written to the disk; may be truncated.
     pub size: u64,
 }
-
-
 
 fn read_content_type(cont_type: &str) -> Mime {
     cont_type.parse().ok().unwrap_or_else(::mime_guess::octet_stream)
@@ -474,4 +592,20 @@ fn create_full_path(path: &Path) -> io::Result<File> {
     }
 
     File::create(&path)
+}
+
+pub trait ReadField: Sized {
+    fn read_field(self) -> ReadEntryResult<Self>;
+}
+
+impl<R: Read> ReadField for Multipart<R> {
+    fn read_field(self) -> ReadEntryResult<Self> {
+        read_field(self)
+    }
+}
+
+impl<'a, R: Read + 'a> ReadField for &'a mut Multipart<R> {
+    fn read_field(self) -> ReadEntryResult<Self> {
+        read_field(self)
+    }
 }

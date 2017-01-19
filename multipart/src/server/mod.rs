@@ -26,7 +26,6 @@ use std::path::{Path, PathBuf};
 use std::{io, mem};
 
 use self::boundary::BoundaryReader;
-use self::field::FieldHeaders;
 
 pub use self::field::{MultipartField, MultipartFile, MultipartData, SavedFile};
 
@@ -48,6 +47,19 @@ macro_rules! try_opt (
     )
 );
 
+macro_rules! try_read_entry {
+    ($self_:expr; $try:expr) => (
+        match $try {
+            Ok(res) => res,
+            Err(err) => return Err(::server::ReadEntryError {
+                multipart: $self_,
+                error: err,
+                __private: (),
+            })
+        }
+    )
+}
+
 mod boundary;
 mod field;
 
@@ -67,8 +79,7 @@ pub mod tiny_http;
 ///
 /// Implements `Borrow<R>` to allow access to the request body, if desired.
 pub struct Multipart<B> {
-    source: BoundaryReader<B>,
-    line_buf: String, 
+    reader: BoundaryReader<B>,
 }
 
 impl Multipart<()> {
@@ -90,8 +101,7 @@ impl<B: Read> Multipart<B> {
     /// Construct a new `Multipart` with the given body reader and boundary.
     pub fn with_body<Bnd: Into<String>>(body: B, boundary: Bnd) -> Self {
         Multipart { 
-            source: BoundaryReader::from_reader(body, boundary.into()),
-            line_buf: String::new(),
+            reader: BoundaryReader::from_reader(body, boundary.into()),
         }
     }
 
@@ -101,16 +111,22 @@ impl<B: Read> Multipart<B> {
     /// ##Warning: Risk of Data Loss
     /// If the previously returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry.
-    pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<B>>> {
+    pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<&mut Self>>> {
         if try!(self.consume_boundary()) {
             return Ok(None);
         }
 
-        self::field::read_field(self)
+        self::field::read_field(self).map_err(|e| e.error)
     }
 
-    fn read_field_headers(&mut self) -> io::Result<Option<FieldHeaders>> {
-        FieldHeaders::parse(&mut self.source)
+    /// Read the next entry from this multipart request, returning a struct with the field's name and
+    /// data. See `MultipartField` for more info.
+    pub fn into_entry(mut self) -> ReadEntryResult<Self> {
+        if try_read_entry!(self; self.consume_boundary()) {
+            return Ok(None);
+        }
+
+        self::field::read_field(self)
     }
 
     /// Call `f` for each entry in the multipart request.
@@ -119,7 +135,7 @@ impl<B: Read> Multipart<B> {
     /// from `next()` borrows the iterator for a bound lifetime).
     ///
     /// Returns `Ok(())` when all fields have been read, or the first error.
-    pub fn foreach_entry<F>(&mut self, mut foreach: F) -> io::Result<()> where F: FnMut(MultipartField<B>) {
+    pub fn foreach_entry<F>(&mut self, mut foreach: F) -> io::Result<()> where F: FnMut(MultipartField<&mut Self>) {
         loop {
             match self.read_entry() {
                 Ok(Some(field)) => foreach(field),
@@ -214,19 +230,20 @@ impl<B: Read> Multipart<B> {
                     entries.files.insert(field.name, file);
                 },
                 MultipartData::Text(text) => {
-                    entries.fields.insert(field.name, text.into());
+                    entries.fields.insert(field.name, text.text);
                 },
+                MultipartData::_Swapping => unreachable!("MultipartData::_Swapping was left in-place somehow"),
             }
         }
 
         Ok(())
     } 
 
-    fn read_to_string(&mut self) -> io::Result<&str> {
-        self.line_buf.clear();
+    fn read_to_string(&mut self) -> io::Result<String> {
+        let mut buf = String::new();
 
-        match self.source.read_to_string(&mut self.line_buf) {
-            Ok(read) => Ok(&self.line_buf[..read]),
+        match self.reader.read_to_string(&mut buf) {
+            Ok(_) => Ok(buf),
             Err(err) => Err(err),
         }
     }
@@ -235,13 +252,13 @@ impl<B: Read> Multipart<B> {
     /// Returns `true` if the last boundary was read, `false` otherwise.
     fn consume_boundary(&mut self) -> io::Result<bool> {
         debug!("Consume boundary!");
-        self.source.consume_boundary()
+        self.reader.consume_boundary()
     }
 }
 
 impl<B> Borrow<B> for Multipart<B> {
     fn borrow(&self) -> &B {
-        self.source.borrow()
+        self.reader.borrow()
     }
 }
 
@@ -418,4 +435,16 @@ impl AsRef<Path> for SaveDir {
     fn as_ref(&self) -> &Path {
         self.as_path()
     }
+}
+
+/// Result type returned by `Multipart::read_entry()` and `Multipart::into_entry()`.
+pub type ReadEntryResult<M> = Result<Option<MultipartField<M>>, ReadEntryError<M>>;
+
+/// Error type returned by `Multipart::read_entry()` and `Multipart::into_entry()`.
+pub struct ReadEntryError<M> {
+    /// The `Multipart` that caused the error.
+    pub multipart: M,
+    /// The actual error.
+    pub error: io::Error,
+    __private: (),
 }

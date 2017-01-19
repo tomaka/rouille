@@ -162,15 +162,15 @@ fn test_server(buf: HttpBuffer, mut fields: TestFields) {
                 assert!(
                     test_text.is_some(),
                     "Got text field that wasn't in original dataset: {:?} : {:?} ",
-                    field.name, text
+                    field.name, text.text
                 );
 
                 let test_text = test_text.unwrap();
 
                 assert!(
-                    text == test_text, 
+                    text.text == test_text,
                     "Unexpected data for field {:?}: Expected {:?}, got {:?}", 
-                    field.name, test_text, text
+                    field.name, test_text, text.text
                 );
 
             },
@@ -184,6 +184,7 @@ fn test_server(buf: HttpBuffer, mut fields: TestFields) {
                         field.name, String::from_utf8_lossy(&test_bytes), String::from_utf8_lossy(&bytes)
                 );
             },
+            _ => unimplemented!(),
         }
     }
 
