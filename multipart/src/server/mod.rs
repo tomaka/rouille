@@ -26,8 +26,9 @@ use std::path::{Path, PathBuf};
 use std::{io, mem};
 
 use self::boundary::BoundaryReader;
+use self::field::ReadEntry;
 
-pub use self::field::{MultipartField, MultipartFile, MultipartData, SavedFile};
+pub use self::field::{MultipartField, MultipartFile, MultipartData, ReadEntryResult, SavedFile};
 
 macro_rules! try_opt (
     ($expr:expr) => (
@@ -51,11 +52,7 @@ macro_rules! try_read_entry {
     ($self_:expr; $try:expr) => (
         match $try {
             Ok(res) => res,
-            Err(err) => return Err(::server::ReadEntryError {
-                multipart: $self_,
-                error: err,
-                __private: (),
-            })
+            Err(err) => return ::server::ReadEntryResult::Error($self_, err),
         }
     )
 }
@@ -116,17 +113,17 @@ impl<B: Read> Multipart<B> {
             return Ok(None);
         }
 
-        self::field::read_field(self).map_err(|e| e.error)
+        ReadEntry::read_entry(self).into_result()
     }
 
     /// Read the next entry from this multipart request, returning a struct with the field's name and
     /// data. See `MultipartField` for more info.
     pub fn into_entry(mut self) -> ReadEntryResult<Self> {
         if try_read_entry!(self; self.consume_boundary()) {
-            return Ok(None);
+            return ReadEntryResult::End(self);
         }
 
-        self::field::read_field(self)
+        self.read_entry()
     }
 
     /// Call `f` for each entry in the multipart request.
@@ -232,7 +229,7 @@ impl<B: Read> Multipart<B> {
                 MultipartData::Text(text) => {
                     entries.fields.insert(field.name, text.text);
                 },
-                MultipartData::_Swapping => unreachable!("MultipartData::_Swapping was left in-place somehow"),
+                MultipartData::Nested(_) => unimplemented!(),
             }
         }
 
@@ -435,16 +432,4 @@ impl AsRef<Path> for SaveDir {
     fn as_ref(&self) -> &Path {
         self.as_path()
     }
-}
-
-/// Result type returned by `Multipart::read_entry()` and `Multipart::into_entry()`.
-pub type ReadEntryResult<M> = Result<Option<MultipartField<M>>, ReadEntryError<M>>;
-
-/// Error type returned by `Multipart::read_entry()` and `Multipart::into_entry()`.
-pub struct ReadEntryError<M> {
-    /// The `Multipart` that caused the error.
-    pub multipart: M,
-    /// The actual error.
-    pub error: io::Error,
-    __private: (),
 }

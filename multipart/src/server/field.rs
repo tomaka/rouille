@@ -9,13 +9,13 @@
 
 use super::httparse::{self, EMPTY_HEADER, Status};
 
-use super::{Multipart, ReadEntryResult};
+use super::Multipart;
+use self::ReadEntryResult::*;
 
-use mime::{Attr, Mime, Value};
+use mime::{Attr, TopLevel, Mime, Value};
 
-use std::borrow::BorrowMut;
 use std::io::{self, Read, BufRead, Write};
-use std::fs::{self, File};
+use std::fs;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::{mem, str};
@@ -46,11 +46,11 @@ struct StrHeader<'a> {
 }
 
 /// The headers that (may) appear before a `multipart/form-data` field.
-struct FieldHeaders {
+pub struct FieldHeaders {
     /// The `Content-Disposition` header, required.
     cont_disp: ContentDisp,
     /// The `Content-Type` header, optional.
-    cont_type: Option<ContentType>,
+    cont_type: Option<Mime>,
 }
 
 impl FieldHeaders {
@@ -101,17 +101,21 @@ impl FieldHeaders {
                 debug!("Failed to read Content-Disposition")
             );
 
-        let cont_type = ContentType::parse(headers);
+        let cont_type = parse_cont_type(headers);
 
         Some(FieldHeaders {
             cont_disp: cont_disp,
             cont_type: cont_type,
         })
     }
+
+    fn name(&self) -> &str {
+        &self.cont_disp.field_name
+    }
 }
 
 /// The `Content-Disposition` header.
-struct ContentDisp {
+pub struct ContentDisp {
     /// The name of the `multipart/form-data` field.
     field_name: String,
     /// The optional filename for this field.
@@ -164,163 +168,78 @@ impl ContentDisp {
     }
 }
 
-/// The `Content-Type` header.
-struct ContentType {
-    /// The MIME type of the `multipart` field.
-    ///
-    /// May contain a sub-boundary parameter.
-    val: Mime,
-}
+fn parse_cont_type(headers: &[StrHeader]) -> Option<Mime> {
+    const CONTENT_TYPE: &'static str = "Content-Type";
 
-impl ContentType {
-    fn parse(headers: &[StrHeader]) -> Option<ContentType> {
-        const CONTENT_TYPE: &'static str = "Content-Type";
+    let header = try_opt!(
+    find_header(headers, CONTENT_TYPE),
+    debug!("Content-Type header not found for field.")
+    );
 
-        let header = try_opt!(
-            find_header(headers, CONTENT_TYPE),
-            debug!("Content-Type header not found for field.")
-        );
-
-        // Boundary parameter will be parsed into the `Mime`
-        debug!("Found Content-Type: {:?}", header.val);
-        let content_type = read_content_type(header.val.trim());
-        Some(ContentType { val: content_type })
-    }
-
-    /// Get the optional boundary parameter for this `Content-Type`.
-    #[allow(dead_code)]
-    pub fn boundary(&self) -> Option<&str> {
-        self.val.get_param(Attr::Boundary).map(Value::as_str)
-    }
+    // Boundary parameter will be parsed into the `Mime`
+    debug!("Found Content-Type: {:?}", header.val);
+    let content_type = read_content_type(header.val.trim());
+    Some(content_type)
 }
 
 /// A field in a multipart request. May be either text or a binary stream (file).
 #[derive(Debug)]
-pub struct MultipartField<M> {
+pub struct MultipartField<M: ReadEntry> {
     /// The field's name from the form
     pub name: String,
     /// The data of the field. Can be text or binary.
     pub data: MultipartData<M>,
 }
 
-impl<M: ReadField> MultipartField<M> {
+impl<M: ReadEntry> MultipartField<M> {
     /// Read the next entry in the request.
     pub fn next_entry(self) -> ReadEntryResult<M> {
-        self.data.into_inner().read_field()
+        self.data.into_inner().read_entry()
     }
 
     /// Update `self` as the next entry.
     ///
     /// Returns `Ok(Some(self))` if another entry was read, `Ok(None)` if the end of the body was
     /// reached, and `Err(e)` for any errors that occur.
-    pub fn next_entry_inplace(&mut self) -> io::Result<Option<&mut Self>> where for<'a> &'a mut M: ReadField {
-        let entry = match try!(self.read_entry()) {
-            Some(pair) => pair,
-            None => return Ok(None),
-        };
+    pub fn next_entry_inplace(&mut self) -> io::Result<Option<&mut Self>> where for<'a> &'a mut M: ReadEntry {
+        let multipart = self.data.take_inner();
 
-        let multipart = mem::replace(&mut self.data, MultipartData::_Swapping).into_inner();
-
-        *self = entry.set_inner(multipart);
-
-        Ok(Some(self))
-    }
-
-    fn read_entry(&mut self) -> io::Result<Option<MultipartField<()>>> where for<'a> &'a mut M: ReadField {
-        self.data.inner_mut().read_field()
-            .map_err(|e| e.error)
-            .map(|entry| entry.map(|entry| entry.set_inner(())))
-    }
-}
-
-impl<M> MultipartField<M> {
-    fn set_inner<M_>(self, new_inner: M_) -> MultipartField<M_> {
-        MultipartField {
-            name: self.name,
-            data: self.data.set_inner(new_inner).1
+        match multipart.read_entry() {
+            Entry(entry) => {
+                *self = entry;
+                Ok(Some(self))
+            },
+            End(multipart) => {
+                self.data.give_inner(multipart);
+                Ok(None)
+            },
+            Error(multipart, err) => {
+                self.data.give_inner(multipart);
+                Err(err)
+            }
         }
     }
-}
-
-pub fn read_field<R: Read, M: BorrowMut<Multipart<R>>>(mut multipart: M) -> ReadEntryResult<M> {
-    let field_headers = match try_read_entry!(multipart; FieldHeaders::read_from(&mut multipart.borrow_mut().reader)) {
-        Some(headers) => headers,
-        None => return Ok(None),
-    };
-
-    let data = match field_headers.cont_type {
-        Some(content_type) => {
-            MultipartData::File(
-                MultipartFile::from_stream(
-                    field_headers.cont_disp.filename,
-                    content_type.val,
-                    multipart,
-                )
-            )
-        },
-        None => {
-            let text = try_read_entry!(multipart; multipart.borrow_mut().read_to_string());
-            MultipartData::Text(MultipartText {
-                text: text,
-                multipart: multipart,
-            })
-        },
-    };
-
-    Ok(Some(
-        MultipartField {
-            name: field_headers.cont_disp.field_name,
-            data: data,
-        }
-    ))
 }
 
 /// The data of a field in a `multipart/form-data` request.
 #[derive(Debug)]
-pub enum MultipartData<M> {
+pub enum MultipartData<M: ReadEntry> {
     /// The field's payload is a text string.
     Text(MultipartText<M>),
     /// The field's payload is a binary stream (file).
     File(MultipartFile<M>),
-    // TODO: Support multiple files per field (nested boundaries)
-    // MultiFiles(Vec<MultipartFile>),
-    #[doc(hidden)]
-    _Swapping,
+    /// The field's payload is a nested multipart body (multiple files).
+    Nested(NestedMultipart<M>),
 }
 
-impl<M> MultipartData<M> {
-    /// Return the inner `Multipart`.
-    pub fn into_inner(self) -> M {
-        use self::MultipartData::*;
-
-        match self {
-            Text(text) => text.multipart,
-            File(file) => file.multipart,
-            _Swapping => unreachable!("MultipartData::_Swapping was left in-place somehow"),
-        }
-    }
-
+impl<M: ReadEntry> MultipartData<M> {
     fn inner_mut(&mut self) -> &mut M {
         use self::MultipartData::*;
 
         match *self {
-            Text(ref mut text) => &mut text.multipart,
-            File(ref mut file) => &mut file.multipart,
-            _Swapping => unreachable!("MultipartData::_Swapping was left in-place somehow"),
-        }
-    }
-
-    fn set_inner<M_>(self, new_inner: M_) -> (M, MultipartData<M_>) {
-        use self::MultipartData::*;
-
-        match self {
-            Text(text) => (text.multipart, Text(MultipartText { text: text.text, multipart: new_inner })),
-            File(file) => (file.multipart, File(MultipartFile {
-                filename: file.filename,
-                content_type: file.content_type,
-                multipart: new_inner
-            })),
-            _Swapping => unreachable!("MultipartData::_Swapping was left in-place somehow"),
+            Text(ref mut text) => text.inner_mut(),
+            File(ref mut file) => file.inner_mut(),
+            Nested(ref mut nested) => nested.inner_mut(),
         }
     }
 
@@ -340,6 +259,39 @@ impl<M> MultipartData<M> {
             _ => None,
         }
     }
+
+    /// Return the inner `Multipart`.
+    pub fn into_inner(self) -> M {
+        use self::MultipartData::*;
+
+        match self {
+            Text(text) => text.into_inner(),
+            File(file) => file.into_inner(),
+            Nested(nested) => nested.into_inner(),
+        }
+    }
+
+    fn take_inner(&mut self) -> M {
+        use self::MultipartData::*;
+
+        match *self {
+            Text(ref mut text) => text.take_inner(),
+            File(ref mut file) => file.take_inner(),
+            Nested(ref mut nested) => nested.take_inner(),
+        }
+    }
+
+    fn give_inner(&mut self, inner: M) {
+        use self::MultipartData::*;
+
+        let inner = Some(inner);
+
+        match *self {
+            Text(ref mut text) => text.inner = inner,
+            File(ref mut file) => file.inner = inner,
+            Nested(ref mut nested) => nested.inner = inner,
+        }
+    }
 }
 
 /// A representation of a text field in a `multipart/form-data` body.
@@ -348,7 +300,7 @@ pub struct MultipartText<M> {
     /// The text of this field.
     pub text: String,
     /// The `Multipart` this field was read from.
-    pub multipart: M,
+    inner: Option<M>,
 }
 
 impl<M> Deref for MultipartText<M> {
@@ -365,6 +317,20 @@ impl<M> Into<String> for MultipartText<M> {
     }
 }
 
+impl<M> MultipartText<M> {
+    fn inner_mut(&mut self) -> &mut M {
+        self.inner.as_mut().expect("MultipartText::inner taken!")
+    }
+
+    fn take_inner(&mut self) -> M {
+        self.inner.take().expect("MultipartText::inner taken!")
+    }
+
+    fn into_inner(self) -> M {
+        self.inner.expect("MultipartText::inner taken!")
+    }
+}
+
 /// A representation of a file in HTTP `multipart/form-data`.
 ///
 /// Note that the file is not yet saved to the local filesystem;
@@ -378,20 +344,10 @@ pub struct MultipartFile<M> {
     filename: Option<String>,
     content_type: Mime,
     /// The `Multipart` this field was read from.
-    pub multipart: M,
+    inner: Option<M>,
 }
 
 impl<M> MultipartFile<M> {
-    fn from_stream(filename: Option<String>,
-                   content_type: Mime,
-                   multipart: M) -> MultipartFile<M> {
-        MultipartFile {
-            filename: filename,
-            content_type: content_type,
-            multipart: multipart,
-        }
-    }
-
     /// Get the filename of this entry, if supplied.
     ///
     /// ##Warning
@@ -406,6 +362,18 @@ impl<M> MultipartFile<M> {
     /// or `"applicaton/octet-stream"` otherwise.
     pub fn content_type(&self) -> &Mime {
         &self.content_type
+    }
+
+    fn inner_mut(&mut self) -> &mut M {
+        self.inner.as_mut().expect("MultipartFile::inner taken!")
+    }
+
+    fn take_inner(&mut self) -> M {
+        self.inner.take().expect("MultipartFile::inner taken!")
+    }
+
+    fn into_inner(self) -> M {
+        self.inner.expect("MultipartFile::inner taken!")
     }
 }
 
@@ -496,33 +464,33 @@ impl<M> MultipartFile<M> where MultipartFile<M>: Read {
 
 impl<R: Read> Read for MultipartFile<Multipart<R>> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
-        self.multipart.reader.read(buf)
+        self.inner_mut().reader.read(buf)
     }
 }
 
 impl<R: Read> BufRead for MultipartFile<Multipart<R>> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.multipart.reader.fill_buf()
+        self.inner_mut().reader.fill_buf()
     }
 
     fn consume(&mut self, amt: usize) {
-        self.multipart.reader.consume(amt)
+        self.inner_mut().reader.consume(amt)
     }
 }
 
 impl<'a, R: Read + 'a> Read for MultipartFile<&'a mut Multipart<R>> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
-        self.multipart.reader.read(buf)
+        self.inner_mut().reader.read(buf)
     }
 }
 
 impl<'a, R: Read + 'a> BufRead for MultipartFile<&'a mut Multipart<R>> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.multipart.reader.fill_buf()
+        self.inner_mut().reader.fill_buf()
     }
 
     fn consume(&mut self, amt: usize) {
-        self.multipart.borrow_mut().reader.consume(amt)
+        self.inner_mut().reader.consume(amt)
     }
 }
 
@@ -583,7 +551,7 @@ fn retry_on_interrupt<F, T>(mut do_fn: F) -> io::Result<T> where F: FnMut() -> i
     }
 }
 
-fn create_full_path(path: &Path) -> io::Result<File> {
+fn create_full_path(path: &Path) -> io::Result<fs::File> {
     if let Some(parent) = path.parent() {
         try!(fs::create_dir_all(parent));
     } else {
@@ -591,21 +559,162 @@ fn create_full_path(path: &Path) -> io::Result<File> {
         warn!("Attempting to save file in what looks like a root directory. File path: {:?}", path);
     }
 
-    File::create(&path)
+    fs::File::create(&path)
 }
 
-pub trait ReadField: Sized {
-    fn read_field(self) -> ReadEntryResult<Self>;
+#[derive(Debug)]
+pub struct NestedMultipart<M: ReadEntry> {
+    outer_boundary: Vec<u8>,
+    inner: Option<M>,
 }
 
-impl<R: Read> ReadField for Multipart<R> {
-    fn read_field(self) -> ReadEntryResult<Self> {
-        read_field(self)
+impl<M: ReadEntry> NestedMultipart<M> {
+    pub fn read_entry(&mut self) -> ReadEntryResult<&mut M> where for<'a> &'a mut M: ReadEntry {
+        self.inner.as_mut().expect("NestedMultipart::inner taken!()").read_entry()
+    }
+
+    fn inner_mut(&mut self) -> &mut M {
+        self.inner.as_mut().expect("NestedMultipart::inner taken!")
+    }
+
+    fn take_inner(&mut self) -> M {
+        self.inner.take().expect("NestedMultipart::inner taken!()")
+    }
+
+    fn into_inner(mut self) -> M {
+        self.restore_boundary();
+        self.inner.take().expect("NestedMultipart::inner taken!()")
+    }
+
+    fn restore_boundary(&mut self) {
+        let multipart = self.inner.as_mut().expect("NestedMultipart::inner taken!()");
+        let outer_boundary = mem::replace(&mut self.outer_boundary, Vec::new());
+        multipart.swap_boundary(outer_boundary);
     }
 }
 
-impl<'a, R: Read + 'a> ReadField for &'a mut Multipart<R> {
-    fn read_field(self) -> ReadEntryResult<Self> {
-        read_field(self)
+impl<M: ReadEntry> Drop for NestedMultipart<M> {
+    fn drop(&mut self) {
+        if self.inner.is_some() {
+            self.restore_boundary();
+        }
+    }
+}
+
+/// Public trait but not re-exported.
+pub trait ReadEntry: Sized {
+    fn read_headers(&mut self) -> io::Result<Option<FieldHeaders>>;
+
+    fn read_to_string(&mut self) -> io::Result<String>;
+
+    fn swap_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) -> Vec<u8>;
+
+    fn read_entry(mut self) -> ReadEntryResult<Self> {
+        let field_headers = match try_read_entry!(self; self.read_headers()) {
+            Some(headers) => headers,
+            None => return End(self),
+        };
+
+        let data = match field_headers.cont_type {
+            Some(cont_type) => {
+                match cont_type.0 {
+                    TopLevel::Multipart if cont_type.1 == "mixed" => {
+                        let outer_boundary = match cont_type.get_param(Attr::Boundary) {
+                            Some(&Value::Ext(ref boundary)) => self.swap_boundary(&**boundary),
+                            _ => {
+                                let msg = format!("Nested multipart boundary was not provided for \
+                                                   field {:?}", field_headers.cont_disp.field_name);
+                                return ReadEntryResult::invalid_data(self, msg);
+                            },
+                        };
+
+                        MultipartData::Nested(
+                            NestedMultipart {
+                                outer_boundary: outer_boundary,
+                                inner: Some(self),
+                            }
+                        )
+                    },
+                    _ => {
+                        MultipartData::File(
+                            MultipartFile {
+                                filename: field_headers.cont_disp.filename,
+                                content_type: cont_type,
+                                inner: Some(self)
+                            }
+                        )
+                    }
+                }
+            },
+            None => {
+                let text = try_read_entry!(self; self.read_to_string());
+                MultipartData::Text(MultipartText {
+                    text: text,
+                    inner: Some(self),
+                })
+            },
+        };
+
+        Entry(
+            MultipartField {
+                name: field_headers.cont_disp.field_name,
+                data: data,
+            }
+        )
+    }
+}
+
+impl<R: Read> ReadEntry for Multipart<R> {
+    fn read_headers(&mut self) -> io::Result<Option<FieldHeaders>> {
+        FieldHeaders::read_from(&mut self.reader)
+    }
+
+    fn read_to_string(&mut self) -> io::Result<String> {
+        self.read_to_string()
+    }
+
+    fn swap_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) -> Vec<u8> {
+        self.reader.swap_boundary(boundary)
+    }
+}
+
+impl<'a, M: ReadEntry> ReadEntry for &'a mut M {
+    fn read_headers(&mut self) -> io::Result<Option<FieldHeaders>> {
+        self.read_headers()
+    }
+
+    fn read_to_string(&mut self) -> io::Result<String> {
+        self.read_to_string()
+    }
+
+    fn swap_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) -> Vec<u8> {
+        self.swap_boundary(boundary)
+    }
+}
+
+/// Result type returned by `Multipart::into_entry()` and `MultipartField::next_entry()`.
+pub enum ReadEntryResult<M: ReadEntry> {
+    /// The next entry was found.
+    Entry(MultipartField<M>),
+    /// No  more entries could be read.
+    End(M),
+    /// An error occurred.
+    Error(M, io::Error),
+}
+
+impl<M: ReadEntry> ReadEntryResult<M> {
+    pub fn into_result(self) -> io::Result<Option<MultipartField<M>>> {
+        match self {
+            ReadEntryResult::Entry(entry) => Ok(Some(entry)),
+            ReadEntryResult::End(_) => Ok(None),
+            ReadEntryResult::Error(_, err) => Err(err),
+        }
+    }
+
+    fn invalid_data(multipart: M, msg: String) -> Self {
+        ReadEntryResult::Error (
+            multipart,
+            io::Error::new(io::ErrorKind::InvalidData, msg),
+        )
     }
 }

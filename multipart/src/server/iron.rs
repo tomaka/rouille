@@ -173,7 +173,7 @@ impl Intercept {
                 MultipartData::Text(text) => {
                     entries.fields.insert(field.name, text.text);
                 },
-                MultipartData::_Swapping => unreachable!("MultipartData::_Swapping was left in-place somehow"),
+                MultipartData::Nested(nested) => unimplemented!(),
             }
         }
 

@@ -18,6 +18,8 @@ use std::borrow::Borrow;
 use std::io;
 use std::io::prelude::*;
 
+use std::mem;
+
 /// A struct implementing `Read` and `BufRead` that will yield bytes until it sees a given sequence.
 #[derive(Debug)]
 pub struct BoundaryReader<R> {
@@ -169,8 +171,14 @@ impl<R> BoundaryReader<R> where R: Read {
     // Keeping this around to support nested boundaries later.
     #[allow(unused)]
     #[doc(hidden)]
-    pub fn set_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) {
-        self.boundary = boundary.into();
+    pub fn swap_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) -> Vec<u8> {
+        let mut boundary = boundary.into();
+
+        if boundary.get(..2) != Some(b"--") {
+            safemem::prepend(b"--", &mut boundary);
+        }
+
+        mem::replace(&mut self.boundary, boundary)
     }
 }
 
