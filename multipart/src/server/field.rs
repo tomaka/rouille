@@ -108,10 +108,6 @@ impl FieldHeaders {
             cont_type: cont_type,
         })
     }
-
-    fn name(&self) -> &str {
-        &self.cont_disp.field_name
-    }
 }
 
 /// The `Content-Disposition` header.
@@ -233,16 +229,6 @@ pub enum MultipartData<M: ReadEntry> {
 }
 
 impl<M: ReadEntry> MultipartData<M> {
-    fn inner_mut(&mut self) -> &mut M {
-        use self::MultipartData::*;
-
-        match *self {
-            Text(ref mut text) => text.inner_mut(),
-            File(ref mut file) => file.inner_mut(),
-            Nested(ref mut nested) => nested.inner_mut(),
-        }
-    }
-
     /// Borrow this payload as a text field, if possible.
     pub fn as_text(&self) -> Option<&str> {
         match *self {
