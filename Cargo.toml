@@ -8,6 +8,7 @@ documentation = "http://docs.rs/rouille"
 description = "High-level idiomatic web framework."
 readme = "README.md"
 keywords = ["web", "framework", "http", "rest"]
+categories = ["web-programming::http-server", "web-programming::websocket"]
 
 [features]
 default = ["gzip", "brotli"]
