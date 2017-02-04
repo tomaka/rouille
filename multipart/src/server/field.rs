@@ -39,10 +39,53 @@ const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader {
     val: "",
 };
 
+/// Not exposed
 #[derive(Copy, Clone, Debug)]
-struct StrHeader<'a> {
+pub struct StrHeader<'a> {
     name: &'a str,
     val: &'a str,
+}
+
+
+fn with_headers<R, F, Ret>(r: &mut R, f: F) -> io::Result<Ret>
+where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
+    const HEADER_LEN: usize = 4;
+
+    // These are only written once so they don't need to be `mut` or initialized.
+    let consume;
+    let header_len;
+
+    let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
+
+    {
+        let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
+
+        loop {
+            let buf = try!(r.fill_buf());
+
+            match try_io!(httparse::parse_headers(buf, &mut raw_headers)) {
+                Status::Complete((consume_, raw_headers)) =>  {
+                    consume = consume_;
+                    header_len = raw_headers.len();
+                    break;
+                },
+                Status::Partial => (),
+            }
+        }
+
+        for (raw, header) in raw_headers.iter().take(header_len).zip(&mut headers) {
+            header.name = raw.name;
+            header.val = try!(io_str_utf8(raw.value));
+        }
+    }
+
+    r.consume(consume);
+
+    let headers = &headers[..header_len];
+
+    debug!("Parsed headers: {:?}", headers);
+
+    Ok(f(headers))
 }
 
 /// The headers that (may) appear before a `multipart/form-data` field.
@@ -56,43 +99,7 @@ pub struct FieldHeaders {
 impl FieldHeaders {
     /// Parse the field headers from the passed `BufRead`, consuming the relevant bytes.
     fn read_from<R: BufRead>(r: &mut R) -> io::Result<Option<Self>> {
-        const HEADER_LEN: usize = 4;
-
-        // These are only written once so they don't need to be `mut` or initialized.
-        let consume;
-        let header_len;
-
-        let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
-
-        {
-            let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
-
-            loop {
-                let buf = try!(r.fill_buf());
-
-                match try_io!(httparse::parse_headers(buf, &mut raw_headers)) {
-                    Status::Complete((consume_, raw_headers)) =>  {
-                        consume = consume_;
-                        header_len = raw_headers.len();
-                        break;
-                    },
-                    Status::Partial => (),
-                }
-            }
-
-            for (raw, header) in raw_headers.iter().take(header_len).zip(&mut headers) {
-                header.name = raw.name;
-                header.val = try!(io_str_utf8(raw.value));
-            }
-        }
-
-        let headers = &headers[..header_len];
-
-        debug!("Parsed field headers: {:?}", headers);
-
-        r.consume(consume);
-
-        Ok(Self::parse(headers))
+        with_headers(r, Self::parse)
     }
 
     fn parse(headers: &[StrHeader]) -> Option<FieldHeaders> {
@@ -548,6 +555,12 @@ fn create_full_path(path: &Path) -> io::Result<fs::File> {
     fs::File::create(&path)
 }
 
+pub struct NestedEntry<M: ReadEntry> {
+    pub content_type: Mime,
+    pub filename: Option<String>,
+    inner: M
+}
+
 #[derive(Debug)]
 pub struct NestedMultipart<M: ReadEntry> {
     outer_boundary: Vec<u8>,
@@ -555,8 +568,30 @@ pub struct NestedMultipart<M: ReadEntry> {
 }
 
 impl<M: ReadEntry> NestedMultipart<M> {
-    pub fn read_entry(&mut self) -> ReadEntryResult<&mut M> where for<'a> &'a mut M: ReadEntry {
-        self.inner.as_mut().expect("NestedMultipart::inner taken!()").read_entry()
+    pub fn read_entry(&mut self) -> ReadEntryResult<&mut M, NestedEntry<&mut M>>
+        where for<'a> &'a mut M: ReadEntry {
+
+        let inner = self.inner_mut();
+
+        let headers = match inner.read_headers() {
+            Ok(Some(headers)) => headers,
+            Ok(None) => return End(inner),
+            Err(e) => return Error(inner, e),
+        };
+
+        let cont_type = match headers.cont_type {
+            Some(cont_type) => cont_type,
+            None => return ReadEntryResult::invalid_data(inner,
+                                         "Nested multipart requires Content-Type".to_string())
+        };
+
+        Entry (
+            NestedEntry {
+                filename: headers.cont_disp.filename,
+                content_type: cont_type,
+                inner: inner,
+            }
+        )
     }
 
     fn inner_mut(&mut self) -> &mut M {
@@ -666,30 +701,30 @@ impl<R: Read> ReadEntry for Multipart<R> {
 
 impl<'a, M: ReadEntry> ReadEntry for &'a mut M {
     fn read_headers(&mut self) -> io::Result<Option<FieldHeaders>> {
-        self.read_headers()
+        (**self).read_headers()
     }
 
     fn read_to_string(&mut self) -> io::Result<String> {
-        self.read_to_string()
+        (**self).read_to_string()
     }
 
     fn swap_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) -> Vec<u8> {
-        self.swap_boundary(boundary)
+        (**self).swap_boundary(boundary)
     }
 }
 
 /// Result type returned by `Multipart::into_entry()` and `MultipartField::next_entry()`.
-pub enum ReadEntryResult<M: ReadEntry> {
+pub enum ReadEntryResult<M: ReadEntry, Entry = MultipartField<M>> {
     /// The next entry was found.
-    Entry(MultipartField<M>),
+    Entry(Entry),
     /// No  more entries could be read.
     End(M),
     /// An error occurred.
     Error(M, io::Error),
 }
 
-impl<M: ReadEntry> ReadEntryResult<M> {
-    pub fn into_result(self) -> io::Result<Option<MultipartField<M>>> {
+impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
+    pub fn into_result(self) -> io::Result<Option<Entry>> {
         match self {
             ReadEntryResult::Entry(entry) => Ok(Some(entry)),
             ReadEntryResult::End(_) => Ok(None),
