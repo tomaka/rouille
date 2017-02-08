@@ -133,7 +133,7 @@ impl<B: Read> Multipart<B> {
     /// directory under the OS temporary directory. 
     ///
     /// If there is an error in reading the request, returns the partial result along with the
-    /// error. See [`SaveResult`](enum.saveresult.html) for more information.
+    /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     pub fn save_all(&mut self) -> SaveResult {
         let mut entries = match Entries::new_tempdir() {
             Ok(entries) => entries,
@@ -150,7 +150,7 @@ impl<B: Read> Multipart<B> {
     /// directory under `dir`. 
     ///
     /// If there is an error in reading the request, returns the partial result along with the
-    /// error. See [`SaveResult`](enum.saveresult.html) for more information.
+    /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     pub fn save_all_under<P: AsRef<Path>>(&mut self, dir: P) -> SaveResult {
         let mut entries = match Entries::new_tempdir_in(dir) {
             Ok(entries) => entries,
@@ -169,7 +169,7 @@ impl<B: Read> Multipart<B> {
     /// Files larger than `limit` will be truncated to `limit`.
     ///
     /// If there is an error in reading the request, returns the partial result along with the
-    /// error. See [`SaveResult`](enum.saveresult.html) for more information.
+    /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     pub fn save_all_limited(&mut self, limit: u64) -> SaveResult {
         let mut entries = match Entries::new_tempdir() {
             Ok(entries) => entries,
@@ -188,7 +188,7 @@ impl<B: Read> Multipart<B> {
     /// Files larger than `limit` will be truncated to `limit`.
     ///
     /// If there is an error in reading the request, returns the partial result along with the
-    /// error. See [`SaveResult`](enum.saveresult.html) for more information.
+    /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     pub fn save_all_under_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> SaveResult {
         let mut entries = match Entries::new_tempdir_in(dir) {
             Ok(entries) => entries,
@@ -245,7 +245,7 @@ impl<B> Borrow<B> for Multipart<B> {
     }
 }
 
-/// The result of [`Multipart::save_all()`](struct.multipart.html#method.save_all).
+/// The result of [`Multipart::save_all()`](struct.Multipart.html#method.save_all).
 #[derive(Debug)]
 pub enum SaveResult {
     /// The operation was a total success. Contained are all entries of the request.
