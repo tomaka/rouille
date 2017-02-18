@@ -34,15 +34,6 @@ macro_rules! try_io(
     )
 );
 
-macro_rules! assert_log_ret_none (
-    ($expr, $else_:expr) => (
-        if !$expr {
-            $else_;
-            return None;
-        }
-    )
-);
-
 const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader {
     name: "",
     val: "",
