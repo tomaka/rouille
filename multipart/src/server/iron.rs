@@ -150,7 +150,7 @@ impl Intercept {
                     }
 
                     let file = try_iron!(
-                        file.save_in_limited(&entries.dir, self.file_size_limit);
+                        file.save().limit(self.file_size_limit).with_dir(&entries.dir);
                         "Error reading field: \"{}\" (filename: \"{}\")",
                         field.name,
                         file.filename().unwrap_or("(none)")

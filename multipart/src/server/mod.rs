@@ -218,11 +218,7 @@ impl<B: Read> Multipart<B> {
         while let Some(field) = try!(self.read_entry()) {
             match field.data {
                 MultipartData::File(mut file) => {
-                    let file = if let Some(limit) = limit {
-                        try!(file.save_in_limited(&entries.dir, limit))
-                    } else {
-                        try!(file.save_in(&entries.dir))
-                    };
+                    let file = try!(file.save().limit(limit).with_dir(&entries.dir));
 
                     entries.files.insert(field.name, file);
                 },
