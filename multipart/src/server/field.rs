@@ -377,7 +377,7 @@ impl<M> MultipartFile<M> where MultipartFile<M>: Read {
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     pub fn save_to<W: Write>(&mut self, mut out: W) -> io::Result<u64> {
-        retry_on_interrupt(|| io::copy(self, &mut out))
+        io::copy(self, &mut out)
     }
 
     /// Save this file to the given output stream, **truncated** to `limit`
@@ -387,7 +387,7 @@ impl<M> MultipartFile<M> where MultipartFile<M>: Read {
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     pub fn save_to_limited<W: Write>(&mut self, mut out: W, limit: u64) -> io::Result<u64> {
-        retry_on_interrupt(|| io::copy(&mut self.by_ref().take(limit), &mut out))
+        io::copy(&mut self.by_ref().take(limit), &mut out)
     }
 
     /// Save this file to `path`.
@@ -531,17 +531,6 @@ fn io_str_utf8(buf: &[u8]) -> io::Result<&str> {
 
 fn find_header<'a, 'b>(headers: &'a [StrHeader<'b>], name: &str) -> Option<&'a StrHeader<'b>> {
     headers.iter().find(|header| header.name == name)
-}
-
-fn retry_on_interrupt<F, T>(mut do_fn: F) -> io::Result<T> where F: FnMut() -> io::Result<T> {
-    loop {
-        match do_fn() {
-            Ok(val) => return Ok(val),
-            Err(err) => if err.kind() != io::ErrorKind::Interrupted {
-                return Err(err);
-            },
-        }
-    }
 }
 
 fn create_full_path(path: &Path) -> io::Result<fs::File> {
