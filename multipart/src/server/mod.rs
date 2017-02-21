@@ -26,9 +26,11 @@ use std::path::{Path, PathBuf};
 use std::{io, mem};
 
 use self::boundary::BoundaryReader;
-use self::field::ReadEntry;
 
-pub use self::field::{MultipartField, MultipartFile, MultipartData, ReadEntryResult, SavedFile};
+use self::field::PrivReadEntry;
+
+pub use self::field::{MultipartField, MultipartFile, MultipartData, ReadEntry, ReadEntryResult,
+                      SaveBuilder, SavedFile};
 
 macro_rules! try_opt (
     ($expr:expr) => (
@@ -109,20 +111,12 @@ impl<B: Read> Multipart<B> {
     /// If the previously returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry.
     pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<&mut Self>>> {
-        if try!(self.consume_boundary()) {
-            return Ok(None);
-        }
-
-        ReadEntry::read_entry(self).into_result()
+        PrivReadEntry::read_entry(self).into_result()
     }
 
     /// Read the next entry from this multipart request, returning a struct with the field's name and
     /// data. See `MultipartField` for more info.
-    pub fn into_entry(mut self) -> ReadEntryResult<Self> {
-        if try_read_entry!(self; self.consume_boundary()) {
-            return ReadEntryResult::End(self);
-        }
-
+    pub fn into_entry(self) -> ReadEntryResult<Self> {
         self.read_entry()
     }
 
@@ -230,15 +224,24 @@ impl<B: Read> Multipart<B> {
         }
 
         Ok(())
-    } 
+    }
+}
 
-    fn read_to_string(&mut self) -> io::Result<String> {
-        let mut buf = String::new();
+impl<R> Borrow<R> for Multipart<R> {
+    fn borrow(&self) -> &R {
+        self.reader.borrow()
+    }
+}
 
-        match self.reader.read_to_string(&mut buf) {
-            Ok(_) => Ok(buf),
-            Err(err) => Err(err),
-        }
+impl<R: Read> PrivReadEntry for Multipart<R> {
+    type Source = BoundaryReader<R>;
+
+    fn source(&mut self) -> &mut BoundaryReader<R> {
+        &mut self.reader
+    }
+
+    fn swap_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) -> Vec<u8> {
+        self.reader.swap_boundary(boundary)
     }
 
     /// Consume the next boundary.
@@ -246,12 +249,6 @@ impl<B: Read> Multipart<B> {
     fn consume_boundary(&mut self) -> io::Result<bool> {
         debug!("Consume boundary!");
         self.reader.consume_boundary()
-    }
-}
-
-impl<B> Borrow<B> for Multipart<B> {
-    fn borrow(&self) -> &B {
-        self.reader.borrow()
     }
 }
 

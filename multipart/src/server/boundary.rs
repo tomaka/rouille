@@ -132,8 +132,7 @@ impl<R> BoundaryReader<R> where R: Read {
 
         if log_enabled!(LogLevel::Trace) {
             trace!("Consumed up to self.search_idx, remaining buf: {:?}",
-                   String::from_utf8_lossy(self.source.get_buf())
-            );
+                   String::from_utf8_lossy(self.source.get_buf()));
         }
 
         let consume_amt = {

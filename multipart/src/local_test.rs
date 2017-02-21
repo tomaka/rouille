@@ -6,9 +6,13 @@
 // copied, modified, or distributed except according to those terms.
 use mock::{ClientRequest, HttpBuffer};
 
+use server::{MultipartField, MultipartData, ReadEntry};
+
 use rand::{self, Rng};
 
 use std::collections::HashMap;
+use std::convert::AsRef;
+use std::fmt;
 use std::io::prelude::*;
 use std::io::Cursor;
 use std::iter;
@@ -20,10 +24,51 @@ struct TestFields {
     nested: HashMap<String, Vec<FileEntry>>,
 }
 
+impl TestFields {
+    fn check_field<M: ReadEntry>(&mut self, field: &mut MultipartField<M>) {
+        match field.data {
+            MultipartData::Text(ref text) => {
+                let test_text = self.texts.remove(&field.name);
+
+                assert!(
+                    test_text.is_some(),
+                    "Got text field that wasn't in original dataset: {:?} : {:?} ",
+                    field.name, text.text
+                );
+
+                let test_text = test_text.unwrap();
+
+                assert!(
+                    text.text == test_text,
+                    "Unexpected data for field {:?}: Expected {:?}, got {:?}",
+                    field.name, test_text, text.text
+                );
+            },
+            MultipartData::File(ref mut file) => {
+                let test_file = self.files.remove(&field.name).unwrap();
+
+                let mut bytes = Vec::with_capacity(test_file.data.0.len());
+                file.read_to_end(&mut bytes).unwrap();
+
+                assert!(bytes == test_file.data.0, "Unexpected data for file {:?}: Expected {:?}, Got {:?}",
+                        field.name, String::from_utf8_lossy(&test_file.data.0),
+                        String::from_utf8_lossy(&bytes)
+                );
+            },
+            _ => (),
+        }
+    }
+
+    fn assert_is_empty(&self) {
+        assert!(self.texts.is_empty(), "Text fields were not exhausted! Text fields: {:?}", self.texts);
+        assert!(self.files.is_empty(), "File fields were not exhausted! File fields: {:?}", self.files);
+    }
+}
+
 #[derive(Debug)]
 struct FileEntry {
     filename: Option<String>,
-    data: Vec<u8>,
+    data: PrintHex,
 }
 
 impl FileEntry {
@@ -35,7 +80,7 @@ impl FileEntry {
 
         FileEntry {
             filename: filename,
-            data: gen_bytes()
+            data: PrintHex(gen_bytes())
         }
     }
 
@@ -44,33 +89,70 @@ impl FileEntry {
     }
 }
 
-#[test]
-fn local_test() {
-    do_test(test_client, "Regular");
+struct PrintHex(Vec<u8>);
+
+impl fmt::Debug for PrintHex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(f, "["));
+
+        let mut written = false;
+
+        for byte in &self.0 {
+            try!(write!(f, "{:X}", byte));
+
+            if written {
+                try!(write!(f, ", "));
+            }
+
+            written = true;
+        }
+
+        write!(f, "]")
+    }
 }
 
-#[test]
-fn local_test_lazy() {
-    do_test(test_client_lazy, "Lazy");
-}
+macro_rules! do_test (
+    ($client_test:ident, $server_test:ident) => (
+        let _ = ::env_logger::init();
 
-fn do_test(client: fn(&TestFields) -> HttpBuffer, name: &str) {
-    let _ = ::env_logger::init();
+        info!("Client Test: {:?} Server Test: {:?}", stringify!($client_test),
+              stringify!($server_test));
 
-    info!("Testing {} client", name);
+        let mut test_fields = gen_test_fields();
 
-    let test_fields = gen_test_fields();
+        trace!("Fields for test: {:?}", test_fields);
 
-    trace!("Fields for test: {:?}", test_fields);
+        let buf = $client_test(&test_fields);
 
-    let buf = client(&test_fields);
+        trace!(
+            "\n==Test Buffer Begin==\n{}\n==Test Buffer End==",
+            String::from_utf8_lossy(&buf.buf)
+        );
 
-    trace!(
-        "\n==Test Buffer Begin==\n{}\n==Test Buffer End==",
-        String::from_utf8_lossy(&buf.buf)
+        $server_test(buf, &mut test_fields);
+
+        test_fields.assert_is_empty();
     );
+);
 
-    test_server(buf, test_fields);
+#[test]
+fn reg_client_reg_server() {
+    do_test!(test_client, test_server);
+}
+
+#[test]
+fn reg_client_entry_server() {
+    do_test!(test_client, test_server_entry_api);
+}
+
+#[test]
+fn lazy_client_reg_server() {
+    do_test!(test_client_lazy, test_server);
+}
+
+#[test]
+fn lazy_client_entry_server() {
+    do_test!(test_client_lazy, test_server_entry_api);
 }
 
 fn gen_test_fields() -> TestFields {
@@ -136,7 +218,7 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
     // Intersperse file fields amongst text fields
     for (name, text) in &test_fields.texts {
         if let Some((file_name, file)) = files.next() {
-            multipart.write_stream(file_name, &mut &*file.data, file.filename(), None)
+            multipart.write_stream(file_name, &mut &*file.data.0, file.filename(), None)
                 .unwrap();
         }
 
@@ -151,7 +233,7 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
 
     // Write remaining files
     for (file_name, file) in files {
-       multipart.write_stream(file_name, &mut &*file.data, None, None).unwrap();
+       multipart.write_stream(file_name, &mut &*file.data.0, None, None).unwrap();
     }
 
     for (file_name, files) in nested_files {
@@ -173,7 +255,7 @@ fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
 
     for (name, text) in &test_fields.texts {
         for (file_name, file) in &mut test_files {
-            multipart.add_stream(&**file_name, Cursor::new(&file.data), file.filename(), None);
+            multipart.add_stream(&**file_name, Cursor::new(&file.data.0), file.filename(), None);
         }
 
         if let Some((file_name, files)) = nested_files.next() {
@@ -187,7 +269,7 @@ fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
     }
 
     for (file_name, file) in test_files {
-        multipart.add_stream(&**file_name, Cursor::new(&file.data), None as Option<&str>, None);
+        multipart.add_stream(&**file_name, Cursor::new(&file.data.0), None as Option<&str>, None);
     }
 
     for (file_name, files) in nested_files {
@@ -209,8 +291,8 @@ fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
     HttpBuffer::with_buf(buf, boundary, content_len)
 }
 
-fn test_server(buf: HttpBuffer, mut fields: TestFields) {
-    use server::{Multipart, MultipartData};
+fn test_server(buf: HttpBuffer, fields: &mut TestFields) {
+    use server::Multipart;
 
     let server_buf = buf.for_server();
 
@@ -221,43 +303,30 @@ fn test_server(buf: HttpBuffer, mut fields: TestFields) {
     let mut multipart = Multipart::from_request(server_buf)
         .unwrap_or_else(|_| panic!("Buffer should be multipart!"));
 
-    while let Ok(Some(mut field)) = multipart.read_entry() {
-        match field.data {
-            MultipartData::Text(text) => {
-                let test_text = fields.texts.remove(&field.name);
+    while let Some(mut field) = multipart.read_entry().unwrap() {
+        fields.check_field(&mut field);
+    }
+}
 
-                assert!(
-                    test_text.is_some(),
-                    "Got text field that wasn't in original dataset: {:?} : {:?} ",
-                    field.name, text.text
-                );
+fn test_server_entry_api(buf: HttpBuffer, fields: &mut TestFields) {
+    use server::Multipart;
 
-                let test_text = test_text.unwrap();
+    let server_buf = buf.for_server();
 
-                assert!(
-                    text.text == test_text,
-                    "Unexpected data for field {:?}: Expected {:?}, got {:?}", 
-                    field.name, test_text, text.text
-                );
-
-            },
-            MultipartData::File(ref mut file) => {
-                let test_file = fields.files.remove(&field.name).unwrap();
-
-                let mut bytes = Vec::with_capacity(test_file.data.len());
-                file.read_to_end(&mut bytes).unwrap();
-
-                assert!(bytes == test_file.data, "Unexpected data for file {:?}: Expected {:?}, Got {:?}",
-                        field.name, String::from_utf8_lossy(&test_file.data),
-                        String::from_utf8_lossy(&bytes)
-                );
-            },
-            _ => unimplemented!(),
-        }
+    if let Some(content_len) = server_buf.content_len {
+        assert!(content_len == server_buf.data.len() as u64, "Supplied content_len different from actual");
     }
 
-    assert!(fields.texts.is_empty(), "Text fields were not exhausted! Text fields: {:?}", fields.texts);
-    assert!(fields.files.is_empty(), "File fields were not exhausted! File fields: {:?}", fields.files);
+    let multipart = Multipart::from_request(server_buf)
+        .unwrap_or_else(|_| panic!("Buffer should be multipart!"));
+
+    let mut entry = multipart.into_entry().expect_alt("Expected entry, got none", "Error reading entry");
+    fields.check_field(&mut entry);
+
+    while let Some(entry_) = entry.next_entry().unwrap_opt() {
+        entry = entry_;
+        fields.check_field(&mut entry);
+    }
 }
 
 fn gen_nested_multipart(files: &[FileEntry]) -> (Vec<u8>, String) {
@@ -282,7 +351,7 @@ fn gen_nested_multipart(files: &[FileEntry]) -> (Vec<u8>, String) {
 
         write!(out, "\r\n\r\n");
 
-        out.write_all(&file.data);
+        out.write_all(&file.data.0);
 
         written = true;
     }

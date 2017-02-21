@@ -10,6 +10,7 @@
 use super::httparse::{self, EMPTY_HEADER, Status};
 
 use super::Multipart;
+
 use self::ReadEntryResult::*;
 
 use super::buf_redux::copy_buf;
@@ -372,7 +373,7 @@ impl<M> MultipartFile<M> {
     }
 }
 
-impl<M> MultipartFile<M> where MultipartFile<M>: BufRead {
+impl<M> MultipartFile<M> where M: ReadEntry {
     /// Get a builder type which can save the file with or without a size limit.
     pub fn save(&mut self) -> SaveBuilder<M> {
         SaveBuilder::from_file(self)
@@ -450,35 +451,19 @@ impl<M> MultipartFile<M> where MultipartFile<M>: BufRead {
     }
 }
 
-impl<R: Read> Read for MultipartFile<Multipart<R>> {
+impl<M: ReadEntry> Read for MultipartFile<M> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
-        self.inner_mut().reader.read(buf)
+        self.inner_mut().source().read(buf)
     }
 }
 
-impl<R: Read> BufRead for MultipartFile<Multipart<R>> {
+impl<M: ReadEntry> BufRead for MultipartFile<M> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.inner_mut().reader.fill_buf()
+        self.inner_mut().source().fill_buf()
     }
 
     fn consume(&mut self, amt: usize) {
-        self.inner_mut().reader.consume(amt)
-    }
-}
-
-impl<'a, R: Read + 'a> Read for MultipartFile<&'a mut Multipart<R>> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
-        self.inner_mut().reader.read(buf)
-    }
-}
-
-impl<'a, R: Read + 'a> BufRead for MultipartFile<&'a mut Multipart<R>> {
-    fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.inner_mut().reader.fill_buf()
-    }
-
-    fn consume(&mut self, amt: usize) {
-        self.inner_mut().reader.consume(amt)
+        self.inner_mut().source().consume(amt)
     }
 }
 
@@ -770,15 +755,41 @@ impl<M: ReadEntry> Drop for NestedMultipart<M> {
     }
 }
 
-/// Public trait but not re-exported.
-pub trait ReadEntry: Sized {
-    fn read_headers(&mut self) -> io::Result<Option<FieldHeaders>>;
+/// Common trait for `Multipart` and `&mut Multipart`
+pub trait ReadEntry: PrivReadEntry {}
 
-    fn read_to_string(&mut self) -> io::Result<String>;
+impl<T> ReadEntry for T where T: PrivReadEntry {}
+
+/// Public trait but not re-exported.
+pub trait PrivReadEntry: Sized {
+    type Source: BufRead;
+
+    fn source(&mut self) -> &mut Self::Source;
+
+    /// Consume the next boundary.
+    /// Returns `true` if the last boundary was read, `false` otherwise.
+    fn consume_boundary(&mut self) -> io::Result<bool>;
 
     fn swap_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) -> Vec<u8>;
 
+    fn read_headers(&mut self) -> io::Result<Option<FieldHeaders>> {
+        FieldHeaders::read_from(&mut self.source())
+    }
+
+    fn read_to_string(&mut self) -> io::Result<String> {
+        let mut buf = String::new();
+
+        match self.source().read_to_string(&mut buf) {
+            Ok(_) => Ok(buf),
+            Err(err) => Err(err),
+        }
+    }
+
     fn read_entry(mut self) -> ReadEntryResult<Self> {
+        if try_read_entry!(self; self.consume_boundary()) {
+            return End(self);
+        }
+
         let field_headers = match try_read_entry!(self; self.read_headers()) {
             Some(headers) => headers,
             None => return End(self),
@@ -833,31 +844,18 @@ pub trait ReadEntry: Sized {
     }
 }
 
-impl<R: Read> ReadEntry for Multipart<R> {
-    fn read_headers(&mut self) -> io::Result<Option<FieldHeaders>> {
-        FieldHeaders::read_from(&mut self.reader)
-    }
+impl<'a, M: ReadEntry> PrivReadEntry for &'a mut M {
+    type Source = M::Source;
 
-    fn read_to_string(&mut self) -> io::Result<String> {
-        self.read_to_string()
-    }
-
-    fn swap_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) -> Vec<u8> {
-        self.reader.swap_boundary(boundary)
-    }
-}
-
-impl<'a, M: ReadEntry> ReadEntry for &'a mut M {
-    fn read_headers(&mut self) -> io::Result<Option<FieldHeaders>> {
-        (**self).read_headers()
-    }
-
-    fn read_to_string(&mut self) -> io::Result<String> {
-        (**self).read_to_string()
+    fn source(&mut self) -> &mut M::Source {
+        (**self).source()
     }
 
     fn swap_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) -> Vec<u8> {
         (**self).swap_boundary(boundary)
+    }
+    fn consume_boundary(&mut self) -> io::Result<bool> {
+        (**self).consume_boundary()
     }
 }
 
@@ -877,6 +875,35 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
             ReadEntryResult::Entry(entry) => Ok(Some(entry)),
             ReadEntryResult::End(_) => Ok(None),
             ReadEntryResult::Error(_, err) => Err(err),
+        }
+    }
+
+    pub fn unwrap(self) -> Entry {
+        self.expect_alt("`ReadEntryResult::unwrap()` called on `End` value",
+                        "`ReadEntryResult::unwrap()` called on `Error` value: {:?}")
+    }
+
+    pub fn expect(self, msg: &str) -> Entry {
+        self.expect_alt(msg, msg)
+    }
+
+    pub fn expect_alt(self, end_msg: &str, err_msg: &str) -> Entry {
+        match self {
+            Entry(entry) => entry,
+            End(_) => panic!("{}", end_msg),
+            Error(_, err) => panic!("{}: {:?}", err_msg, err),
+        }
+    }
+
+    pub fn unwrap_opt(self) -> Option<Entry> {
+        self.expect_opt("`ReadEntryResult::unwrap_opt()` called on `Error` value")
+    }
+
+    pub fn expect_opt(self, msg: &str) -> Option<Entry> {
+        match self {
+            Entry(entry) => Some(entry),
+            End(_) => None,
+            Error(_, err) => panic!("{}: {:?}", msg, err),
         }
     }
 
