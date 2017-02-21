@@ -870,6 +870,11 @@ pub enum ReadEntryResult<M: ReadEntry, Entry = MultipartField<M>> {
 }
 
 impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
+    /// Convert `self` into `Result<Option<Entry>>` as follows:
+    ///
+    /// * `Entry(entry) -> Ok(Some(entry))`
+    /// * `End(_) -> Ok(None)`
+    /// * `Error(_, err) -> Err(err)`
     pub fn into_result(self) -> io::Result<Option<Entry>> {
         match self {
             ReadEntryResult::Entry(entry) => Ok(Some(entry)),
@@ -878,15 +883,21 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
         }
     }
 
+    /// Attempt to unwrap `Entry`, panicking if this is `End` or `Error`.
     pub fn unwrap(self) -> Entry {
         self.expect_alt("`ReadEntryResult::unwrap()` called on `End` value",
                         "`ReadEntryResult::unwrap()` called on `Error` value: {:?}")
     }
 
+    /// Attempt to unwrap `Entry`, panicking if this is `End` or `Error`
+    /// with the given message. Adds the error's message in the `Error` case.
     pub fn expect(self, msg: &str) -> Entry {
         self.expect_alt(msg, msg)
     }
 
+    /// Attempt to unwrap `Entry`, panicking if this is `End` or `Error`.
+    /// If this is `End`, panics with `end_msg`; if `Error`, panics with `err_msg`
+    /// as well as the error's message.
     pub fn expect_alt(self, end_msg: &str, err_msg: &str) -> Entry {
         match self {
             Entry(entry) => entry,
@@ -895,10 +906,13 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
         }
     }
 
+    /// Attempt to unwrap as `Option<Entry>`, panicking in the `Error` case.
     pub fn unwrap_opt(self) -> Option<Entry> {
         self.expect_opt("`ReadEntryResult::unwrap_opt()` called on `Error` value")
     }
 
+    /// Attempt to unwrap as `Option<Entry>`, panicking in the `Error` case
+    /// with the given message as well as the error's message.
     pub fn expect_opt(self, msg: &str) -> Option<Entry> {
         match self {
             Entry(entry) => Some(entry),

@@ -28,7 +28,7 @@
 //! * `nickel_`: Integration with the [Nickel](http://nickel.rs) web application framework.
 //! See the [`server::nickel`](server/nickel/index.html) module for more information. Enables the `hyper`
 //! feature.
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![cfg_attr(feature = "nightly", feature(insert_str))]
 
 #[macro_use]
