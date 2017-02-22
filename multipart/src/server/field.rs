@@ -11,7 +11,7 @@ use super::httparse::{self, EMPTY_HEADER, Status};
 
 use self::ReadEntryResult::*;
 
-use super::buf_redux::copy_buf;
+use super::save::{SaveBuilder, SavedFile};
 
 use mime::{TopLevel, Mime};
 
@@ -20,8 +20,6 @@ use std::io::{self, Read, BufRead, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::{env, str};
-
-const RANDOM_FILENAME_LEN: usize = 12;
 
 macro_rules! try_io(
     ($try:expr) => (
@@ -413,8 +411,8 @@ impl<M> MultipartFile<M> {
 
 impl<M> MultipartFile<M> where M: ReadEntry {
     /// Get a builder type which can save the file with or without a size limit.
-    pub fn save(&mut self) -> SaveBuilder<M> {
-        SaveBuilder::from_file(self)
+    pub fn save(&mut self) -> SaveBuilder<Self> {
+        SaveBuilder::new(self)
     }
 
     /// Save this file to the given output stream.
@@ -505,185 +503,6 @@ impl<M: ReadEntry> BufRead for MultipartFile<M> {
     }
 }
 
-/// A builder for saving a `MultipartFile` to the local filesystem.
-#[must_use = "file is not saved to the filesystem yet"]
-pub struct SaveBuilder<'m, M: 'm> {
-    file: &'m mut MultipartFile<M>,
-    open_opts: OpenOptions,
-    limit: Option<u64>,
-}
-
-impl<'m, M: 'm> SaveBuilder<'m, M> where MultipartFile<M>: BufRead {
-    fn from_file(file: &'m mut MultipartFile<M>) -> Self {
-        let mut open_opts = OpenOptions::new();
-        open_opts.write(true).create_new(true);
-
-        SaveBuilder {
-            file: file,
-            open_opts: open_opts,
-            limit: None,
-        }
-    }
-
-    /// Set the maximum number of bytes to write out.
-    ///
-    /// Can be `u64` or `Option<u64>`. If `None`, clears the limit.
-    pub fn limit<L: Into<Option<u64>>>(&mut self, limit: L) -> &mut Self {
-        self.limit = limit.into();
-        self
-    }
-
-    /// Modify the `OpenOptions` used to open the file for writing.
-    ///
-    /// The `write` flag will be reset to `true` after the closure returns. (It'd be pretty
-    /// pointless otherwise, right?)
-    pub fn mod_open_opts<F: FnOnce(&mut OpenOptions)>(&mut self, opts_fn: F) -> &mut Self {
-        opts_fn(&mut self.open_opts);
-        self.open_opts.write(true);
-        self
-    }
-
-    /// Save to a file with a random alphanumeric name in the given directory.
-    ///
-    /// See `with_path()` for more details.
-    ///
-    /// ### Warning: Do **not* trust user input!
-    /// It is a serious security risk to create files or directories with paths based on user input.
-    /// A malicious user could craft a path which can be used to overwrite important files, such as
-    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
-    /// if they are writable by the server process.
-    ///
-    /// This can be mitigated somewhat by setting filesystem permissions as
-    /// conservatively as possible and running the server under its own user with restricted
-    /// permissions, but you should still not use user input directly as filesystem paths.
-    /// If it is truly necessary, you should sanitize filenames such that they cannot be
-    /// misinterpreted by the OS.
-    pub fn with_dir<P: AsRef<Path>>(&mut self, dir: P) -> io::Result<SavedFile> {
-        let path = dir.as_ref().join(rand_filename());
-        self.with_path(path)
-    }
-
-    /// Save to a file with the given name in the OS temporary directory.
-    ///
-    /// See `with_path()` for more details.
-    ///
-    /// ### Warning: Do **not* trust user input!
-    /// It is a serious security risk to create files or directories with paths based on user input.
-    /// A malicious user could craft a path which can be used to overwrite important files, such as
-    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
-    /// if they are writable by the server process.
-    ///
-    /// This can be mitigated somewhat by setting filesystem permissions as
-    /// conservatively as possible and running the server under its own user with restricted
-    /// permissions, but you should still not use user input directly as filesystem paths.
-    /// If it is truly necessary, you should sanitize filenames such that they cannot be
-    /// misinterpreted by the OS.
-    pub fn with_filename<P: AsRef<Path>>(&mut self, filename: P) -> io::Result<SavedFile> {
-        self.with_path(env::temp_dir().join(filename))
-    }
-
-    /// Save to a file with the given path.
-    ///
-    /// Truncates the file to the given limit, if set, and the contained `OpenOptions`.
-    ///
-    /// ### Warning: Do **not* trust user input!
-    /// It is a serious security risk to create files or directories with paths based on user input.
-    /// A malicious user could craft a path which can be used to overwrite important files, such as
-    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
-    /// if they are writable by the server process.
-    ///
-    /// This can be mitigated somewhat by setting filesystem permissions as
-    /// conservatively as possible and running the server under its own user with restricted
-    /// permissions, but you should still not use user input directly as filesystem paths.
-    /// If it is truly necessary, you should sanitize filenames such that they cannot be
-    /// misinterpreted by the OS.
-    ///
-    /// ### `OpenOptions`
-    /// By default, the open options are set with `.write(true).create_new(true)`,
-    /// so if the file already exists then an error will be thrown. This is to avoid accidentally
-    /// overwriting files from other requests.
-    ///
-    /// If you want to modify the options used to open the save file, you can use
-    /// `mod_open_options()`.
-    pub fn with_path<P: Into<PathBuf>>(&mut self, path: P) -> io::Result<SavedFile> {
-        let path = path.into();
-
-        try!(create_full_path(&path));
-
-        let file = try!(self.open_opts.open(&path));
-        let (written, truncated) = try!(self.write_to(file));
-
-        Ok(SavedFile {
-            path: path,
-            filename: self.file.filename.clone(),
-            size: written,
-            truncated: truncated,
-            _priv: (),
-        })
-    }
-
-    /// Save to a file with a random alphanumeric name in the OS temporary directory.
-    ///
-    /// Does not use user input to create the path.
-    ///
-    /// See `with_path()` for more details.
-    pub fn temp(&mut self) -> io::Result<SavedFile> {
-        let path = env::temp_dir().join(rand_filename());
-        self.with_path(path)
-    }
-
-    /// Write out the file field to `dest`, truncating if a limit was set.
-    ///
-    /// Returns the number of bytes copied, and whether or not the limit was reached
-    /// (tested by `MultipartFile::fill_buf().is_empty()` so no bytes are consumed).
-    ///
-    /// Retries on interrupts.
-    pub fn write_to<W: Write>(&mut self, mut dest: W) -> io::Result<(u64, bool)> {
-        if let Some(limit) = self.limit {
-            let copied = try!(copy_buf(&mut self.file.by_ref().take(limit), &mut dest));
-            // If there's more data to be read, the field was truncated
-            Ok((copied, !try!(self.file.fill_buf()).is_empty()))
-        } else {
-            copy_buf(&mut self.file, &mut dest).map(|copied| (copied, false))
-        }
-    }
-}
-
-/// A file saved to the local filesystem from a multipart request.
-#[derive(Debug)]
-pub struct SavedFile {
-    /// The complete path this file was saved at.
-    pub path: PathBuf,
-
-    /// The original filename of this file, if one was provided in the request.
-    ///
-    /// ##Warning: Provided by Client! Do **not** trust user input!
-    /// You should treat this value as untrustworthy because it is an arbitrary string provided by
-    /// the client. You should *not* blindly append it to a directory path and save the file there,
-    /// as such behavior could easily be exploited by a malicious client.
-    ///
-    /// It is a serious security risk to create files or directories with paths based on user input.
-    /// A malicious user could craft a path which can be used to overwrite important files, such as
-    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
-    /// if they are writable by the server process.
-    ///
-    /// This can be mitigated somewhat by setting filesystem permissions as
-    /// conservatively as possible and running the server under its own user with restricted
-    /// permissions, but you should still not use user input directly as filesystem paths.
-    /// If it is truly necessary, you should sanitize filenames such that they cannot be
-    /// misinterpreted by the OS.
-    pub filename: Option<String>,
-
-    /// The number of bytes written to the disk. May be truncated, check the `truncated` flag
-    /// before making any assumptions based on this number.
-    pub size: u64,
-
-    /// If the file save limit was hit and the saved file ended up truncated.
-    pub truncated: bool,
-    // Private field to prevent exhaustive matching for backwards compatibility
-    _priv: (),
-}
-
 fn read_content_type(cont_type: &str) -> Mime {
     cont_type.parse().ok().unwrap_or_else(::mime_guess::octet_stream)
 }
@@ -710,21 +529,6 @@ fn io_str_utf8(buf: &[u8]) -> io::Result<&str> {
 
 fn find_header<'a, 'b>(headers: &'a [StrHeader<'b>], name: &str) -> Option<&'a StrHeader<'b>> {
     headers.iter().find(|header| header.name == name)
-}
-
-fn create_full_path(path: &Path) -> io::Result<fs::File> {
-    if let Some(parent) = path.parent() {
-        try!(fs::create_dir_all(parent));
-    } else {
-        // RFC: return an error instead?
-        warn!("Attempting to save file in what looks like a root directory. File path: {:?}", path);
-    }
-
-    fs::File::create(&path)
-}
-
-fn rand_filename() -> String {
-    ::random_alphanumeric(RANDOM_FILENAME_LEN)
 }
 
 /// Common trait for `Multipart` and `&mut Multipart`

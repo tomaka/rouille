@@ -12,7 +12,8 @@ use iron::{BeforeMiddleware, IronError, IronResult};
 use std::path::PathBuf;
 use std::{error, fmt};
 
-use super::{Entries, HttpRequest, Multipart, MultipartData};
+use super::{HttpRequest, Multipart, MultipartData};
+use super::save::Entries;
 
 impl<'r, 'a, 'b> HttpRequest for &'r mut IronRequest<'a, 'b> {
     type Body = &'r mut IronBody<'a, 'b>;
