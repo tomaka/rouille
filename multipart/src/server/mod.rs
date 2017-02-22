@@ -219,7 +219,6 @@ impl<B: Read> Multipart<B> {
                 MultipartData::Text(text) => {
                     entries.fields.insert(field.name, text.text);
                 },
-                MultipartData::Nested(_) => unimplemented!(),
             }
         }
 
@@ -238,10 +237,6 @@ impl<R: Read> PrivReadEntry for Multipart<R> {
 
     fn source(&mut self) -> &mut BoundaryReader<R> {
         &mut self.reader
-    }
-
-    fn swap_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) -> Vec<u8> {
-        self.reader.swap_boundary(boundary)
     }
 
     /// Consume the next boundary.

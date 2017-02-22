@@ -153,7 +153,7 @@ impl Intercept {
                         file.save().limit(self.file_size_limit).with_dir(&entries.dir);
                         "Error reading field: \"{}\" (filename: \"{}\")",
                         field.name,
-                        file.filename().unwrap_or("(none)")
+                        file.filename.as_ref().map_or("(none)", |f| f)
                     );
 
                     if file.size == self.file_size_limit {
@@ -173,7 +173,6 @@ impl Intercept {
                 MultipartData::Text(text) => {
                     entries.fields.insert(field.name, text.text);
                 },
-                MultipartData::Nested(nested) => unimplemented!(),
             }
         }
 

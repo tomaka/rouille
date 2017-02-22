@@ -8,35 +8,58 @@ use mock::{ClientRequest, HttpBuffer};
 
 use server::{MultipartField, MultipartData, ReadEntry};
 
+use mime::Mime;
+
 use rand::{self, Rng};
 
-use std::collections::HashMap;
-use std::convert::AsRef;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io::prelude::*;
 use std::io::Cursor;
-use std::iter;
+use std::iter::{self, FromIterator};
+
+const MIN_FIELDS: usize = 1;
+const MAX_FIELDS: usize = 3;
+
+const MIN_LEN: usize = 2;
+const MAX_LEN: usize = 5;
+const MAX_DASHES: usize = 2;
+
+fn collect_rand<C: FromIterator<T>, T, F: FnMut() -> T>(mut gen: F) -> C {
+    (0 .. rand::thread_rng().gen_range(MIN_FIELDS, MAX_FIELDS))
+        .map(|_| gen()).collect()
+}
+
+macro_rules! expect_fmt (
+    ($val:expr, $($args:tt)*) => (
+        match $val {
+            Some(val) => val,
+            None => panic!($($args)*),
+        }
+    );
+);
 
 #[derive(Debug)]
 struct TestFields {
     texts: HashMap<String, String>,
-    files: HashMap<String, FileEntry>,
-    nested: HashMap<String, Vec<FileEntry>>,
+    files: HashMap<String, HashSet<FileEntry>>,
 }
 
 impl TestFields {
+    fn gen() -> Self {
+        TestFields {
+            texts: collect_rand(|| (gen_string(), gen_string())),
+            files: collect_rand(|| (gen_string(), FileEntry::gen_many())),
+        }
+    }
+
     fn check_field<M: ReadEntry>(&mut self, field: &mut MultipartField<M>) {
         match field.data {
             MultipartData::Text(ref text) => {
-                let test_text = self.texts.remove(&field.name);
-
-                assert!(
-                    test_text.is_some(),
+                let test_text = expect_fmt!(self.texts.remove(&field.name),
                     "Got text field that wasn't in original dataset: {:?} : {:?} ",
                     field.name, text.text
                 );
-
-                let test_text = test_text.unwrap();
 
                 assert!(
                     text.text == test_text,
@@ -45,17 +68,30 @@ impl TestFields {
                 );
             },
             MultipartData::File(ref mut file) => {
-                let test_file = self.files.remove(&field.name).unwrap();
-
-                let mut bytes = Vec::with_capacity(test_file.data.0.len());
+                let mut bytes = Vec::with_capacity(MAX_LEN);
                 file.read_to_end(&mut bytes).unwrap();
 
-                assert!(bytes == test_file.data.0, "Unexpected data for file {:?}: Expected {:?}, Got {:?}",
-                        field.name, String::from_utf8_lossy(&test_file.data.0),
-                        String::from_utf8_lossy(&bytes)
-                );
+                let curr_file = FileEntry {
+                    content_type: file.content_type.clone(),
+                    filename: file.filename.take(),
+                    data: PrintHex(bytes),
+                };
+
+                let files_empty = {
+                    let mut files = expect_fmt!(self.files.get_mut(&field.name),
+                    "Got file field that wasn't in original dataset: {:?} : {:?}",
+                    field.name, curr_file);
+
+                    assert!(files.remove(&curr_file), "Unexpected data for file field {:?}: {:?}",
+                        field.name, curr_file);
+
+                    files.is_empty()
+                };
+
+                if files_empty {
+                    let _ = self.files.remove(&field.name);
+                }
             },
-            _ => (),
         }
     }
 
@@ -65,13 +101,18 @@ impl TestFields {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash, PartialEq, Eq)]
 struct FileEntry {
+    content_type: Mime,
     filename: Option<String>,
     data: PrintHex,
 }
 
 impl FileEntry {
+    fn gen_many() -> HashSet<Self> {
+        collect_rand(Self::gen)
+    }
+
     fn gen() -> Self {
         let filename = match gen_bool() {
             true => Some(gen_string()),
@@ -79,6 +120,7 @@ impl FileEntry {
         };
 
         FileEntry {
+            content_type: rand_mime(),
             filename: filename,
             data: PrintHex(gen_bytes())
         }
@@ -89,6 +131,7 @@ impl FileEntry {
     }
 }
 
+#[derive(Hash, PartialEq, Eq)]
 struct PrintHex(Vec<u8>);
 
 impl fmt::Debug for PrintHex {
@@ -118,7 +161,7 @@ macro_rules! do_test (
         info!("Client Test: {:?} Server Test: {:?}", stringify!($client_test),
               stringify!($server_test));
 
-        let mut test_fields = gen_test_fields();
+        let mut test_fields = TestFields::gen();
 
         trace!("Fields for test: {:?}", test_fields);
 
@@ -155,39 +198,11 @@ fn lazy_client_entry_server() {
     do_test!(test_client_lazy, test_server_entry_api);
 }
 
-fn gen_test_fields() -> TestFields {
-    const MIN_FIELDS: usize = 1;
-    const MAX_FIELDS: usize = 3;
-
-    let mut rng = rand::weak_rng();
-
-    let texts_count = rng.gen_range(MIN_FIELDS, MAX_FIELDS);
-    let files_count = rng.gen_range(MIN_FIELDS, MAX_FIELDS);
-    let nested_count = rng.gen_range(MIN_FIELDS, MAX_FIELDS);
-
-    TestFields {
-        texts: (0..texts_count).map(|_| (gen_string(), gen_string())).collect(),
-        files: (0..files_count).map(|_| (gen_string(), FileEntry::gen())).collect(),
-        nested: (0..nested_count).map(|_| {
-            let files_count = rng.gen_range(MIN_FIELDS, MAX_FIELDS);
-
-            (
-                gen_string(),
-                (0..files_count).map(|_| FileEntry::gen()).collect()
-            )
-        }).collect()
-    }
-}
-
 fn gen_bool() -> bool {
     rand::thread_rng().gen()
 }
 
 fn gen_string() -> String {
-    const MIN_LEN: usize = 2;
-    const MAX_LEN: usize = 5;
-    const MAX_DASHES: usize = 2;
-
     let mut rng_1 = rand::thread_rng();
     let mut rng_2 = rand::thread_rng();
 
@@ -210,36 +225,28 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
 
     let request = ClientRequest::default();
 
-    let mut files = test_fields.files.iter();
-    let mut nested_files = test_fields.nested.iter();
+    let mut test_files = test_fields.files.iter();
 
     let mut multipart = Multipart::from_request(request).unwrap();
    
     // Intersperse file fields amongst text fields
     for (name, text) in &test_fields.texts {
-        if let Some((file_name, file)) = files.next() {
-            multipart.write_stream(file_name, &mut &*file.data.0, file.filename(), None)
-                .unwrap();
-        }
-
-        if let Some((file_name, files)) = nested_files.next() {
-            let (data, boundary) = gen_nested_multipart(files);
-            let mime = format!("multipart/mixed; boundary={}", boundary).parse().unwrap();
-            multipart.write_stream(file_name, &mut &*data, None, Some(mime)).unwrap();
+        if let Some((file_name, files)) = test_files.next() {
+            for file in files {
+                multipart.write_stream(file_name, &mut &*file.data.0, file.filename(),
+                                       Some(file.content_type.clone())).unwrap();
+            }
         }
 
         multipart.write_text(name, text).unwrap();    
     }
 
     // Write remaining files
-    for (file_name, file) in files {
-       multipart.write_stream(file_name, &mut &*file.data.0, None, None).unwrap();
-    }
-
-    for (file_name, files) in nested_files {
-        let (data, boundary) = gen_nested_multipart(files);
-        let mime = format!("multipart/mixed; boundary={}", boundary).parse().unwrap();
-        multipart.write_stream(file_name, &mut &*data, None, Some(mime)).unwrap();
+    for (file_name, files) in test_files {
+        for file in files {
+            multipart.write_stream(file_name, &mut &*file.data.0, file.filename(),
+                                   Some(file.content_type.clone())).unwrap();
+        }
     }
 
     multipart.send().unwrap()
@@ -251,32 +258,23 @@ fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
     let mut multipart = Multipart::new();
 
     let mut test_files = test_fields.files.iter();
-    let mut nested_files = test_fields.nested.iter();
 
     for (name, text) in &test_fields.texts {
-        for (file_name, file) in &mut test_files {
-            multipart.add_stream(&**file_name, Cursor::new(&file.data.0), file.filename(), None);
-        }
-
-        if let Some((file_name, files)) = nested_files.next() {
-            let (data, boundary) = gen_nested_multipart(files);
-            let mime = format!("multipart/mixed; boundary={}", boundary).parse().unwrap();
-            multipart.add_stream(&**file_name, Cursor::new(data), None as Option<&'static str>,
-                                 Some(mime));
+        if let Some((file_name, files)) = test_files.next() {
+            for file in files {
+                multipart.add_stream(&**file_name, Cursor::new(&file.data.0), file.filename(),
+                                     Some(file.content_type.clone()));
+            }
         }
 
         multipart.add_text(&**name, &**text);
     }
 
-    for (file_name, file) in test_files {
-        multipart.add_stream(&**file_name, Cursor::new(&file.data.0), None as Option<&str>, None);
-    }
-
-    for (file_name, files) in nested_files {
-        let (data, boundary) = gen_nested_multipart(files);
-        let mime = format!("multipart/mixed; boundary={}", boundary).parse().unwrap();
-        multipart.add_stream(&**file_name, Cursor::new(data), None as Option<&'static str>,
-                             Some(mime));
+    for (file_name, files) in test_files {
+        for file in files {
+            multipart.add_stream(&**file_name, Cursor::new(&file.data.0), file.filename(),
+                                 Some(file.content_type.clone()));
+        }
     }
 
     let mut prepared = multipart.prepare_threshold(None).unwrap();
@@ -329,35 +327,12 @@ fn test_server_entry_api(buf: HttpBuffer, fields: &mut TestFields) {
     }
 }
 
-fn gen_nested_multipart(files: &[FileEntry]) -> (Vec<u8>, String) {
-    let mut out = Vec::new();
-    let boundary = gen_string();
-
-    write!(out, "Content-Type: multipart/mixed; boundary={boundary}\r\n\r\n \
-    --{boundary}\r\n", boundary=boundary);
-
-    let mut written = false;
-
-    for file in files {
-        if written {
-            write!(out, "\r\n--{}\r\n", boundary);
-        }
-
-        write!(out, "Content-Type: application/octet-stream");
-
-        if let Some(ref filename) = file.filename {
-            write!(out, "; filename={}", filename);
-        }
-
-        write!(out, "\r\n\r\n");
-
-        out.write_all(&file.data.0);
-
-        written = true;
-    }
-
-    write!(out, "\r\n--{}--\r\n", boundary);
-
-    (out, boundary)
+fn rand_mime() -> Mime {
+    rand::thread_rng().choose(&[
+        // TODO: fill this out, preferably with variants that may be hard to parse
+        // i.e. containing hyphens, mainly
+        mime!(Application/OctetStream),
+        mime!(Text/Plain),
+        mime!(Image/Png),
+    ]).unwrap().clone()
 }
-
