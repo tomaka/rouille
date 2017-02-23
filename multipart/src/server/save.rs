@@ -13,6 +13,8 @@ use mime::Mime;
 use super::field::{MultipartData, MultipartFile};
 use super::Multipart;
 
+use self::SaveResult::*;
+
 pub use tempdir::TempDir;
 
 use std::collections::HashMap;
@@ -32,6 +34,24 @@ const PATH_SEP: &'static str = "\\";
 fn rand_filename() -> String {
     ::random_alphanumeric(RANDOM_FILENAME_LEN)
 }
+
+macro_rules! try_start (
+    ($try:expr) => (
+        match $try {
+            Ok(val) => val,
+            Err(e) => return SaveResult::Error(e),
+        }
+    )
+);
+
+macro_rules! try_partial (
+    ($try:expr; $partial:expr) => (
+        match $try {
+            Ok(val) => val,
+            Err(e) => return SaveResult::Partial($partial, e),
+        }
+    )
+);
 
 /// A builder for saving a file or files to the local filesystem.
 ///
@@ -123,7 +143,7 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
     ///
     /// ### Note: Temporary
     /// See `SaveDir` for more info (the type of `Entries::save_dir`).
-    pub fn temp(&mut self) -> SaveResult {
+    pub fn temp(&mut self) -> EntriesSaveResult {
         self.temp_with_prefix("multipart-rs")
     }
 
@@ -134,55 +154,58 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
     ///
     /// ### Note: Temporary
     /// See `SaveDir` for more info (the type of `Entries::save_dir`).
-    pub fn temp_with_prefix(&mut self, prefix: &str) -> SaveResult {
+    pub fn temp_with_prefix(&mut self, prefix: &str) -> EntriesSaveResult {
         match TempDir::new(prefix) {
             Ok(tempdir) => self.with_temp_dir(tempdir),
             Err(e) => SaveResult::Error(e),
         }
     }
 
-    /// Save the file fields in the request to a new permanent directory with the given path.
-    ///
-    /// Any nonexistent parent directories will be created.
-    pub fn with_dir<P: Into<PathBuf>>(&mut self, dir: P) -> SaveResult {
-        let dir = dir.into();
-
-        if let Err(e) = create_dir_all(&dir) {
-            return SaveResult::Error(e);
-        };
-
-        self.with_save_dir(SaveDir::Perm(dir.into()))
-    }
-
     /// Save the file fields to the given `TempDir`.
     ///
     /// The `TempDir` is returned in the result under `Entries::save_dir`.
-    pub fn with_temp_dir(&mut self, tempdir: TempDir) -> SaveResult {
-        self.with_save_dir(SaveDir::Temp(tempdir))
+    pub fn with_temp_dir(&mut self, tempdir: TempDir) -> EntriesSaveResult {
+        self.with_entries(Entries::new(SaveDir::Temp(tempdir)))
     }
 
-    fn with_save_dir(&mut self, save_dir: SaveDir) -> SaveResult {
-        let mut entries = Entries::new(save_dir);
+    /// Save the file fields in the request to a new permanent directory with the given path.
+    ///
+    /// Any nonexistent parent directories will be created.
+    pub fn with_dir<P: Into<PathBuf>>(&mut self, dir: P) -> EntriesSaveResult {
+        let dir = dir.into();
 
-        let mut count = 0;
+        try_start!(create_dir_all(&dir));
 
+        self.with_entries(Entries::new(SaveDir::Perm(dir.into())))
+    }
+
+    pub fn with_entries(&mut self, mut entries: Entries) -> EntriesSaveResult {
         loop {
-            let field = match self.savable.read_entry() {
-                Ok(Some(field)) => field,
-                Ok(None) => break,
-                Err(e) => return SaveResult::Partial(entries, e),
+            let field = match try_partial!(self.savable.read_entry(); entries) {
+                Some(field) => field,
+                None => break,
             };
 
             match field.data {
                 MultipartData::File(mut file) => {
                     match self.count_limit {
-                        Some(limit) if count >= limit => return SaveResult::LimitHit(entries),
+                        Some(limit) if count >= limit => return SaveResult::Partial (
+                            entries,
+                            LimitHitFile {
+                                field_name: field.name,
+                                filename: file.filename,
+                                content_type: file.content_type,
+                                limit_kind: LimitKind::Count,
+                            }
+                        ),
                         _ => (),
                     }
 
                     match file.save().limit(self.limit).with_dir(&entries.save_dir) {
-                        Ok(saved_file) => entries.files.entry(field.name).or_insert(Vec::new())
-                                            .push(saved_file),
+                        Ok(saved_file) => if saved_file.truncated {
+                            entries.files.entry(field.name).or_insert(Vec::new())
+                                .push(saved_file)
+                        },
                         Err(e) => return SaveResult::Partial(entries, e),
                     }
 
@@ -199,23 +222,15 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
 }
 
 impl<'s, M: 's> SaveBuilder<'s, MultipartFile<M>> where MultipartFile<M>: BufRead {
-    /// Save to a file with a random alphanumeric name in the given directory.
+
+
+    /// Save to a file with a random alphanumeric name in the OS temporary directory.
+    ///
+    /// Does not use user input to create the path.
     ///
     /// See `with_path()` for more details.
-    ///
-    /// ### Warning: Do **not* trust user input!
-    /// It is a serious security risk to create files or directories with paths based on user input.
-    /// A malicious user could craft a path which can be used to overwrite important files, such as
-    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
-    /// if they are writable by the server process.
-    ///
-    /// This can be mitigated somewhat by setting filesystem permissions as
-    /// conservatively as possible and running the server under its own user with restricted
-    /// permissions, but you should still not use user input directly as filesystem paths.
-    /// If it is truly necessary, you should sanitize filenames such that they cannot be
-    /// misinterpreted by the OS.
-    pub fn with_dir<P: AsRef<Path>>(&mut self, dir: P) -> io::Result<SavedFile> {
-        let path = dir.as_ref().join(rand_filename());
+    pub fn temp(&mut self) -> FileSaveResult {
+        let path = env::temp_dir().join(rand_filename());
         self.with_path(path)
     }
 
@@ -234,11 +249,31 @@ impl<'s, M: 's> SaveBuilder<'s, MultipartFile<M>> where MultipartFile<M>: BufRea
     /// permissions, but you should still not use user input directly as filesystem paths.
     /// If it is truly necessary, you should sanitize filenames such that they cannot be
     /// misinterpreted by the OS.
-    pub fn with_filename(&mut self, filename: &str) -> io::Result<SavedFile> {
+    pub fn with_filename(&mut self, filename: &str) -> FileSaveResult {
         let mut tempdir = env::temp_dir();
         tempdir.set_file_name(filename);
 
         self.with_path(tempdir)
+    }
+
+    /// Save to a file with a random alphanumeric name in the given directory.
+    ///
+    /// See `with_path()` for more details.
+    ///
+    /// ### Warning: Do **not* trust user input!
+    /// It is a serious security risk to create files or directories with paths based on user input.
+    /// A malicious user could craft a path which can be used to overwrite important files, such as
+    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
+    /// if they are writable by the server process.
+    ///
+    /// This can be mitigated somewhat by setting filesystem permissions as
+    /// conservatively as possible and running the server under its own user with restricted
+    /// permissions, but you should still not use user input directly as filesystem paths.
+    /// If it is truly necessary, you should sanitize filenames such that they cannot be
+    /// misinterpreted by the OS.
+    pub fn with_dir<P: AsRef<Path>>(&mut self, dir: P) -> FileSaveResult {
+        let path = dir.as_ref().join(rand_filename());
+        self.with_path(path)
     }
 
     /// Save to a file with the given path.
@@ -246,7 +281,7 @@ impl<'s, M: 's> SaveBuilder<'s, MultipartFile<M>> where MultipartFile<M>: BufRea
     /// Creates any missing directories in the path.
     /// Uses the contained `OpenOptions` to create the file.
     /// Truncates the file to the given limit, if set.
-    pub fn with_path<P: Into<PathBuf>>(&mut self, path: P) -> io::Result<SavedFile> {
+    pub fn with_path<P: Into<PathBuf>>(&mut self, path: P) -> FileSaveResult {
         let path = path.into();
 
         try!(create_dir_all(&path));
@@ -259,20 +294,9 @@ impl<'s, M: 's> SaveBuilder<'s, MultipartFile<M>> where MultipartFile<M>: BufRea
             filename: self.savable.filename.clone(),
             content_type: self.savable.content_type.clone(),
             size: written,
-            truncated: truncated,
-            _priv: (),
         })
     }
 
-    /// Save to a file with a random alphanumeric name in the OS temporary directory.
-    ///
-    /// Does not use user input to create the path.
-    ///
-    /// See `with_path()` for more details.
-    pub fn temp(&mut self) -> io::Result<SavedFile> {
-        let path = env::temp_dir().join(rand_filename());
-        self.with_path(path)
-    }
 
     /// Write out the file field to `dest`, truncating if a limit was set.
     ///
@@ -325,14 +349,8 @@ pub struct SavedFile {
     /// starting another program or querying/updating a database (web-search "SQL injection").
     pub content_type: Mime,
 
-    /// The number of bytes written to the disk. May be truncated, check the `truncated` flag
-    /// before making any assumptions based on this number.
+    /// The number of bytes written to the disk.
     pub size: u64,
-
-    /// If the file save limit was hit and the saved file ended up truncated.
-    pub truncated: bool,
-    // Private field to prevent exhaustive matching for backwards compatibility
-    _priv: (),
 }
 
 /// A result of `Multipart::save_all()`.
@@ -437,22 +455,77 @@ impl AsRef<Path> for SaveDir {
     }
 }
 
+/// The file that was to be read next when the limit was hit.
+#[derive(Clone, Debug)]
+pub struct PartialFile {
+    /// The field name for this file.
+    pub field_name: Option<String>,
+
+    /// The path of
+    pub file_path: Option<PathBuf>,
+
+    /// The filename of this entry, if supplied.
+    ///
+    /// ### Warning: Client Provided / Untrustworthy
+    /// You should treat this value as **untrustworthy** because it is an arbitrary string
+    /// provided by the client.
+    ///
+    /// It is a serious security risk to create files or directories with paths based on user input.
+    /// A malicious user could craft a path which can be used to overwrite important files, such as
+    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
+    /// if they are writable by the server process.
+    ///
+    /// This can be mitigated somewhat by setting filesystem permissions as
+    /// conservatively as possible and running the server under its own user with restricted
+    /// permissions, but you should still not use user input directly as filesystem paths.
+    /// If it is truly necessary, you should sanitize filenames such that they cannot be
+    /// misinterpreted by the OS. Such functionality is outside the scope of this crate.
+    pub filename: Option<String>,
+
+    /// The MIME type (`Content-Type` value) of this file, if supplied by the client,
+    /// or `"applicaton/octet-stream"` otherwise.
+    ///
+    /// ### Note: Client Provided
+    /// Consider this value to be potentially untrustworthy, as it is provided by the client.
+    /// It may be inaccurate or entirely wrong, depending on how the client determined it.
+    ///
+    /// Some variants wrap arbitrary strings which could be abused by a malicious user if your
+    /// application performs any non-idempotent operations based on their value, such as
+    /// starting another program or querying/updating a database (web-search "SQL injection").
+    pub content_type: Mime,
+}
+
+/// The kind of the limit that was hit
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PartialReason {
+    CountLimit,
+    SizeLimit,
+    IoError(io::Error),
+}
+
+pub struct PartialEntries {
+    pub entries: Entries,
+    pub errored_file: Option<PartialFile>,
+}
+
 /// The result of [`Multipart::save_all()`](struct.multipart.html#method.save_all)
 /// and methods on `SaveBuilder<Multipart>`.
 #[derive(Debug)]
-pub enum SaveResult {
-    /// The operation was a total success. Contained are all entries of the request.
-    Full(Entries),
-    /// The file count limit in the save operation was hit. Contained are the entries
-    /// that came in under the limit.
-    LimitHit(Entries),
-    /// The operation errored partway through. Contained are the entries gathered thus far,
-    /// as well as the error that ended the process.
-    Partial(Entries, io::Error),
-    /// The `TempDir` for `Entries` could not be constructed. Contained is the error detailing the
-    /// problem.
+pub enum SaveResult<Success, Partial> {
+    /// The operation was a total success. Contained is the complete result.
+    Full(Success),
+    /// The operation quit partway through. Included is the partial
+    /// result along with the reason.
+    Partial(Partial, PartialReason),
+    /// An error occurred at the start of the operation, before anything was done.
     Error(io::Error),
 }
+
+/// Shorthand result for methods that return `Entries`
+pub type EntriesSaveResult = SaveResult<Entries, PartialEntries>;
+
+/// Shorthand result for methods that return `SavedFile`s.
+pub type FileSaveResult = SaveResult<SavedFile, PartialFile>;
 
 impl SaveResult {
     /// Take the `Entries` from `self`, if applicable, and discarding
@@ -461,7 +534,7 @@ impl SaveResult {
         use self::SaveResult::*;
 
         match self {
-            Full(entries) | LimitHit(entries) | Partial(entries, _) => Some(entries),
+            Full(entries) | LimitHit(entries, _) | Partial(entries, _) => Some(entries),
             Error(_) => None,
         }
     }
@@ -472,7 +545,7 @@ impl SaveResult {
 
         match self {
             Full(entries) => (Some(entries), None),
-            LimitHit(entries) => (Some(entries), None),
+            LimitHit(entries, _) => (Some(entries), None),
             Partial(entries, error) => (Some(entries), Some(error)),
             Error(error) => (None, Some(error)),
         }
@@ -483,7 +556,7 @@ impl SaveResult {
         use self::SaveResult::*;
 
         match self {
-            Full(entries) | LimitHit(entries) | Partial(entries, _) => Ok(entries),
+            Full(entries) | LimitHit(entries, _) | Partial(entries, _) => Ok(entries),
             Error(error) => Err(error),
         }
     }
