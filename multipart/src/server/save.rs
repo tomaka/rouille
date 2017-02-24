@@ -180,6 +180,8 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
     }
 
     pub fn with_entries(&mut self, mut entries: Entries) -> EntriesSaveResult {
+        let mut count = 0;
+
         loop {
             let field = match try_partial!(self.savable.read_entry(); entries) {
                 Some(field) => field,
@@ -191,22 +193,33 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
                     match self.count_limit {
                         Some(limit) if count >= limit => return SaveResult::Partial (
                             entries,
-                            LimitHitFile {
-                                field_name: field.name,
+                            PartialFile {
+                                field_name: Some(field.name),
+                                file_path: None,
                                 filename: file.filename,
                                 content_type: file.content_type,
-                                limit_kind: LimitKind::Count,
+                                written: 0,
                             }
                         ),
                         _ => (),
                     }
 
                     match file.save().limit(self.limit).with_dir(&entries.save_dir) {
-                        Ok(saved_file) => if saved_file.truncated {
-                            entries.files.entry(field.name).or_insert(Vec::new())
-                                .push(saved_file)
-                        },
-                        Err(e) => return SaveResult::Partial(entries, e),
+                        Success(saved_file) => entries.mut_files_for(&field.name).push(saved_file),
+                        Partial(partial, reason) => return Partial(
+                            PartialEntries {
+                                entries: entries,
+                                errored_file: Some(partial),
+                            },
+                            reason
+                        ),
+                        Err(e) => return Partial(
+                            PartialEntries {
+                                entries: entries,
+                                errored_file: Some(partial),
+                            },
+                            PartialReason::IoError(error)
+                        ),
                     }
 
                     count += 1;
@@ -222,7 +235,6 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
 }
 
 impl<'s, M: 's> SaveBuilder<'s, MultipartFile<M>> where MultipartFile<M>: BufRead {
-
 
     /// Save to a file with a random alphanumeric name in the OS temporary directory.
     ///
@@ -372,6 +384,10 @@ impl Entries {
             save_dir: save_dir,
         }
     }
+
+    pub fn mut_files_for(&mut self, field: &str) -> &mut Vec<SavedFile> {
+        self.files.entry(field).or_insert_with(Vec::new)
+    }
 }
 
 /// The save directory for `Entries`. May be temporary (delete-on-drop) or permanent.
@@ -458,10 +474,10 @@ impl AsRef<Path> for SaveDir {
 /// The file that was to be read next when the limit was hit.
 #[derive(Clone, Debug)]
 pub struct PartialFile {
-    /// The field name for this file.
+    /// The field name for this file, if available.
     pub field_name: Option<String>,
 
-    /// The path of
+    /// The path of the file, if one was already created.
     pub file_path: Option<PathBuf>,
 
     /// The filename of this entry, if supplied.
@@ -493,6 +509,17 @@ pub struct PartialFile {
     /// application performs any non-idempotent operations based on their value, such as
     /// starting another program or querying/updating a database (web-search "SQL injection").
     pub content_type: Mime,
+
+    /// The number of bytes that were written out before the error occurred.
+    pub written: u64,
+    __priv: (),
+}
+
+impl PartialFile {
+    fn with_field_name(mut self, field_name: String) -> Self {
+        self.field_name = Some(field_name);
+        self
+    }
 }
 
 /// The kind of the limit that was hit
