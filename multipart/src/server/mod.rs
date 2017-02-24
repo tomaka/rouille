@@ -84,8 +84,8 @@ pub mod save;
 /// The server-side implementation of `multipart/form-data` requests.
 ///
 /// Implements `Borrow<R>` to allow access to the request body, if desired.
-pub struct Multipart<B> {
-    reader: BoundaryReader<B>,
+pub struct Multipart<R> {
+    reader: BoundaryReader<R>,
 }
 
 impl Multipart<()> {
@@ -103,9 +103,9 @@ impl Multipart<()> {
     }   
 }
 
-impl<B: Read> Multipart<B> {
+impl<R: Read> Multipart<R> {
     /// Construct a new `Multipart` with the given body reader and boundary.
-    pub fn with_body<Bnd: Into<String>>(body: B, boundary: Bnd) -> Self {
+    pub fn with_body<Bnd: Into<String>>(body: R, boundary: Bnd) -> Self {
         Multipart { 
             reader: BoundaryReader::from_reader(body, boundary.into()),
         }
@@ -153,7 +153,7 @@ impl<B: Read> Multipart<B> {
     /// If there is an error in reading the request, returns the partial result along with the
     /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     #[deprecated = "use `.save().temp()` instead"]
-    pub fn save_all(&mut self) -> EntriesSaveResult {
+    pub fn save_all(&mut self) -> EntriesSaveResult<R> {
         self.save().temp()
     }
 
@@ -163,7 +163,7 @@ impl<B: Read> Multipart<B> {
     /// If there is an error in reading the request, returns the partial result along with the
     /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     #[deprecated = "use `.save().with_temp_dir()` instead"]
-    pub fn save_all_under<P: AsRef<Path>>(&mut self, dir: P) -> EntriesSaveResult {
+    pub fn save_all_under<P: AsRef<Path>>(&mut self, dir: P) -> EntriesSaveResult<R> {
         match TempDir::new_in(dir, "multipart") {
             Ok(temp_dir) => self.save().with_temp_dir(temp_dir),
             Err(err) => return SaveResult::Error(err),
@@ -178,7 +178,7 @@ impl<B: Read> Multipart<B> {
     /// If there is an error in reading the request, returns the partial result along with the
     /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     #[deprecated = "use `.save().limit(limit)` instead"]
-    pub fn save_all_limited(&mut self, limit: u64) -> EntriesSaveResult {
+    pub fn save_all_limited(&mut self, limit: u64) -> EntriesSaveResult<R> {
         self.save().limit(limit).temp()
     }
 
@@ -190,7 +190,7 @@ impl<B: Read> Multipart<B> {
     /// If there is an error in reading the request, returns the partial result along with the
     /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     #[deprecated = "use `.save().limit(limit).with_temp_dir()` instead"]
-    pub fn save_all_under_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> EntriesSaveResult {
+    pub fn save_all_under_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> EntriesSaveResult<R> {
         match TempDir::new_in(dir, "multipart") {
             Ok(temp_dir) => self.save().limit(limit).with_temp_dir(temp_dir),
             Err(err) => return SaveResult::Error(err),

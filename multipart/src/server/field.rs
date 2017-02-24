@@ -11,7 +11,8 @@ use super::httparse::{self, EMPTY_HEADER, Status};
 
 use self::ReadEntryResult::*;
 
-use super::save::{SaveBuilder, SavedFile};
+use super::save::{PartialReason, SaveBuilder, SavedFile};
+use super::save::SaveResult::*;
 
 use mime::{TopLevel, Mime};
 
@@ -225,7 +226,7 @@ impl<M: ReadEntry> MultipartField<M> {
 
 /// The data of a field in a `multipart/form-data` request.
 #[derive(Debug)]
-pub enum MultipartData<M: ReadEntry> {
+pub enum MultipartData<M> {
     /// The field's payload is a text string.
     Text(MultipartText<M>),
     /// The field's payload is a binary stream (file).
@@ -422,7 +423,12 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     #[deprecated = "use `.save().write_to()` instead"]
     pub fn save_to<W: Write>(&mut self, out: W) -> io::Result<u64> {
-        self.save().write_to(out).map(|(size, _)| size)
+        match self.save().write_to(out) {
+            Full(copied) => Ok(copied),
+            Partial(copied, PartialReason::IoError(e)) => Err(e),
+            Partial(_, _) => unreachable!(),
+            Error(e) => Err(e),
+        }
     }
 
     /// Save this file to the given output stream, **truncated** to `limit`
@@ -433,7 +439,12 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     #[deprecated = "use `.save().limit(limit).write_to(out)` instead"]
     pub fn save_to_limited<W: Write>(&mut self, out: W, limit: u64) -> io::Result<u64> {
-        self.save().limit(limit).write_to(out).map(|(size, _)| size)
+        match self.save().limit(limit).write_to(out) {
+            Full(copied) => Ok(copied),
+            Partial(copied, PartialReason::IoError(e)) => Err(e),
+            Partial(copied, _) => Ok(copied),
+            Error(e) => Err(e),
+        }
     }
 
     /// Save this file to `path`.
