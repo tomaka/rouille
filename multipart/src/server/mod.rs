@@ -153,7 +153,7 @@ impl<R: Read> Multipart<R> {
     /// If there is an error in reading the request, returns the partial result along with the
     /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     #[deprecated = "use `.save().temp()` instead"]
-    pub fn save_all(&mut self) -> EntriesSaveResult<R> {
+    pub fn save_all(&mut self) -> EntriesSaveResult<&mut Self> {
         self.save().temp()
     }
 
@@ -163,7 +163,7 @@ impl<R: Read> Multipart<R> {
     /// If there is an error in reading the request, returns the partial result along with the
     /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     #[deprecated = "use `.save().with_temp_dir()` instead"]
-    pub fn save_all_under<P: AsRef<Path>>(&mut self, dir: P) -> EntriesSaveResult<R> {
+    pub fn save_all_under<P: AsRef<Path>>(&mut self, dir: P) -> EntriesSaveResult<&mut Self> {
         match TempDir::new_in(dir, "multipart") {
             Ok(temp_dir) => self.save().with_temp_dir(temp_dir),
             Err(err) => return SaveResult::Error(err),
@@ -178,8 +178,8 @@ impl<R: Read> Multipart<R> {
     /// If there is an error in reading the request, returns the partial result along with the
     /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     #[deprecated = "use `.save().limit(limit)` instead"]
-    pub fn save_all_limited(&mut self, limit: u64) -> EntriesSaveResult<R> {
-        self.save().limit(limit).temp()
+    pub fn save_all_limited(&mut self, limit: u64) -> EntriesSaveResult<&mut Self> {
+        self.save().size_limit(limit).temp()
     }
 
     /// Read the request fully, parsing all fields and saving all files in a new temporary
@@ -190,9 +190,9 @@ impl<R: Read> Multipart<R> {
     /// If there is an error in reading the request, returns the partial result along with the
     /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
     #[deprecated = "use `.save().limit(limit).with_temp_dir()` instead"]
-    pub fn save_all_under_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> EntriesSaveResult<R> {
+    pub fn save_all_under_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> EntriesSaveResult<&mut Self> {
         match TempDir::new_in(dir, "multipart") {
-            Ok(temp_dir) => self.save().limit(limit).with_temp_dir(temp_dir),
+            Ok(temp_dir) => self.save().size_limit(limit).with_temp_dir(temp_dir),
             Err(err) => return SaveResult::Error(err),
         }
     }

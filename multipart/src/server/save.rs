@@ -80,7 +80,7 @@ macro_rules! try_start (
 pub struct SaveBuilder<S> {
     savable: S,
     open_opts: OpenOptions,
-    limit: Option<u64>,
+    size_limit: Option<u64>,
     count_limit: Option<u32>,
 }
 
@@ -94,7 +94,7 @@ impl<S> SaveBuilder<S> {
         SaveBuilder {
             savable: savable,
             open_opts: open_opts,
-            limit: None,
+            size_limit: None,
             count_limit: None,
         }
     }
@@ -102,8 +102,8 @@ impl<S> SaveBuilder<S> {
     /// Set the maximum number of bytes to write out *per file*.
     ///
     /// Can be `u64` or `Option<u64>`. If `None`, clears the limit.
-    pub fn limit<L: Into<Option<u64>>>(&mut self, limit: L) -> &mut Self {
-        self.limit = limit.into();
+    pub fn size_limit<L: Into<Option<u64>>>(mut self, limit: L) -> Self {
+        self.size_limit = limit.into();
         self
     }
 
@@ -111,18 +111,18 @@ impl<S> SaveBuilder<S> {
     ///
     /// The `write` flag will be reset to `true` after the closure returns. (It'd be pretty
     /// pointless otherwise, right?)
-    pub fn mod_open_opts<F: FnOnce(&mut OpenOptions)>(&mut self, opts_fn: F) -> &mut Self {
+    pub fn mod_open_opts<F: FnOnce(&mut OpenOptions)>(mut self, opts_fn: F) -> Self {
         opts_fn(&mut self.open_opts);
         self.open_opts.write(true);
         self
     }
 }
 
-impl<'m, R: 'm> SaveBuilder<&'m mut Multipart<R>> where R: Read {
+impl<M> SaveBuilder<M> where M: ReadEntry {
     /// Set the maximum number of files to write out.
     ///
     /// Can be `u32` or `Option<u32>`. If `None`, clears the limit.
-    pub fn count_limit<L: Into<Option<u32>>>(&mut self, count_limit: L) -> &mut Self {
+    pub fn count_limit<L: Into<Option<u32>>>(mut self, count_limit: L) -> Self {
         self.count_limit = count_limit.into();
         self
     }
@@ -134,7 +134,7 @@ impl<'m, R: 'm> SaveBuilder<&'m mut Multipart<R>> where R: Read {
     ///
     /// ### Note: Temporary
     /// See `SaveDir` for more info (the type of `Entries::save_dir`).
-    pub fn temp(&mut self) -> EntriesSaveResult<R> {
+    pub fn temp(self) -> EntriesSaveResult<M> {
         self.temp_with_prefix("multipart-rs")
     }
 
@@ -145,7 +145,7 @@ impl<'m, R: 'm> SaveBuilder<&'m mut Multipart<R>> where R: Read {
     ///
     /// ### Note: Temporary
     /// See `SaveDir` for more info (the type of `Entries::save_dir`).
-    pub fn temp_with_prefix(&mut self, prefix: &str) -> EntriesSaveResult<R> {
+    pub fn temp_with_prefix(self, prefix: &str) -> EntriesSaveResult<M> {
         match TempDir::new(prefix) {
             Ok(tempdir) => self.with_temp_dir(tempdir),
             Err(e) => SaveResult::Error(e),
@@ -155,14 +155,14 @@ impl<'m, R: 'm> SaveBuilder<&'m mut Multipart<R>> where R: Read {
     /// Save the file fields to the given `TempDir`.
     ///
     /// The `TempDir` is returned in the result under `Entries::save_dir`.
-    pub fn with_temp_dir(&mut self, tempdir: TempDir) -> EntriesSaveResult<R> {
+    pub fn with_temp_dir(self, tempdir: TempDir) -> EntriesSaveResult<M> {
         self.with_entries(Entries::new(SaveDir::Temp(tempdir)))
     }
 
     /// Save the file fields in the request to a new permanent directory with the given path.
     ///
     /// Any nonexistent parent directories will be created.
-    pub fn with_dir<P: Into<PathBuf>>(&mut self, dir: P) -> EntriesSaveResult<R> {
+    pub fn with_dir<P: Into<PathBuf>>(self, dir: P) -> EntriesSaveResult<M> {
         let dir = dir.into();
 
         try_start!(create_dir_all(&dir));
@@ -170,7 +170,7 @@ impl<'m, R: 'm> SaveBuilder<&'m mut Multipart<R>> where R: Read {
         self.with_entries(Entries::new(SaveDir::Perm(dir.into())))
     }
 
-    pub fn with_entries(&mut self, mut entries: Entries) -> EntriesSaveResult<R> {
+    pub fn with_entries(mut self, mut entries: Entries) -> EntriesSaveResult<M> {
         let mut count = 0;
 
         loop {
@@ -205,8 +205,11 @@ impl<'m, R: 'm> SaveBuilder<&'m mut Multipart<R>> where R: Read {
 
                     count += 1;
 
-                    match file.save().limit(self.limit).with_dir(&entries.save_dir) {
-                        Full(saved_file) => entries.mut_files_for(field.name).push(saved_file),
+                    match file.save().size_limit(self.size_limit).with_dir(&entries.save_dir) {
+                        Full(saved_file) => {
+                            self.savable = file.take_inner();
+                            entries.mut_files_for(field.name).push(saved_file);
+                        },
                         Partial(partial, reason) => return Partial(
                             PartialEntries {
                                 entries: entries,
@@ -231,7 +234,8 @@ impl<'m, R: 'm> SaveBuilder<&'m mut Multipart<R>> where R: Read {
                         ),
                     }
                 },
-                MultipartData::Text(text) => {
+                MultipartData::Text(mut text) => {
+                    self.savable = text.take_inner();
                     entries.fields.insert(field.name, text.text);
                 },
             }
@@ -310,7 +314,7 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: Bu
             size: 0,
         };
 
-        let file = match create_dir_all(&path).and_then(|_| self.open_opts.open(&path)) {
+        let file = match create_dir_all(&saved.path).and_then(|_| self.open_opts.open(&saved.path)) {
             Ok(file) => file,
             Err(e) => return Partial(saved, e.into())
         };
@@ -326,7 +330,7 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: Bu
     ///
     /// Retries on interrupts.
     pub fn write_to<W: Write>(&mut self, mut dest: W) -> SaveResult<u64, u64> {
-        if let Some(limit) = self.limit {
+        if let Some(limit) = self.size_limit {
             let copied = match try_copy_buf(self.savable.take(limit), &mut dest) {
                 Full(copied) => copied,
                 other => return other,
@@ -519,20 +523,36 @@ impl From<io::Error> for PartialReason {
     }
 }
 
-pub struct PartialFileField<'m, R: 'm> {
+pub struct PartialFileField<M> {
     /// The field name for the errored file.
     pub field_name: String,
-    pub source: MultipartFile<&'m mut Multipart<R>>,
+    pub source: MultipartFile<M>,
     pub dest: Option<SavedFile>,
 }
 
-pub struct PartialEntries<'m, R: 'm> {
+pub struct PartialEntries<M> {
     pub entries: Entries,
-    pub partial_file: Option<PartialFileField<'m, R>>,
+    pub partial_file: Option<PartialFileField<M>>,
 }
 
-impl<'m, R: 'm> Into<Entries> for PartialEntries<'m, R> {
+impl<M> Into<Entries> for PartialEntries<M> {
     fn into(self) -> Entries {
+        self.entries
+    }
+}
+
+impl<M> PartialEntries<M> {
+    /// If `partial_file` is present and contains a `SavedFile` then just
+    /// add it to the `Entries` instance and return it.
+    ///
+    /// Otherwise, returns `self.entries`
+    pub fn keep_partial(mut self) -> Entries {
+        if let Some(partial_file) = self.partial_file {
+            if let Some(saved_file) = partial_file.dest {
+                self.entries.mut_files_for(partial_file.field_name).push(saved_file);
+            }
+        }
+
         self.entries
     }
 }
@@ -551,7 +571,7 @@ pub enum SaveResult<Success, Partial> {
 }
 
 /// Shorthand result for methods that return `Entries`
-pub type EntriesSaveResult<'m, R> = SaveResult<Entries, PartialEntries<'m, R>>;
+pub type EntriesSaveResult<M> = SaveResult<Entries, PartialEntries<M>>;
 
 /// Shorthand result for methods that return `SavedFile`s.
 ///
@@ -560,7 +580,7 @@ pub type EntriesSaveResult<'m, R> = SaveResult<Entries, PartialEntries<'m, R>>;
 /// saves some headache with the borrow-checker.
 pub type FileSaveResult = SaveResult<SavedFile, SavedFile>;
 
-impl<'m, R> EntriesSaveResult<'m, R> {
+impl<M> EntriesSaveResult<M> {
     /// Take the `Entries` from `self`, if applicable, and discarding
     /// the error, if any.
     pub fn into_entries(self) -> Option<Entries> {
@@ -634,7 +654,7 @@ fn create_dir_all(path: &Path) -> io::Result<()> {
     }
 }
 
-fn try_copy_buf<R: BufRead, W: Write>(mut src: R, dest: W) -> SaveResult<u64, u64> {
+fn try_copy_buf<R: BufRead, W: Write>(mut src: R, mut dest: W) -> SaveResult<u64, u64> {
     let mut total_copied = 0u64;
 
     macro_rules! try_here (
@@ -649,20 +669,49 @@ fn try_copy_buf<R: BufRead, W: Write>(mut src: R, dest: W) -> SaveResult<u64, u6
     );
 
     loop {
-        let mut buf = try_here!(src.fill_buf());
+        let res = {
+            let mut buf = try_here!(src.fill_buf());
+            if buf.is_empty() { break; }
+            try_write_all(buf, &mut dest)
+        };
 
-        if buf.is_empty() { break; }
-
-        while !buf.is_empty() {
-            match try_here!(dest.write(buf)) {
-                0 => try_here!(Err(io::Error::new(io::ErrorKind::WriteZero,
-                                          "failed to write whole buffer"))),
-                copied => {
-                    buf = &mut buf[copied..];
-                    total_copied += copied as u64;
-                    src.consume(copied)
-                },
+        match res {
+            Full(copied) => { src.consume(copied); total_copied += copied as u64; }
+            Partial(copied, reason) => {
+                src.consume(copied); total_copied += copied as u64;
+                return Partial(total_copied, reason);
+            },
+            Error(err) => {
+                return Partial(total_copied, err.into());
             }
+        }
+    }
+
+    Full(total_copied)
+}
+
+fn try_write_all<W>(mut buf: &[u8], mut dest: W) -> SaveResult<usize, usize> where W: Write {
+    let mut total_copied = 0;
+
+    macro_rules! try_here (
+        ($try:expr) => (
+            match $try {
+                Ok(val) => val,
+                Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                Err(e) => return if total_copied == 0 { Error(e) }
+                                 else { Partial(total_copied, e.into()) },
+            }
+        )
+    );
+
+    while !buf.is_empty() {
+        match try_here!(dest.write(buf)) {
+            0 => try_here!(Err(io::Error::new(io::ErrorKind::WriteZero,
+                                          "failed to write whole buffer"))),
+            copied => {
+                buf = &buf[copied..];
+                total_copied += copied;
+            },
         }
     }
 

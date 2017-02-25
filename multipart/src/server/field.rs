@@ -305,8 +305,9 @@ impl<M> Into<String> for MultipartText<M> {
 }
 
 impl<M> MultipartText<M> {
-    fn take_inner(&mut self) -> M {
-        self.inner.take().expect("MultipartText::inner taken!")
+    #[doc(hidden)]
+    pub fn take_inner(&mut self) -> M {
+        self.inner.take().expect("MultipartText::inner already taken!")
     }
 
     fn into_inner(self) -> M {
@@ -400,8 +401,9 @@ impl<M> MultipartFile<M> {
         self.inner.as_mut().expect("MultipartFile::inner taken!")
     }
 
-    fn take_inner(&mut self) -> M {
-        self.inner.take().expect("MultipartFile::inner taken!")
+    #[doc(hidden)]
+    pub fn take_inner(&mut self) -> M {
+        self.inner.take().expect("MultipartFile::inner already taken!")
     }
 
     fn into_inner(self) -> M {
@@ -433,7 +435,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     #[deprecated = "use `.save().limit(limit).write_to(out)` instead"]
     pub fn save_to_limited<W: Write>(&mut self, out: W, limit: u64) -> io::Result<u64> {
-        self.save().limit(limit).write_to(out).into_result_strict()
+        self.save().size_limit(limit).write_to(out).into_result_strict()
     }
 
     /// Save this file to `path`.
@@ -468,7 +470,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     #[deprecated = "use `.save().limit(limit).with_path(path)` instead"]
     pub fn save_as_limited<P: Into<PathBuf>>(&mut self, path: P, limit: u64) -> io::Result<SavedFile> {
-        self.save().limit(limit).with_path(path).into_result_strict()
+        self.save().size_limit(limit).with_path(path).into_result_strict()
     }
 
     /// Save this file in the directory pointed at by `dir`,
@@ -483,7 +485,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     #[deprecated = "use `.save().limit(limit).with_dir(dir)` instead"]
     pub fn save_in_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> io::Result<SavedFile> {
-        self.save().limit(limit).with_dir(dir).into_result_strict()
+        self.save().size_limit(limit).with_dir(dir).into_result_strict()
     }
 }
 
