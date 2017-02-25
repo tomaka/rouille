@@ -10,7 +10,7 @@ use super::buf_redux::copy_buf;
 
 use mime::Mime;
 
-use super::field::{MultipartData, MultipartFile};
+use super::field::{MultipartData, MultipartFile, ReadEntry, ReadEntryResult};
 use super::Multipart;
 
 use self::SaveResult::*;
@@ -40,15 +40,6 @@ macro_rules! try_start (
         match $try {
             Ok(val) => val,
             Err(e) => return SaveResult::Error(e),
-        }
-    )
-);
-
-macro_rules! try_partial (
-    ($try:expr; $partial:expr) => (
-        match $try {
-            Ok(val) => val,
-            Err(e) => Partial($partial, e.into()),
         }
     )
 );
@@ -86,17 +77,17 @@ macro_rules! try_partial (
 /// If it is truly necessary, you should sanitize user input such that it cannot cause a path to be
 /// misinterpreted by the OS. Such functionality is outside the scope of this crate.
 #[must_use = "nothing saved to the filesystem yet"]
-pub struct SaveBuilder<'s, S: 's> {
-    savable: &'s mut S,
+pub struct SaveBuilder<S> {
+    savable: S,
     open_opts: OpenOptions,
     limit: Option<u64>,
     count_limit: Option<u32>,
 }
 
-impl<'s, S: 's> SaveBuilder<'s, S> {
+impl<S> SaveBuilder<S> {
     /// Implementation detail but not problematic to have accessible.
     #[doc(hidden)]
-    pub fn new(savable: &'s mut S) -> SaveBuilder<'s, S> {
+    pub fn new(savable: S) -> SaveBuilder<S> {
         let mut open_opts = OpenOptions::new();
         open_opts.write(true).create_new(true);
 
@@ -127,7 +118,7 @@ impl<'s, S: 's> SaveBuilder<'s, S> {
     }
 }
 
-impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
+impl<'m, R: 'm> SaveBuilder<&'m mut Multipart<R>> where R: Read {
     /// Set the maximum number of files to write out.
     ///
     /// Can be `u32` or `Option<u32>`. If `None`, clears the limit.
@@ -143,7 +134,7 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
     ///
     /// ### Note: Temporary
     /// See `SaveDir` for more info (the type of `Entries::save_dir`).
-    pub fn temp(&mut self) -> EntriesSaveResult<'s, R> {
+    pub fn temp(&mut self) -> EntriesSaveResult<R> {
         self.temp_with_prefix("multipart-rs")
     }
 
@@ -154,7 +145,7 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
     ///
     /// ### Note: Temporary
     /// See `SaveDir` for more info (the type of `Entries::save_dir`).
-    pub fn temp_with_prefix(&mut self, prefix: &str) -> EntriesSaveResult<'s, R> {
+    pub fn temp_with_prefix(&mut self, prefix: &str) -> EntriesSaveResult<R> {
         match TempDir::new(prefix) {
             Ok(tempdir) => self.with_temp_dir(tempdir),
             Err(e) => SaveResult::Error(e),
@@ -164,14 +155,14 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
     /// Save the file fields to the given `TempDir`.
     ///
     /// The `TempDir` is returned in the result under `Entries::save_dir`.
-    pub fn with_temp_dir(&mut self, tempdir: TempDir) -> EntriesSaveResult<'s, R> {
+    pub fn with_temp_dir(&mut self, tempdir: TempDir) -> EntriesSaveResult<R> {
         self.with_entries(Entries::new(SaveDir::Temp(tempdir)))
     }
 
     /// Save the file fields in the request to a new permanent directory with the given path.
     ///
     /// Any nonexistent parent directories will be created.
-    pub fn with_dir<P: Into<PathBuf>>(&mut self, dir: P) -> EntriesSaveResult<'s, R> {
+    pub fn with_dir<P: Into<PathBuf>>(&mut self, dir: P) -> EntriesSaveResult<R> {
         let dir = dir.into();
 
         try_start!(create_dir_all(&dir));
@@ -179,27 +170,32 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
         self.with_entries(Entries::new(SaveDir::Perm(dir.into())))
     }
 
-    pub fn with_entries(&mut self, mut entries: Entries) -> EntriesSaveResult<'s, R> {
+    pub fn with_entries(&mut self, mut entries: Entries) -> EntriesSaveResult<R> {
         let mut count = 0;
 
         loop {
-            let field = match try_partial!(self.savable.read_entry(); PartialEntries {
-                entries: entries,
-                partial_field: None,
-            }) {
-                Some(field) => field,
-                None => break,
+            let field = match ReadEntry::read_entry(self.savable) {
+                ReadEntryResult::Entry(field) => field,
+                ReadEntryResult::End(_) => break,
+                ReadEntryResult::Error(_, e) => return Partial (
+                    PartialEntries {
+                        entries: entries,
+                        partial_file: None,
+                    },
+                    e.into(),
+                )
             };
 
             match field.data {
                 MultipartData::File(mut file) => {
                     match self.count_limit {
-                        Some(limit) if count >= limit => return SaveResult::Partial (
+                        Some(limit) if count >= limit => return Partial (
                             PartialEntries {
                                 entries: entries,
-                                partial_field: Some(PartialFileField {
+                                partial_file: Some(PartialFileField {
                                     field_name: field.name,
-                                    file: PartialFile::just_file(file)
+                                    source: file,
+                                    dest: None,
                                 })
                             },
                             PartialReason::CountLimit,
@@ -210,22 +206,25 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
                     count += 1;
 
                     match file.save().limit(self.limit).with_dir(&entries.save_dir) {
-                        Full(saved_file) => entries.mut_files_for(&field.name).push(saved_file),
+                        Full(saved_file) => entries.mut_files_for(field.name).push(saved_file),
                         Partial(partial, reason) => return Partial(
                             PartialEntries {
                                 entries: entries,
-                                partial_field: Some(PartialFileField {
+                                partial_file: Some(PartialFileField {
                                     field_name: field.name,
-                                    file: partial.with_file(file),
+                                    source: file,
+                                    dest: Some(partial)
                                 })
-                            }
+                            },
+                            reason
                         ),
-                        Err(e) => return Partial(
+                        Error(e) => return Partial(
                             PartialEntries {
                                 entries: entries,
-                                partial_field: Some(PartialFileField {
+                                partial_file: Some(PartialFileField {
                                     field_name: field.name,
-                                    file: PartialFile::just_file(file)
+                                    source: file,
+                                    dest: None,
                                 }),
                             },
                             e.into(),
@@ -242,7 +241,7 @@ impl<'s, R: 's> SaveBuilder<'s, Multipart<R>> where R: Read {
     }
 }
 
-impl<'s, M: 's> SaveBuilder<'s, MultipartFile<M>> where MultipartFile<M>: BufRead {
+impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: BufRead {
 
     /// Save to a file with a random alphanumeric name in the OS temporary directory.
     ///
@@ -304,20 +303,19 @@ impl<'s, M: 's> SaveBuilder<'s, MultipartFile<M>> where MultipartFile<M>: BufRea
     pub fn with_path<P: Into<PathBuf>>(&mut self, path: P) -> FileSaveResult {
         let path = path.into();
 
-        let file = match create_dir_all(&path).and_then(|_| self.open_opts.open(&path)) {
-            Ok(file) => file,
-            Err(e) => return Partial(
-                PartialFile {
-                    file_path: Some(path),
-                    file: (),
-                    written: 0,
-                    __priv: (),
-                },
-                e.into(),
-            )
+        let mut saved = SavedFile {
+            content_type: self.savable.content_type.clone(),
+            filename: self.savable.filename.clone(),
+            path: path,
+            size: 0,
         };
 
-        self.write_to(file)
+        let file = match create_dir_all(&path).and_then(|_| self.open_opts.open(&path)) {
+            Ok(file) => file,
+            Err(e) => return Partial(saved, e.into())
+        };
+
+        self.write_to(file).map(move |written| saved.with_size(written))
     }
 
 
@@ -384,6 +382,12 @@ pub struct SavedFile {
     pub size: u64,
 }
 
+impl SavedFile {
+    fn with_size(self, size: u64) -> Self {
+        SavedFile { size: size, .. self }
+    }
+}
+
 /// A result of `Multipart::save_all()`.
 #[derive(Debug)]
 pub struct Entries {
@@ -404,7 +408,11 @@ impl Entries {
         }
     }
 
-    pub fn mut_files_for(&mut self, field: &str) -> &mut Vec<SavedFile> {
+    pub fn is_empty(&self) -> bool {
+        self.fields.is_empty() && self.files.is_empty()
+    }
+
+    pub fn mut_files_for(&mut self, field: String) -> &mut Vec<SavedFile> {
         self.files.entry(field).or_insert_with(Vec::new)
     }
 }
@@ -490,45 +498,8 @@ impl AsRef<Path> for SaveDir {
     }
 }
 
-/// The file that was to be read next when the limit was hit.
-#[derive(Clone, Debug)]
-pub struct PartialFile<F> {
-    /// The path of the file on the filesystem.
-    ///
-    /// If an error occurred while creating the file, this will not exist.
-    pub file_path: Option<PathBuf>,
-
-    /// The file in the multipart stream.
-    pub file: F,
-
-    /// The number of bytes written to the filesystem.
-    pub written: u64,
-
-    __priv: (),
-}
-
-impl<F> PartialFile<F> {
-    fn with_file<F_>(self, file: F_) -> PartialFile<F_> {
-        PartialFile {
-            file_path: self.file_path,
-            file: file,
-            written: self.written,
-            __priv: ()
-        }
-    }
-
-    fn just_file(file: F) -> Self {
-        PartialFile {
-            file_path: None,
-            file: file,
-            written: 0,
-            __priv: ()
-        }
-    }
-}
-
 /// The reason the save operation quit partway through.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum PartialReason {
     /// The count limit for files in the request was hit.
     ///
@@ -551,13 +522,19 @@ impl From<io::Error> for PartialReason {
 pub struct PartialFileField<'m, R: 'm> {
     /// The field name for the errored file.
     pub field_name: String,
-    pub file: PartialFile<MultipartFile<&'m mut Multipart<R>>>,
-
+    pub source: MultipartFile<&'m mut Multipart<R>>,
+    pub dest: Option<SavedFile>,
 }
 
 pub struct PartialEntries<'m, R: 'm> {
     pub entries: Entries,
-    pub partial_field: Option<PartialFileField<'m, R>>,
+    pub partial_file: Option<PartialFileField<'m, R>>,
+}
+
+impl<'m, R: 'm> Into<Entries> for PartialEntries<'m, R> {
+    fn into(self) -> Entries {
+        self.entries
+    }
 }
 
 /// The result of [`Multipart::save_all()`](struct.multipart.html#method.save_all)
@@ -578,34 +555,71 @@ pub type EntriesSaveResult<'m, R> = SaveResult<Entries, PartialEntries<'m, R>>;
 
 /// Shorthand result for methods that return `SavedFile`s.
 ///
-/// The `MultipartFile` is not available here because it is not necessary to return
-/// a borrow when the owned version is probably in the same scope.
-pub type FileSaveResult = SaveResult<SavedFile, PartialFile<()>>;
+/// The `MultipartFile` is not provided here because it is not necessary to return
+/// a borrow when the owned version is probably in the same scope. This hopefully
+/// saves some headache with the borrow-checker.
+pub type FileSaveResult = SaveResult<SavedFile, SavedFile>;
 
 impl<'m, R> EntriesSaveResult<'m, R> {
     /// Take the `Entries` from `self`, if applicable, and discarding
     /// the error, if any.
-    pub fn to_entries(self) -> Option<Entries> {
+    pub fn into_entries(self) -> Option<Entries> {
         match self {
             Full(entries) | Partial(PartialEntries { entries, .. }, _) => Some(entries),
             Error(_) => None,
         }
     }
+}
 
-    /// Decompose `self` to `(Option<Entries>, Option<io::Error>)`
-    pub fn to_opt(self) -> (Option<Entries>, Option<io::Error>) {
+impl<S, P> SaveResult<S, P> where P: Into<S> {
+    /// Convert `self` to `Option<S>`; there may still have been an error.
+    pub fn okish(self) -> Option<S> {
+        self.into_opt_both().0
+    }
+
+    /// Map the `Full` or `Partial` values to a new type, retaining the reason
+    /// in the `Partial` case.
+    pub fn map<T, Map>(self, map: Map) -> SaveResult<T, T> where Map: FnOnce(S) -> T {
         match self {
-            Partial(PartialEntries { entries, .. }, PartialReason::IoError(e)) => (Some(entries), Some(e)),
-            Full(entries) | Partial(entries, _) => (Some(entries), None),
+            Full(full) => Full(map(full)),
+            Partial(partial, reason) => Partial(map(partial.into()), reason),
+            Error(e) => Error(e),
+        }
+    }
+
+    /// Decompose `self` to `(Option<S>, Option<io::Error>)`
+    pub fn into_opt_both(self) -> (Option<S>, Option<io::Error>) {
+        match self {
+            Full(full)  => (Some(full), None),
+            Partial(partial, _) => (Some(partial.into()), None),
+            Partial(partial, PartialReason::IoError(e)) => (Some(partial.into()), Some(e)),
             Error(error) => (None, Some(error)),
         }
     }
 
     /// Map `self` to an `io::Result`, discarding the error in the `Partial` case.
-    pub fn to_result(self) -> io::Result<Entries> {
+    pub fn into_result(self) -> io::Result<S> {
         match self {
-            Full(entries) | Partial(PartialEntries { entries, .. }, _) => Ok(entries),
+            Full(entries) => Ok(entries),
+            Partial(partial, _) => Ok(partial.into()),
             Error(error) => Err(error),
+        }
+    }
+
+    /// Pessimistic version of `into_result()` which will return an error even
+    /// for the `Partial` case.
+    ///
+    /// ### Note: Possible Storage Leak
+    /// It's generally not a good idea to ignore the `Partial` case, as there may still be a
+    /// partially written file on-disk. If you're not using a temporary directory
+    /// (OS-managed or via `TempDir`) then partially written files will remain on-disk until
+    /// explicitly removed which could result in excessive disk usage if not monitored closely.
+    pub fn into_result_strict(self) -> io::Result<S> {
+        match self {
+            Full(entries) => Ok(entries),
+            Partial(_, PartialReason::IoError(e)) => Err(e),
+            Partial(partial, _) => Ok(partial.into()),
+            Error(e) => Err(e),
         }
     }
 }
@@ -621,7 +635,7 @@ fn create_dir_all(path: &Path) -> io::Result<()> {
 }
 
 fn try_copy_buf<R: BufRead, W: Write>(mut src: R, dest: W) -> SaveResult<u64, u64> {
-    let mut total_copied = 0;
+    let mut total_copied = 0u64;
 
     macro_rules! try_here (
         ($try:expr) => (
@@ -636,6 +650,8 @@ fn try_copy_buf<R: BufRead, W: Write>(mut src: R, dest: W) -> SaveResult<u64, u6
 
     loop {
         let mut buf = try_here!(src.fill_buf());
+
+        if buf.is_empty() { break; }
 
         while !buf.is_empty() {
             match try_here!(dest.write(buf)) {

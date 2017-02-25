@@ -12,7 +12,6 @@ use super::httparse::{self, EMPTY_HEADER, Status};
 use self::ReadEntryResult::*;
 
 use super::save::{PartialReason, SaveBuilder, SavedFile};
-use super::save::SaveResult::*;
 
 use mime::{TopLevel, Mime};
 
@@ -412,7 +411,7 @@ impl<M> MultipartFile<M> {
 
 impl<M> MultipartFile<M> where M: ReadEntry {
     /// Get a builder type which can save the file with or without a size limit.
-    pub fn save(&mut self) -> SaveBuilder<Self> {
+    pub fn save(&mut self) -> SaveBuilder<&mut Self> {
         SaveBuilder::new(self)
     }
 
@@ -423,12 +422,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     #[deprecated = "use `.save().write_to()` instead"]
     pub fn save_to<W: Write>(&mut self, out: W) -> io::Result<u64> {
-        match self.save().write_to(out) {
-            Full(copied) => Ok(copied),
-            Partial(copied, PartialReason::IoError(e)) => Err(e),
-            Partial(_, _) => unreachable!(),
-            Error(e) => Err(e),
-        }
+        self.save().write_to(out).into_result_strict()
     }
 
     /// Save this file to the given output stream, **truncated** to `limit`
@@ -439,12 +433,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     #[deprecated = "use `.save().limit(limit).write_to(out)` instead"]
     pub fn save_to_limited<W: Write>(&mut self, out: W, limit: u64) -> io::Result<u64> {
-        match self.save().limit(limit).write_to(out) {
-            Full(copied) => Ok(copied),
-            Partial(copied, PartialReason::IoError(e)) => Err(e),
-            Partial(copied, _) => Ok(copied),
-            Error(e) => Err(e),
-        }
+        self.save().limit(limit).write_to(out).into_result_strict()
     }
 
     /// Save this file to `path`.
@@ -454,7 +443,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     #[deprecated = "use `.save().with_path(path)` instead"]
     pub fn save_as<P: Into<PathBuf>>(&mut self, path: P) -> io::Result<SavedFile> {
-        self.save().with_path(path)
+        self.save().with_path(path).into_result_strict()
     }
 
     /// Save this file in the directory pointed at by `dir`,
@@ -467,7 +456,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     #[deprecated = "use `.save().with_dir(dir)` instead"]
     pub fn save_in<P: AsRef<Path>>(&mut self, dir: P) -> io::Result<SavedFile> {
-        self.save().with_dir(dir.as_ref())
+        self.save().with_dir(dir.as_ref()).into_result_strict()
     }
 
     /// Save this file to `path`, **truncated** to `limit` (no more than `limit` bytes will be written out).
@@ -479,7 +468,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     #[deprecated = "use `.save().limit(limit).with_path(path)` instead"]
     pub fn save_as_limited<P: Into<PathBuf>>(&mut self, path: P, limit: u64) -> io::Result<SavedFile> {
-        self.save().limit(limit).with_path(path)
+        self.save().limit(limit).with_path(path).into_result_strict()
     }
 
     /// Save this file in the directory pointed at by `dir`,
@@ -494,7 +483,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
     #[deprecated = "use `.save().limit(limit).with_dir(dir)` instead"]
     pub fn save_in_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> io::Result<SavedFile> {
-        self.save().limit(limit).with_dir(dir)
+        self.save().limit(limit).with_dir(dir).into_result_strict()
     }
 }
 
@@ -543,33 +532,7 @@ fn find_header<'a, 'b>(headers: &'a [StrHeader<'b>], name: &str) -> Option<&'a S
 }
 
 /// Common trait for `Multipart` and `&mut Multipart`
-pub trait ReadEntry: PrivReadEntry {}
-
-impl<T> ReadEntry for T where T: PrivReadEntry {}
-
-/// Public trait but not re-exported.
-pub trait PrivReadEntry: Sized {
-    type Source: BufRead;
-
-    fn source(&mut self) -> &mut Self::Source;
-
-    /// Consume the next boundary.
-    /// Returns `true` if the last boundary was read, `false` otherwise.
-    fn consume_boundary(&mut self) -> io::Result<bool>;
-
-    fn read_headers(&mut self) -> io::Result<Option<FieldHeaders>> {
-        FieldHeaders::read_from(&mut self.source())
-    }
-
-    fn read_to_string(&mut self) -> io::Result<String> {
-        let mut buf = String::new();
-
-        match self.source().read_to_string(&mut buf) {
-            Ok(_) => Ok(buf),
-            Err(err) => Err(err),
-        }
-    }
-
+pub trait ReadEntry: PrivReadEntry + Sized {
     fn read_entry(mut self) -> ReadEntryResult<Self> {
         if try_read_entry!(self; self.consume_boundary()) {
             return End(self);
@@ -618,6 +581,32 @@ pub trait PrivReadEntry: Sized {
                 data: data,
             }
         )
+    }
+}
+
+impl<T> ReadEntry for T where T: PrivReadEntry {}
+
+/// Public trait but not re-exported.
+pub trait PrivReadEntry {
+    type Source: BufRead;
+
+    fn source(&mut self) -> &mut Self::Source;
+
+    /// Consume the next boundary.
+    /// Returns `true` if the last boundary was read, `false` otherwise.
+    fn consume_boundary(&mut self) -> io::Result<bool>;
+
+    fn read_headers(&mut self) -> io::Result<Option<FieldHeaders>> {
+        FieldHeaders::read_from(&mut self.source())
+    }
+
+    fn read_to_string(&mut self) -> io::Result<String> {
+        let mut buf = String::new();
+
+        match self.source().read_to_string(&mut buf) {
+            Ok(_) => Ok(buf),
+            Err(err) => Err(err),
+        }
     }
 }
 

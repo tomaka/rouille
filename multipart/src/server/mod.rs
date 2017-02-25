@@ -118,7 +118,7 @@ impl<R: Read> Multipart<R> {
     /// If the previously returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry.
     pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<&mut Self>>> {
-        PrivReadEntry::read_entry(self).into_result()
+        ReadEntry::read_entry(self).into_result()
     }
 
     /// Read the next entry from this multipart request, returning a struct with the field's name and
@@ -143,7 +143,7 @@ impl<R: Read> Multipart<R> {
         }
     }
 
-    pub fn save(&mut self) -> SaveBuilder<Self> {
+    pub fn save(&mut self) -> SaveBuilder<&mut Self> {
         SaveBuilder::new(self)
     }
 
