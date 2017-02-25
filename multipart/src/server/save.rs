@@ -6,12 +6,9 @@
 // copied, modified, or distributed except according to those terms.
 //! Utilities for saving request entries to the filesystem.
 
-use super::buf_redux::copy_buf;
-
 use mime::Mime;
 
 use super::field::{MultipartData, MultipartFile, ReadEntry, ReadEntryResult};
-use super::Multipart;
 
 use self::SaveResult::*;
 
@@ -24,12 +21,6 @@ use std::path::{Path, PathBuf};
 use std::{env, fs, io, mem};
 
 const RANDOM_FILENAME_LEN: usize = 12;
-
-// Because this isn't exposed as a str in the stdlib
-#[cfg(not(windows))]
-const PATH_SEP: &'static str = "/";
-#[cfg(windows)]
-const PATH_SEP: &'static str = "\\";
 
 fn rand_filename() -> String {
     ::random_alphanumeric(RANDOM_FILENAME_LEN)
@@ -307,7 +298,7 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: Bu
     pub fn with_path<P: Into<PathBuf>>(&mut self, path: P) -> FileSaveResult {
         let path = path.into();
 
-        let mut saved = SavedFile {
+        let saved = SavedFile {
             content_type: self.savable.content_type.clone(),
             filename: self.savable.filename.clone(),
             path: path,
@@ -611,8 +602,8 @@ impl<S, P> SaveResult<S, P> where P: Into<S> {
     pub fn into_opt_both(self) -> (Option<S>, Option<io::Error>) {
         match self {
             Full(full)  => (Some(full), None),
-            Partial(partial, _) => (Some(partial.into()), None),
             Partial(partial, PartialReason::IoError(e)) => (Some(partial.into()), Some(e)),
+            Partial(partial, _) => (Some(partial.into()), None),
             Error(error) => (None, Some(error)),
         }
     }
@@ -670,7 +661,7 @@ fn try_copy_buf<R: BufRead, W: Write>(mut src: R, mut dest: W) -> SaveResult<u64
 
     loop {
         let res = {
-            let mut buf = try_here!(src.fill_buf());
+            let buf = try_here!(src.fill_buf());
             if buf.is_empty() { break; }
             try_write_all(buf, &mut dest)
         };

@@ -11,15 +11,14 @@ use super::httparse::{self, EMPTY_HEADER, Status};
 
 use self::ReadEntryResult::*;
 
-use super::save::{PartialReason, SaveBuilder, SavedFile};
+use super::save::{SaveBuilder, SavedFile};
 
 use mime::{TopLevel, Mime};
 
-use std::fs::{self, OpenOptions};
 use std::io::{self, Read, BufRead, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::{env, str};
+use std::str;
 
 macro_rules! try_io(
     ($try:expr) => (

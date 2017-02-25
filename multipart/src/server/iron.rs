@@ -12,8 +12,8 @@ use iron::{BeforeMiddleware, IronError, IronResult};
 use std::path::PathBuf;
 use std::{error, fmt, io};
 
-use super::{HttpRequest, Multipart, MultipartData};
-use super::save::{Entries, PartialReason, SaveBuilder, TempDir};
+use super::{HttpRequest, Multipart};
+use super::save::{Entries, PartialReason, TempDir};
 use super::save::SaveResult::*;
 
 impl<'r, 'a, 'b> HttpRequest for &'r mut IronRequest<'a, 'b> {
@@ -119,7 +119,7 @@ impl Intercept {
     }
 
     fn read_request(&self, req: &mut IronRequest) -> IronResult<Option<Entries>> {
-        let mut multipart = match Multipart::from_request(req) {
+        let multipart = match Multipart::from_request(req) {
             Ok(multipart) => multipart,
             Err(_) => return Ok(None),
         };
@@ -226,17 +226,6 @@ pub enum LimitBehavior {
     Continue,
 }
 
-impl LimitBehavior {
-    fn throw_error(self) -> bool {
-        use self::LimitBehavior::*;
-
-        match self {
-            ThrowError => true,
-            Continue => false,
-        }
-    }
-}
-
 /// An error returned from `Intercept` when the size limit
 /// for an individual file is exceeded.
 #[derive(Debug)]
@@ -245,15 +234,6 @@ pub struct FileSizeLimitError {
     pub field: String,
     /// The filename of the oversize file, if it was provided.
     pub filename: Option<String>,
-}
-
-impl FileSizeLimitError {
-    fn new(field: String, filename: Option<String>) -> Self {
-        FileSizeLimitError {
-            field: field,
-            filename: filename
-        }
-    }
 }
 
 impl error::Error for FileSizeLimitError {
