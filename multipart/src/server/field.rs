@@ -584,6 +584,11 @@ pub trait ReadEntry: PrivReadEntry + Sized {
             }
         )
     }
+
+    /// Equivalent to `read_entry()` but takes `&mut self`
+    fn read_entry_mut(&mut self) -> ReadEntryResult<&mut Self> {
+        ReadEntry::read_entry(self)
+    }
 }
 
 impl<T> ReadEntry for T where T: PrivReadEntry {}

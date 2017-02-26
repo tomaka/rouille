@@ -301,7 +301,7 @@ fn test_server(buf: HttpBuffer, fields: &mut TestFields) {
     let mut multipart = Multipart::from_request(server_buf)
         .unwrap_or_else(|_| panic!("Buffer should be multipart!"));
 
-    while let Some(mut field) = multipart.read_entry().unwrap() {
+    while let Some(mut field) = multipart.read_entry_mut().unwrap_opt() {
         fields.check_field(&mut field);
     }
 }

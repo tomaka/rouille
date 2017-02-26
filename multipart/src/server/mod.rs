@@ -31,7 +31,7 @@ pub use self::field::{MultipartField, MultipartFile, MultipartData, ReadEntry, R
 
 use self::save::SaveBuilder;
 
-pub use self::save::{Entries, SaveResult};
+pub use self::save::{Entries, SaveResult, SavedFile};
 
 use self::save::EntriesSaveResult;
 
@@ -116,7 +116,7 @@ impl<R: Read> Multipart<R> {
     /// If the previously returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry.
     pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<&mut Self>>> {
-        ReadEntry::read_entry(self).into_result()
+        self.read_entry_mut().into_result()
     }
 
     /// Read the next entry from this multipart request, returning a struct with the field's name and

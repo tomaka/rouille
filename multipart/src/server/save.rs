@@ -521,6 +521,22 @@ impl From<io::Error> for PartialReason {
     }
 }
 
+impl PartialReason {
+    /// Return `io::Error` in the `IoError` case or panic otherwise.
+    pub fn unwrap_err(self) -> io::Error {
+        self.expect_err("`PartialReason` was not `IoError`")
+    }
+
+    /// Return `io::Error` in the `IoError` case or panic with the given
+    /// message otherwise.
+    pub fn expect_err(self, msg: &str) -> io::Error {
+        match self {
+            PartialReason::IoError(e) => e,
+            _ => panic!("{}: {:?}", msg, self),
+        }
+    }
+}
+
 /// The file field that was being read when the save operation quit.
 ///
 /// May be partially saved to the filesystem if `dest` is `Some`.

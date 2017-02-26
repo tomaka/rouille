@@ -2,8 +2,8 @@ extern crate tiny_http;
 extern crate multipart;
 
 use std::fs::File;
-use std::io::{Error, Read};
-use multipart::server::{Multipart, Entries, SaveResult};
+use std::io::{self, Read};
+use multipart::server::{Multipart, Entries, SaveResult, SavedFile};
 use tiny_http::{Response, StatusCode, Request};
 fn main() {
     // Starting a server on `localhost:80`
@@ -28,18 +28,19 @@ fn main() {
 }
 
 /// Processes a request and returns response or an occured error.
-fn process_request<'a, 'b>(request: &'a mut Request) -> Result<Response<&'b [u8]>, Error> {
+fn process_request<'a, 'b>(request: &'a mut Request) -> io::Result<Response<&'b [u8]>> {
     // Getting a multipart reader wrapper
     match Multipart::from_request(request) {
         Ok(mut multipart) => {
             // Fetching all data and processing it.
-            // save_all() reads the request fully, parsing all fields and saving all files
+            // save().temp() reads the request fully, parsing all fields and saving all files
             // in a new temporary directory under the OS temporary directory.
-            match multipart.save_all() {
+            match multipart.save().temp() {
                 SaveResult::Full(entries) => process_entries(entries),
-                SaveResult::Partial(entries, error) => {
-                    try!(process_entries(entries));
-                    Err(error)
+                SaveResult::Partial(entries, reason) => {
+                    try!(process_entries(entries.keep_partial()));
+                    // We don't set limits
+                    Err(reason.unwrap_err())
                 }
                 SaveResult::Error(error) => Err(error),
             }
@@ -50,24 +51,32 @@ fn process_request<'a, 'b>(request: &'a mut Request) -> Result<Response<&'b [u8]
 
 /// Processes saved entries from multipart request.
 /// Returns an OK response or an error.
-fn process_entries<'a>(entries: Entries) -> Result<Response<&'a [u8]>, Error> {
+fn process_entries<'a>(entries: Entries) -> io::Result<Response<&'a [u8]>> {
     for (name, field) in entries.fields {
-        println!(r#"Field "{}": "{}""#, name, field);
+        println!("Field {:?}: {:?}", name, field);
     }
 
-    for (name, savedfile) in entries.files {
-        let filename = match savedfile.filename {
-            Some(s) => s,
-            None => "None".into(),
-        };
-        let mut file = try!(File::open(savedfile.path));
-        let mut contents = String::new();
-        try!(file.read_to_string(&mut contents));
+    for (name, files) in entries.files {
+        println!("Field {:?} has {} files:", name, files.len());
 
-        println!(r#"Field "{}" is file "{}":"#, name, filename);
-        println!("{}", contents);
+        for file in files {
+            try!(print_file(&file));
+        }
     }
-    Ok(build_response(200, "Multipart data is received!".into()))
+
+    Ok(build_response(200, "Multipart data is received!"))
+}
+
+fn print_file(saved_file: &SavedFile) -> io::Result<()> {
+    let mut file = try!(File::open(&saved_file.path));
+
+    let mut contents = String::new();
+    try!(file.read_to_string(&mut contents));
+
+    println!("File {:?} ({:?}):", saved_file.filename, saved_file.content_type);
+    println!("{}", contents);
+
+    Ok(())
 }
 
 /// A utility function to build responses using only two arguments
