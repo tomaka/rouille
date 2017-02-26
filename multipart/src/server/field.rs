@@ -534,6 +534,7 @@ fn find_header<'a, 'b>(headers: &'a [StrHeader<'b>], name: &str) -> Option<&'a S
 
 /// Common trait for `Multipart` and `&mut Multipart`
 pub trait ReadEntry: PrivReadEntry + Sized {
+    /// Attempt to read the next entry in the multipart stream.
     fn read_entry(mut self) -> ReadEntryResult<Self> {
         if try_read_entry!(self; self.consume_boundary()) {
             return End(self);
@@ -623,7 +624,8 @@ impl<'a, M: ReadEntry> PrivReadEntry for &'a mut M {
     }
 }
 
-/// Result type returned by `Multipart::into_entry()` and `MultipartField::next_entry()`.
+/// Ternary result type returned by `ReadEntry::next_entry()`,
+/// `Multipart::into_entry()` and `MultipartField::next_entry()`.
 pub enum ReadEntryResult<M: ReadEntry, Entry = MultipartField<M>> {
     /// The next entry was found.
     Entry(Entry),

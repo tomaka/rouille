@@ -161,6 +161,9 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
         self.with_entries(Entries::new(SaveDir::Perm(dir.into())))
     }
 
+    /// Commence the save operation using the existing `Entries` instance.
+    ///
+    /// May be used to resume a saving operation after handling an error.
     pub fn with_entries(mut self, mut entries: Entries) -> EntriesSaveResult<M> {
         let mut count = 0;
 
@@ -403,11 +406,12 @@ impl Entries {
         }
     }
 
+    /// Returns `true` if both `fields` and `files` are empty, `false` otherwise.
     pub fn is_empty(&self) -> bool {
         self.fields.is_empty() && self.files.is_empty()
     }
 
-    pub fn mut_files_for(&mut self, field: String) -> &mut Vec<SavedFile> {
+    fn mut_files_for(&mut self, field: String) -> &mut Vec<SavedFile> {
         self.files.entry(field).or_insert_with(Vec::new)
     }
 }
@@ -419,6 +423,9 @@ pub enum SaveDir {
     /// is dropped.
     Temp(TempDir),
     /// This directory is permanent and will be left on the filesystem when this wrapper is dropped.
+    ///
+    /// **N.B.** If this directory is in the OS temporary directory then it may still be
+    /// deleted at any time, usually on reboot or when free space is low.
     Perm(PathBuf),
 }
 
@@ -514,18 +521,35 @@ impl From<io::Error> for PartialReason {
     }
 }
 
+/// The file field that was being read when the save operation quit.
+///
+/// May be partially saved to the filesystem if `dest` is `Some`.
+#[derive(Debug)]
 pub struct PartialFileField<M> {
-    /// The field name for the errored file.
+    /// The field name for the partial file.
     pub field_name: String,
+    /// The partial file's source in the multipart stream (may be partially read if `dest`
+    /// is `Some`).
     pub source: MultipartFile<M>,
+    /// The partial file's entry on the filesystem, if the operation got that far.
     pub dest: Option<SavedFile>,
 }
 
+/// The partial result type for `Multipart::save*()`.
+///
+/// Contains the successfully saved entries as well as the partially
+/// saved file that was in the process of being read when the error occurred,
+/// if applicable.
+#[derive(Debug)]
 pub struct PartialEntries<M> {
+    /// The entries that were saved successfully.
     pub entries: Entries,
+    /// The file that was in the process of being read. `None` if the error
+    /// occurred between file entries.
     pub partial_file: Option<PartialFileField<M>>,
 }
 
+/// Discards `partial_file`
 impl<M> Into<Entries> for PartialEntries<M> {
     fn into(self) -> Entries {
         self.entries
@@ -548,8 +572,7 @@ impl<M> PartialEntries<M> {
     }
 }
 
-/// The result of [`Multipart::save_all()`](struct.multipart.html#method.save_all)
-/// and methods on `SaveBuilder<Multipart>`.
+/// The ternary result type used for the `SaveBuilder<_>` API.
 #[derive(Debug)]
 pub enum SaveResult<Success, Partial> {
     /// The operation was a total success. Contained is the complete result.

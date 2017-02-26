@@ -141,6 +141,7 @@ impl<R: Read> Multipart<R> {
         }
     }
 
+    /// Get a builder type for saving the files in this request to the filesystem.
     pub fn save(&mut self) -> SaveBuilder<&mut Self> {
         SaveBuilder::new(self)
     }
