@@ -375,7 +375,7 @@ impl<M> MultipartFile<M> {
     /// permissions, but you should still not use user input directly as filesystem paths.
     /// If it is truly necessary, you should sanitize filenames such that they cannot be
     /// misinterpreted by the OS. Such functionality is outside the scope of this crate.
-    #[deprecated = "`filename` field is now public"]
+    #[deprecated(since = "0.10.0", note = "`filename` field is now public")]
     pub fn filename(&self) -> Option<&str> {
         self.filename.as_ref().map(String::as_ref)
     }
@@ -390,7 +390,7 @@ impl<M> MultipartFile<M> {
     /// Some variants wrap arbitrary strings which could be abused by a malicious user if your
     /// application performs any non-idempotent operations based on their value, such as
     /// starting another program or querying/updating a database (web-search "SQL injection").
-    #[deprecated = "`content_type` field is now public"]
+    #[deprecated(since = "0.10.0", note = "`content_type` field is now public")]
     pub fn content_type(&self) -> &Mime {
         &self.content_type
     }
@@ -421,7 +421,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// If successful, returns the number of bytes written.
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated = "use `.save().write_to()` instead"]
+    #[deprecated(since = "0.10.0", note = "use `.save().write_to()` instead")]
     pub fn save_to<W: Write>(&mut self, out: W) -> io::Result<u64> {
         self.save().write_to(out).into_result_strict()
     }
@@ -432,7 +432,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// If successful, returns the number of bytes written.
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated = "use `.save().limit(limit).write_to(out)` instead"]
+    #[deprecated(since = "0.10.0", note = "use `.save().size_limit(limit).write_to(out)` instead")]
     pub fn save_to_limited<W: Write>(&mut self, out: W, limit: u64) -> io::Result<u64> {
         self.save().size_limit(limit).write_to(out).into_result_strict()
     }
@@ -442,7 +442,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Returns the saved file info on success, or any errors otherwise.
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated = "use `.save().with_path(path)` instead"]
+    #[deprecated(since = "0.10.0", note = "use `.save().with_path(path)` instead")]
     pub fn save_as<P: Into<PathBuf>>(&mut self, path: P) -> io::Result<SavedFile> {
         self.save().with_path(path).into_result_strict()
     }
@@ -455,7 +455,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Returns the saved file's info on success, or any errors otherwise.
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated = "use `.save().with_dir(dir)` instead"]
+    #[deprecated(since = "0.10.0", note = "use `.save().with_dir(dir)` instead")]
     pub fn save_in<P: AsRef<Path>>(&mut self, dir: P) -> io::Result<SavedFile> {
         self.save().with_dir(dir.as_ref()).into_result_strict()
     }
@@ -467,7 +467,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Returns the saved file's info on success, or any errors otherwise.
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated = "use `.save().limit(limit).with_path(path)` instead"]
+    #[deprecated(since = "0.10.0", note = "use `.save().size_limit(limit).with_path(path)` instead")]
     pub fn save_as_limited<P: Into<PathBuf>>(&mut self, path: P, limit: u64) -> io::Result<SavedFile> {
         self.save().size_limit(limit).with_path(path).into_result_strict()
     }
@@ -482,7 +482,7 @@ impl<M> MultipartFile<M> where M: ReadEntry {
     /// Returns the saved file's info on success, or any errors otherwise.
     ///
     /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated = "use `.save().limit(limit).with_dir(dir)` instead"]
+    #[deprecated(since = "0.10.0", note = "use `.save().size_limit(limit).with_dir(dir)` instead")]
     pub fn save_in_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> io::Result<SavedFile> {
         self.save().size_limit(limit).with_dir(dir).into_result_strict()
     }

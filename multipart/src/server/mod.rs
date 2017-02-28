@@ -142,6 +142,8 @@ impl<R: Read> Multipart<R> {
     }
 
     /// Get a builder type for saving the files in this request to the filesystem.
+    ///
+    /// See [`SaveBuilder`](save/struct.SaveBuilder.html) for more information.
     pub fn save(&mut self) -> SaveBuilder<&mut Self> {
         SaveBuilder::new(self)
     }
@@ -150,8 +152,8 @@ impl<R: Read> Multipart<R> {
     /// directory under the OS temporary directory. 
     ///
     /// If there is an error in reading the request, returns the partial result along with the
-    /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
-    #[deprecated = "use `.save().temp()` instead"]
+    /// error. See [`SaveResult`](save/enum.SaveResult.html) for more information.
+    #[deprecated(since = "0.10.0", note = "use `.save().temp()` instead")]
     pub fn save_all(&mut self) -> EntriesSaveResult<&mut Self> {
         self.save().temp()
     }
@@ -160,8 +162,8 @@ impl<R: Read> Multipart<R> {
     /// directory under `dir`. 
     ///
     /// If there is an error in reading the request, returns the partial result along with the
-    /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
-    #[deprecated = "use `.save().with_temp_dir()` instead"]
+    /// error. See [`SaveResult`](save/enum.SaveResult.html) for more information.
+    #[deprecated(since = "0.10.0", note = "use `.save().with_temp_dir()` instead")]
     pub fn save_all_under<P: AsRef<Path>>(&mut self, dir: P) -> EntriesSaveResult<&mut Self> {
         match TempDir::new_in(dir, "multipart") {
             Ok(temp_dir) => self.save().with_temp_dir(temp_dir),
@@ -175,8 +177,8 @@ impl<R: Read> Multipart<R> {
     /// Files larger than `limit` will be truncated to `limit`.
     ///
     /// If there is an error in reading the request, returns the partial result along with the
-    /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
-    #[deprecated = "use `.save().limit(limit)` instead"]
+    /// error. See [`SaveResult`](save/enum.SaveResult.html) for more information.
+    #[deprecated(since = "0.10.0", note = "use `.save().size_limit(limit)` instead")]
     pub fn save_all_limited(&mut self, limit: u64) -> EntriesSaveResult<&mut Self> {
         self.save().size_limit(limit).temp()
     }
@@ -187,8 +189,8 @@ impl<R: Read> Multipart<R> {
     /// Files larger than `limit` will be truncated to `limit`.
     ///
     /// If there is an error in reading the request, returns the partial result along with the
-    /// error. See [`SaveResult`](enum.SaveResult.html) for more information.
-    #[deprecated = "use `.save().limit(limit).with_temp_dir()` instead"]
+    /// error. See [`SaveResult`](save/enum.SaveResult.html) for more information.
+    #[deprecated(since = "0.10.0", note = "use `.save().size_limit(limit).with_temp_dir()` instead")]
     pub fn save_all_under_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> EntriesSaveResult<&mut Self> {
         match TempDir::new_in(dir, "multipart") {
             Ok(temp_dir) => self.save().size_limit(limit).with_temp_dir(temp_dir),

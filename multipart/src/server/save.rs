@@ -49,14 +49,14 @@ macro_rules! try_start (
 /// `mod_open_opts()`.
 ///
 /// ### File Size and Count Limits
-/// You can set a size limit for individual files with `limit()`, which takes either `u64`
+/// You can set a size limit for individual files with `size_limit()`, which takes either `u64`
 /// or `Option<u64>`.
 ///
 /// You can also set the maximum number of files to process with `count_limit()`, which
 /// takes either `u32` or `Option<u32>`. This only has an effect when using
-/// `SaveBuilder<Multipart>`.
+/// `SaveBuilder<[&mut] Multipart>`.
 ///
-/// ### Warning: Do **not* trust user input!
+/// ### Warning: Do **not** trust user input!
 /// It is a serious security risk to create files or directories with paths based on user input.
 /// A malicious user could craft a path which can be used to overwrite important files, such as
 /// web templates, static assets, Javascript files, database files, configuration files, etc.,
@@ -109,6 +109,7 @@ impl<S> SaveBuilder<S> {
     }
 }
 
+/// Save API for whole multipart requests.
 impl<M> SaveBuilder<M> where M: ReadEntry {
     /// Set the maximum number of files to write out.
     ///
@@ -119,7 +120,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
     }
 
     /// Save the file fields in the request to a new temporary directory prefixed with
-    /// "multipart-rs" in the OS temporary directory.
+    /// `multipart-rs` in the OS temporary directory.
     ///
     /// For more options, create a `TempDir` yourself and pass it to `with_temp_dir()` instead.
     ///
@@ -152,7 +153,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
 
     /// Save the file fields in the request to a new permanent directory with the given path.
     ///
-    /// Any nonexistent parent directories will be created.
+    /// Any nonexistent directories in the path will be created.
     pub fn with_dir<P: Into<PathBuf>>(self, dir: P) -> EntriesSaveResult<M> {
         let dir = dir.into();
 
@@ -239,6 +240,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
     }
 }
 
+/// Save API for individual files.
 impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: BufRead {
 
     /// Save to a file with a random alphanumeric name in the OS temporary directory.
