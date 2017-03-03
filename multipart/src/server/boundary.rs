@@ -130,8 +130,7 @@ impl<R> BoundaryReader<R> where R: Read {
 
         if log_enabled!(LogLevel::Trace) {
             trace!("Consumed up to self.search_idx, remaining buf: {:?}",
-                   String::from_utf8_lossy(self.source.get_buf())
-            );
+                   String::from_utf8_lossy(self.source.get_buf()));
         }
 
         let consume_amt = {
@@ -164,13 +163,6 @@ impl<R> BoundaryReader<R> where R: Read {
         }
 
         Ok(self.at_end)
-    }
-
-    // Keeping this around to support nested boundaries later.
-    #[allow(unused)]
-    #[doc(hidden)]
-    pub fn set_boundary<B: Into<Vec<u8>>>(&mut self, boundary: B) {
-        self.boundary = boundary.into();
     }
 }
 

@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate nickel;
 extern crate multipart;
 
@@ -10,12 +9,12 @@ use nickel::{HttpRouter, MiddlewareResult, Nickel, Request, Response};
 fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
     match Multipart::from_request(req) {
         Ok(mut multipart) => {
-            match multipart.save_all() {
+            match multipart.save().temp() {
                 SaveResult::Full(entries) => process_entries(res, entries),
 
                 SaveResult::Partial(entries, e) => {
                     println!("Partial errors ... {:?}", e);
-                    return process_entries(res, entries);
+                    return process_entries(res, entries.keep_partial());
                 },
 
                 SaveResult::Error(e) => {
@@ -36,31 +35,31 @@ fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewar
 /// Returns an OK response or an error.
 fn process_entries<'mw>(res: Response<'mw>, entries: Entries) -> MiddlewareResult<'mw> {
     for (name, field) in entries.fields {
-        println!(r#"Field "{}": "{}""#, name, field);
+        println!("Field {:?}: {:?}", name, field);
     }
 
-    for (name, savedfile) in entries.files {
-        let filename = match savedfile.filename {
-            Some(s) => s,
-            None => "None".into(),
-        };
+    for (name, files) in entries.files {
+        println!("Field {:?} has {} files:", name, files.len());
 
-        match File::open(savedfile.path) {
-            Ok(mut file) => {
-                let mut contents = String::new();
-                match file.read_to_string(&mut contents) {
-                    Ok(sz) => println!("File: \"{}\" is of size: {}b.", filename, sz),
-                    Err(e) => println!("Could not read file's \"{}\" size. Error: {:?}", filename, e),
+        for saved_file in files {
+            match File::open(&saved_file.path) {
+                Ok(mut file) => {
+                    let mut contents = String::new();
+                    if let Err(e) = file.read_to_string(&mut contents) {
+                        println!("Could not read file {:?}. Error: {:?}", saved_file.filename, e);
+                        return res.error(nickel::status::StatusCode::BadRequest, "The uploaded file was not readable")
+                    }
+
+                    println!("File {:?} ({:?}):", saved_file.filename, saved_file.content_type);
+                    println!("{}", contents);
+                    file
                 }
-                println!(r#"Field "{}" is file "{}":"#, name, filename);
-                println!("{}", contents);
-                file
-            }
-            Err(e) => {
-                println!("Could open file \"{}\". Error: {:?}", filename, e);
-                return res.error(nickel::status::StatusCode::BadRequest, "The uploaded file was not readable")
-            }
-        };
+                Err(e) => {
+                    println!("Could open file {:?}. Error: {:?}", saved_file.filename, e);
+                    return res.error(nickel::status::StatusCode::BadRequest, "The uploaded file was not readable")
+                }
+            };
+        }
     }
 
     res.send("Ok")
