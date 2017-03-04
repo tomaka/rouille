@@ -134,6 +134,20 @@ pub struct ServerRequest<'a> {
     rng: ThreadRng,
 }
 
+impl<'a> ServerRequest<'a> {
+    /// Create a new `ServerRequest` with the given data and boundary.
+    ///
+    /// Assumes `content_len: None`
+    pub fn new(data: &'a [u8], boundary: &'a str) -> Self {
+        ServerRequest {
+            data: data,
+            boundary: boundary,
+            content_len: None,
+            rng: rand::thread_rng(),
+        }
+    }
+}
+
 impl<'a> Read for ServerRequest<'a> {
     /// To simulate a network connection, this will copy a random number of bytes
     /// from the buffer to `out`.
