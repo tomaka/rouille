@@ -138,7 +138,7 @@ impl ContentDisp {
 
         if header.val != "form-data" {
             error!("Field `Content-Disposition` header was not `form-data`");
-            return;
+            return None;
         }
 
         const NAME: &'static str = "name=";
