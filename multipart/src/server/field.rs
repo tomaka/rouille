@@ -131,15 +131,10 @@ impl ContentDisp {
 
         const CONT_DISP: &'static str = "Content-Disposition";
 
-        let header: &StrHeader = try_opt!(
+        let header = try_opt!(
             find_header(headers, CONT_DISP),
             error!("Field headers did not contain Content-Disposition header (required)")
         );
-
-        if header.val != "form-data" {
-            error!("Field `Content-Disposition` header was not `form-data`");
-            return None;
-        }
 
         const NAME: &'static str = "name=";
         const FILENAME: &'static str = "filename=";
