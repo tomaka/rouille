@@ -7,6 +7,9 @@ publish = false
 [package.metadata]
 cargo-fuzz = true
 
+[dependencies]
+log = "*"
+
 [dependencies.multipart]
 path = ".."
 default-features = "false"

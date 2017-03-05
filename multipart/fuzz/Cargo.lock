@@ -3,6 +3,7 @@ name = "multipart-fuzz"
 version = "0.0.1"
 dependencies = [
  "libfuzzer-sys 0.1.0 (git+https://github.com/rust-fuzz/libfuzzer-sys.git)",
+ "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "multipart 0.10.0",
 ]
 
