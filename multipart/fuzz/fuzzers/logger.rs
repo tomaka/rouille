@@ -1,8 +1,8 @@
 extern crate log;
 
-use self::log::{LogLevel, LogLevelFilter, Log, LogMetadata, LogRecord};
+use self::log::{LogLevelFilter, Log, LogMetadata, LogRecord};
 
-const MAX_LOG_LEVEL: LogLevel = LogLevel::Trace;
+const MAX_LOG_LEVEL: LogLevelFilter = LogLevelFilter::Error;
 
 struct Logger;
 
@@ -16,9 +16,13 @@ impl Log for Logger {
     }
 }
 
+static LOGGER: Logger = Logger;
+
 pub fn init() {
-    let _ = log::set_logger(|max_lvl| {
-        max_lvl.set(MAX_LOG_LEVEL.to_log_level_filter());
-        Box::new(Logger)
-    });
+    let _ = unsafe {
+        log::set_logger_raw(|max_lvl| {
+            max_lvl.set(MAX_LOG_LEVEL);
+            &LOGGER
+        })
+    };
 }

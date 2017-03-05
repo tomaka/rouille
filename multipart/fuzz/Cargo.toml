@@ -12,7 +12,7 @@ log = "*"
 
 [dependencies.multipart]
 path = ".."
-default-features = "false"
+default-features = false
 features = ["mock", "client", "server"]
 
 [dependencies.libfuzzer-sys]
