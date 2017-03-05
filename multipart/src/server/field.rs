@@ -61,7 +61,11 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
         loop {
             let buf = try!(r.fill_buf());
 
-            if buf.len() == 0 { break; }
+            if buf.len() == 0 {
+                consume = 0;
+                header_len = 0;
+                break;
+            }
 
             match try_io!(httparse::parse_headers(buf, &mut raw_headers)) {
                 Status::Complete((consume_, raw_headers)) =>  {
