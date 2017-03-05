@@ -44,6 +44,7 @@ pub struct StrHeader<'a> {
     val: &'a str,
 }
 
+const MAX_ATTEMPTS: usize = 5;
 
 fn with_headers<R, F, Ret>(r: &mut R, f: F) -> io::Result<Ret>
 where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
@@ -58,10 +59,13 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
     {
         let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
 
+        let mut attempts = 0;
+
         loop {
             let buf = try!(r.fill_buf());
 
-            if buf.len() == 0 {
+            if attempts == MAX_ATTEMPTS {
+                error!("Could not read field headers.");
                 consume = 0;
                 header_len = 0;
                 break;
@@ -73,7 +77,7 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
                     header_len = raw_headers.len();
                     break;
                 },
-                Status::Partial => (),
+                Status::Partial => attempts += 1,
             }
         }
 
