@@ -7,7 +7,7 @@
 
 //! `multipart` field header parsing.
 
-use super::httparse::{self, EMPTY_HEADER, Status};
+use super::httparse::{self, EMPTY_HEADER, Header, Status};
 
 use self::ReadEntryResult::*;
 
@@ -46,15 +46,13 @@ pub struct StrHeader<'a> {
 
 const MAX_ATTEMPTS: usize = 5;
 
-fn with_headers<R, F, Ret>(r: &mut R, f: F) -> io::Result<Ret>
+fn with_headers<R, F, Ret>(r: &mut R, closure: F) -> io::Result<Ret>
 where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
     const HEADER_LEN: usize = 4;
 
     // These are only written once so they don't need to be `mut` or initialized.
     let consume;
-    let header_len;
-
-    let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
+    let ret;
 
     {
         let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
@@ -66,34 +64,36 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
 
             if attempts == MAX_ATTEMPTS {
                 error!("Could not read field headers.");
-                consume = 0;
-                header_len = 0;
-                break;
+                // RFC: return an actual error instead?
+                return Ok(closure(&[]));
             }
 
             match try_io!(httparse::parse_headers(buf, &mut raw_headers)) {
                 Status::Complete((consume_, raw_headers)) =>  {
                     consume = consume_;
-                    header_len = raw_headers.len();
+                    let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
+                    let headers = try!(copy_headers(raw_headers, &mut headers));
+                    debug!("Parsed headers: {:?}", headers);
+                    ret = closure(headers);
                     break;
                 },
                 Status::Partial => attempts += 1,
             }
         }
-
-        for (raw, header) in raw_headers.iter().take(header_len).zip(&mut headers) {
-            header.name = raw.name;
-            header.val = try!(io_str_utf8(raw.value));
-        }
     }
 
     r.consume(consume);
 
-    let headers = &headers[..header_len];
+    Ok(ret)
+}
 
-    debug!("Parsed headers: {:?}", headers);
+fn copy_headers<'h, 'b: 'h>(raw: &[Header<'b>], headers: &'h mut [StrHeader<'b>]) -> io::Result<&'h [StrHeader<'b>]> {
+    for (raw, header) in raw.iter().zip(&mut *headers) {
+        header.name = raw.name;
+        header.val = try!(io_str_utf8(raw.value));
+    }
 
-    Ok(f(headers))
+    Ok(&mut headers[..raw.len()])
 }
 
 /// The headers that (may) appear before a `multipart/form-data` field.
