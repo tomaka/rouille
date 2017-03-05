@@ -49,7 +49,10 @@ impl<R> BoundaryReader<R> where R: Read {
 
         let buf = try!(fill_buf_min(&mut self.source, min_len));
 
-        self.at_end = buf.len() == 0;
+        if buf.len() == 0 {
+            self.at_end = true;
+            return Ok(buf);
+        }
 
         if log_enabled!(LogLevel::Trace) {
             trace!("Buf: {:?}", String::from_utf8_lossy(buf));
