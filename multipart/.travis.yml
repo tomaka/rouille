@@ -1,6 +1,9 @@
 language: rust
 cache: cargo
 sudo: false
+branches:
+  except:
+  - fuzzing
 rust:
   - stable
   - beta
