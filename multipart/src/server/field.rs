@@ -536,6 +536,8 @@ fn find_header<'a, 'b>(headers: &'a [StrHeader<'b>], name: &str) -> Option<&'a S
 pub trait ReadEntry: PrivReadEntry + Sized {
     /// Attempt to read the next entry in the multipart stream.
     fn read_entry(mut self) -> ReadEntryResult<Self> {
+        debug!("ReadEntry::read_entry()");
+
         if try_read_entry!(self; self.consume_boundary()) {
             return End(self);
         }
