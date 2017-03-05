@@ -2,7 +2,7 @@ extern crate log;
 
 use self::log::{LogLevelFilter, Log, LogMetadata, LogRecord};
 
-const MAX_LOG_LEVEL: LogLevelFilter = LogLevelFilter::Error;
+const MAX_LOG_LEVEL: LogLevelFilter = LogLevelFilter::Debug;
 
 struct Logger;
 
