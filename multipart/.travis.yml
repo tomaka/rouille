@@ -11,6 +11,9 @@ rust:
 os:
   - linux
   - osx
+env:
+  # Get some logging in tests without being too verbose
+  - RUST_LOG=multipart=info
 script:
   - cargo build -v --features all
   - cargo test -v --features all
