@@ -54,32 +54,36 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
     let consume;
     let ret;
 
-    {
+    let mut attempts = 0;
+
+    loop {
         let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
 
-        let mut attempts = 0;
+        let buf = try!(r.fill_buf());
 
-        loop {
-            let buf = try!(r.fill_buf());
-
-            if attempts == MAX_ATTEMPTS {
-                error!("Could not read field headers.");
-                // RFC: return an actual error instead?
-                return Ok(closure(&[]));
-            }
-
-            match try_io!(httparse::parse_headers(buf, &mut raw_headers)) {
-                Status::Complete((consume_, raw_headers)) =>  {
-                    consume = consume_;
-                    let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
-                    let headers = try!(copy_headers(raw_headers, &mut headers));
-                    debug!("Parsed headers: {:?}", headers);
-                    ret = closure(headers);
-                    break;
-                },
-                Status::Partial => attempts += 1,
-            }
+        if attempts == MAX_ATTEMPTS {
+            error!("Could not read field headers.");
+            // RFC: return an actual error instead?
+            return Ok(closure(&[]));
         }
+
+        // FIXME: https://github.com/seanmonstar/httparse/issues/34
+        let err = match httparse::parse_headers(buf, &mut raw_headers) {
+            Ok(Status::Complete((consume_, raw_headers))) =>  {
+                consume = consume_;
+                let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
+                let headers = try!(copy_headers(raw_headers, &mut headers));
+                debug!("Parsed headers: {:?}", headers);
+                ret = closure(headers);
+                break;
+            },
+            Ok(Status::Partial) => { attempts += 1; continue },
+            Err(err) => err,
+        };
+
+        error!("Error returned from parse_headers(): {}, Buf: {:?}",
+               err, String::from_utf8_lossy(buf));
+        return Err(Error::new(ErrorKind::InvalidData, e));
     }
 
     r.consume(consume);
