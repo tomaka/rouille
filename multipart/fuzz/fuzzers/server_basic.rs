@@ -18,11 +18,14 @@ const BOUNDARY: &'static str = "--12--34--56";
 pub extern fn go(data: &[u8]) {
     logger::init();
 
+    info!("Fuzzing started! Data len: {}", data.len());
+
     do_fuzz(data);
+
+    info!("Finished fuzzing iteration");
 }
 
 fn do_fuzz(data: &[u8]) {
-    info!("Fuzzing started! Data len: {}", data.len());
 
     if data.len() < BOUNDARY.len() { return; }
 
@@ -38,6 +41,7 @@ fn do_fuzz(data: &[u8]) {
 
     // A lot of requests will be malformed
     while let Ok(Some(entry)) = multipart.read_entry() {
+	    info!("read_entry() loop!");
         match entry.data {
             MultipartData::Text(_) => (),
             MultipartData::File(mut file) => loop {
