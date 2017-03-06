@@ -205,8 +205,13 @@ impl<R> BufRead for BoundaryReader<R> where R: Read {
 }
 
 fn fill_buf_min<R: Read>(buf: &mut BufReader<R>, min: usize) -> io::Result<&[u8]> {
-    if buf.available() < min {
-        try!(buf.read_into_buf());
+    const MAX_ATTEMPTS: usize = 3;
+
+    let mut attempts = 0;
+
+    while buf.available() < min && attempts < MAX_ATTEMPTS {
+        if try!(buf.read_into_buf()) == 0 { break; };
+        attempts += 1;
     }
 
     Ok(buf.get_buf())
