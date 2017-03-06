@@ -104,8 +104,12 @@ impl Multipart<()> {
 impl<R: Read> Multipart<R> {
     /// Construct a new `Multipart` with the given body reader and boundary.
     pub fn with_body<Bnd: Into<String>>(body: R, boundary: Bnd) -> Self {
+        let boundary = boundary.into();
+
+        info!("Multipart::with_boundary(_, {:?}", boundary);
+
         Multipart { 
-            reader: BoundaryReader::from_reader(body, boundary.into()),
+            reader: BoundaryReader::from_reader(body, boundary),
         }
     }
 
