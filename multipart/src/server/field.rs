@@ -83,7 +83,7 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
 
         error!("Error returned from parse_headers(): {}, Buf: {:?}",
                err, String::from_utf8_lossy(buf));
-        return Err(Error::new(ErrorKind::InvalidData, e));
+        return Err(io::Error::new(io::ErrorKind::InvalidData, err));
     }
 
     r.consume(consume);
