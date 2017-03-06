@@ -179,6 +179,14 @@ macro_rules! do_test (
 );
 
 #[test]
+#[ignore]
+fn perpetual_test_reg_reg() {
+    loop {
+        do_test!(test_client, test_server);
+    }
+}
+
+#[test]
 fn reg_client_reg_server() {
     do_test!(test_client, test_server);
 }
