@@ -179,14 +179,6 @@ macro_rules! do_test (
 );
 
 #[test]
-#[ignore]
-fn perpetual_test_reg_reg() {
-    loop {
-        do_test!(test_client, test_server);
-    }
-}
-
-#[test]
 fn reg_client_reg_server() {
     do_test!(test_client, test_server);
 }
@@ -205,6 +197,55 @@ fn lazy_client_reg_server() {
 fn lazy_client_entry_server() {
     do_test!(test_client_lazy, test_server_entry_api);
 }
+
+mod extended {
+    use super::*;
+
+    use std::time::Instant;
+
+    const TIME_LIMIT_SECS: u64 = 300;
+
+    #[test]
+    #[ignore]
+    fn reg_client_reg_server() {
+        let started = Instant::now();
+
+        while started.elapsed().as_secs() < TIME_LIMIT_SECS {
+            do_test!(test_client, test_server);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn reg_client_entry_server() {
+        let started = Instant::now();
+
+        while started.elapsed().as_secs() < TIME_LIMIT_SECS {
+            do_test!(test_client, test_server_entry_api);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn lazy_client_reg_server() {
+        let started = Instant::now();
+
+        while started.elapsed().as_secs() < TIME_LIMIT_SECS {
+            do_test!(test_client_lazy, test_server);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn lazy_client_entry_server() {
+        let started = Instant::now();
+
+        while started.elapsed().as_secs() < TIME_LIMIT_SECS {
+            do_test!(test_client_lazy, test_server_entry_api);
+        }
+    }
+}
+
 
 fn gen_bool() -> bool {
     rand::thread_rng().gen()
