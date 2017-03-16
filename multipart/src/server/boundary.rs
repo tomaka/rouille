@@ -49,7 +49,7 @@ impl<R> BoundaryReader<R> where R: Read {
 
         let buf = try!(fill_buf_min(&mut self.source, min_len));
 
-        if buf.len() == 0 {
+        if buf.is_empty() {
             debug!("fill_buf_min returned zero-sized buf");
             self.at_end = true;
             return Ok(buf);

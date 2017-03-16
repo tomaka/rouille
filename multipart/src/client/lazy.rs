@@ -302,7 +302,7 @@ impl<'d> PreparedFields<'d> {
 
 impl<'d> Read for PreparedFields<'d> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if buf.len() == 0 {
+        if buf.is_empty() {
             debug!("PreparedFields::read() was passed a zero-sized buffer.");
             return Ok(0);
         }
