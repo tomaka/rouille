@@ -336,7 +336,7 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: Bu
             match self.savable.fill_buf() {
                 Ok(ref buf) if buf.is_empty() => Full(copied),
                 Ok(_) => Partial(copied, PartialReason::SizeLimit),
-                Err(e) => Partial(copied, PartialReason::IoError((e)))
+                Err(e) => Partial(copied, PartialReason::IoError(e))
             }
         } else {
             try_copy_buf(&mut self.savable, &mut dest)
