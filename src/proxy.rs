@@ -158,7 +158,7 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
         None => return Err(ProxyError::BodyAlreadyExtracted),
     };
 
-    try!(socket.write_all(format!("{} {} HTTP/1.1\n", request.method(), request.raw_url()).as_bytes()));
+    try!(socket.write_all(format!("{} {} HTTP/1.1\r\n", request.method(), request.raw_url()).as_bytes()));
     for (header, value) in request.headers() {
         let value = if header == "Host" {
             if let Some(ref replace) = config.replace_host {
@@ -169,10 +169,13 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
         } else {
             value
         };
+        if header == "Connection" {
+            continue;
+        }
 
-        try!(socket.write_all(format!("{}: {}\n", header, value).as_bytes()));
+        try!(socket.write_all(format!("{}: {}\r\n", header, value).as_bytes()));
     }
-    try!(socket.write_all("Connection: close\n\n".as_bytes()));
+    try!(socket.write_all("Connection: close\r\n\r\n".as_bytes()));
     try!(io::copy(&mut data, &mut socket));
 
     let mut socket = io::BufReader::new(socket);
