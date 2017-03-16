@@ -310,7 +310,7 @@ impl<'d> Read for PreparedFields<'d> {
         let mut total_read = 0;
 
         while total_read < buf.len() {
-            if let None = self.next_field {
+            if self.next_field.is_none() {
                 self.next_field = self.fields.next();
             }
 
