@@ -18,7 +18,8 @@ use mime::{TopLevel, Mime};
 use std::io::{self, Read, BufRead, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::str;
+use std::{str, fmt};
+use std::error::Error;
 
 macro_rules! try_io(
     ($try:expr) => (
@@ -46,7 +47,7 @@ pub struct StrHeader<'a> {
 
 const MAX_ATTEMPTS: usize = 5;
 
-fn with_headers<R, F, Ret>(r: &mut R, closure: F) -> io::Result<Ret>
+fn with_headers<R, F, Ret>(r: &mut R, closure: F) -> Result<Ret, ParseHeaderError>
 where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
     const HEADER_LEN: usize = 4;
 
@@ -62,32 +63,28 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
         let buf = try!(r.fill_buf());
 
         if attempts == MAX_ATTEMPTS {
-            error!("Could not read field headers.");
-            // RFC: return an actual error instead?
-            return Ok(closure(&[]));
+            return Err(ParseHeaderError::Other("Unknown error while parsing headers".to_string()));
         }
 
         // FIXME: https://github.com/seanmonstar/httparse/issues/34
-        let err = match httparse::parse_headers(buf, &mut raw_headers) {
+        match httparse::parse_headers(buf, &mut raw_headers) {
             Ok(Status::Complete((consume_, raw_headers))) =>  {
                 consume = consume_;
                 let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
-                let headers = try!(copy_headers(raw_headers, &mut headers));
+                let headers = copy_headers(raw_headers, &mut headers)?;
                 debug!("Parsed headers: {:?}", headers);
                 ret = closure(headers);
                 break;
             },
-            Ok(Status::Partial) => { attempts += 1; continue },
-            Err(err) => err,
+            Ok(Status::Partial) => {
+                attempts += 1;
+                continue;
+            },
+            Err(err) => return Err(ParseHeaderError::from(err)),
         };
-
-        error!("Error returned from parse_headers(): {}, Buf: {:?}",
-               err, String::from_utf8_lossy(buf));
-        return Err(io::Error::new(io::ErrorKind::InvalidData, err));
     }
 
     r.consume(consume);
-
     Ok(ret)
 }
 
@@ -97,7 +94,7 @@ fn copy_headers<'h, 'b: 'h>(raw: &[Header<'b>], headers: &'h mut [StrHeader<'b>]
         header.val = try!(io_str_utf8(raw.value));
     }
 
-    Ok(&mut headers[..raw.len()])
+    Ok(&headers[..raw.len()])
 }
 
 /// The headers that (may) appear before a `multipart/form-data` field.
@@ -110,19 +107,21 @@ pub struct FieldHeaders {
 
 impl FieldHeaders {
     /// Parse the field headers from the passed `BufRead`, consuming the relevant bytes.
-    fn read_from<R: BufRead>(r: &mut R) -> io::Result<Option<Self>> {
-        with_headers(r, Self::parse)
+    fn read_from<R: BufRead>(r: &mut R) -> Result<Self, ParseHeaderError> {
+        with_headers(r, Self::parse)?
     }
 
-    fn parse(headers: &[StrHeader]) -> Option<FieldHeaders> {
-        let cont_disp = try_opt!(
-                ContentDisp::parse(headers),
-                debug!("Failed to read Content-Disposition")
-            );
-
-        let cont_type = parse_cont_type(headers);
-
-        Some(FieldHeaders {
+    fn parse(headers: &[StrHeader]) -> Result<FieldHeaders, ParseHeaderError> {
+        let cont_disp = ContentDisp::parse(headers)?;
+        let cont_type = match parse_cont_type(headers) {
+            Ok(cont_type) => Some(cont_type),
+            // The Content-Type header is not mandatory so that's ok if it was not found.
+            Err(ParseHeaderError::Missing) => None,
+            // Any other error means the header was found but we failed to parse it. This is a read
+            // error.
+            Err(e) => return Err(e),
+        };
+        Ok(FieldHeaders {
             cont_disp: cont_disp,
             cont_type: cont_type,
         })
@@ -138,63 +137,42 @@ pub struct ContentDisp {
 }
 
 impl ContentDisp {
-    fn parse(headers: &[StrHeader]) -> Option<ContentDisp> {
+    fn parse(headers: &[StrHeader]) -> Result<ContentDisp, ParseHeaderError> {
         if headers.is_empty() {
-            return None;
+            return Err(ParseHeaderError::Missing);
         }
 
         const CONT_DISP: &'static str = "Content-Disposition";
-
-        let header = try_opt!(
-            find_header(headers, CONT_DISP),
-            error!("Field headers did not contain Content-Disposition header (required)")
-        );
+        let header = find_header(headers, CONT_DISP).ok_or(ParseHeaderError::Missing)?;
 
         const NAME: &'static str = "name=";
         const FILENAME: &'static str = "filename=";
 
         let after_disp_type = {
-            let (disp_type, after_disp_type) = try_opt!(
-                split_once(header.val, ';'),
-                error!("Expected additional data after Content-Disposition type, got {:?}",
-                header.val)
-            );
-
-
+            let (disp_type, after_disp_type) = split_once(header.val, ';').ok_or(ParseHeaderError::Invalid)?;
             if disp_type.trim() != "form-data" {
-                error!("Unexpected Content-Disposition value: {:?}", disp_type);
-                return None;
-            };
-
+                return Err(ParseHeaderError::Invalid);
+            }
             after_disp_type
         };
 
-        let (field_name, after_field_name) = try_opt!(
-            get_str_after(NAME, ';', after_disp_type),
-            error!("Expected field name and maybe filename, got {:?}", after_disp_type)
-        );
-
+        let (field_name, after_field_name) = get_str_after(NAME, ';', after_disp_type).ok_or(ParseHeaderError::Invalid)?;
         let field_name = trim_quotes(field_name);
-
         let filename = get_str_after(FILENAME, ';', after_field_name)
             .map(|(filename, _)| trim_quotes(filename).to_owned());
 
-        Some(ContentDisp { field_name: field_name.to_owned(), filename: filename })
+        Ok(ContentDisp { field_name: field_name.to_owned(), filename: filename })
     }
 }
 
-fn parse_cont_type(headers: &[StrHeader]) -> Option<Mime> {
+fn parse_cont_type(headers: &[StrHeader]) -> Result<Mime, ParseHeaderError> {
     const CONTENT_TYPE: &'static str = "Content-Type";
 
-    let header = try_opt!(
-        find_header(headers, CONTENT_TYPE),
-        debug!("Content-Type header not found for field.")
-    );
+    let header = find_header(headers, CONTENT_TYPE).ok_or(ParseHeaderError::Missing)?;
 
     // Boundary parameter will be parsed into the `Mime`
     debug!("Found Content-Type: {:?}", header.val);
-    let content_type = read_content_type(header.val.trim());
-    Some(content_type)
+    Ok(read_content_type(header.val.trim()))
 }
 
 /// A field in a multipart request. May be either text or a binary stream (file).
@@ -556,10 +534,7 @@ pub trait ReadEntry: PrivReadEntry + Sized {
             return End(self);
         }
 
-        let field_headers = match try_read_entry!(self; self.read_headers()) {
-            Some(headers) => headers,
-            None => return End(self),
-        };
+        let field_headers = try_read_entry!(self; self.read_headers().map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
 
         let data = match field_headers.cont_type {
             Some(cont_type) => {
@@ -619,7 +594,7 @@ pub trait PrivReadEntry {
     /// Returns `true` if the last boundary was read, `false` otherwise.
     fn consume_boundary(&mut self) -> io::Result<bool>;
 
-    fn read_headers(&mut self) -> io::Result<Option<FieldHeaders>> {
+    fn read_headers(&mut self) -> Result<FieldHeaders, ParseHeaderError> {
         FieldHeaders::read_from(&mut self.source())
     }
 
@@ -713,5 +688,57 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
             multipart,
             io::Error::new(io::ErrorKind::InvalidData, msg),
         )
+    }
+}
+
+#[derive(Debug)]
+pub enum ParseHeaderError {
+    /// The header was not found
+    Missing,
+    /// The header was found but could not be parsed
+    Invalid,
+    /// IO error
+    Io(io::Error),
+    Other(String),
+}
+
+impl fmt::Display for ParseHeaderError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ParseHeaderError::Missing => write!(f, "header not found (ParseHeaderError::Missing)"),
+            ParseHeaderError::Invalid => write!(f, "invalid header (ParseHeaderError::Invalid)"),
+            ParseHeaderError::Io(_) => write!(f, "could not read header (ParseHeaderError::Io)"),
+            ParseHeaderError::Other(ref reason) => write!(f, "unknown parsing error (ParseHeaderError::Other(\"{}\"))", reason),
+        }
+    }
+}
+
+impl Error for ParseHeaderError {
+    fn description(&self) -> &str {
+        match *self {
+            ParseHeaderError::Missing => "header not found",
+            ParseHeaderError::Invalid => "the header is not formatted correctly",
+            ParseHeaderError::Io(_) => "failed to read the header",
+            ParseHeaderError::Other(_) => "unknown parsing error",
+        }
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        match *self {
+            ParseHeaderError::Io(ref e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<io::Error> for ParseHeaderError {
+    fn from(err: io::Error) -> ParseHeaderError {
+        ParseHeaderError::Io(err)
+    }
+}
+
+impl From<httparse::Error> for ParseHeaderError {
+    fn from(_err: httparse::Error) -> ParseHeaderError {
+        ParseHeaderError::Invalid
     }
 }
