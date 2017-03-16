@@ -59,7 +59,7 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
             Ok(Status::Complete((consume_, raw_headers))) =>  {
                 consume = consume_;
                 let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
-                let headers = copy_headers(raw_headers, &mut headers)?;
+                let headers = try!(copy_headers(raw_headers, &mut headers));
                 debug!("Parsed headers: {:?}", headers);
                 ret = closure(headers);
                 break;
@@ -96,11 +96,11 @@ pub struct FieldHeaders {
 impl FieldHeaders {
     /// Parse the field headers from the passed `BufRead`, consuming the relevant bytes.
     fn read_from<R: BufRead>(r: &mut R) -> Result<Self, ParseHeaderError> {
-        with_headers(r, Self::parse)?
+        try!(with_headers(r, Self::parse))
     }
 
     fn parse(headers: &[StrHeader]) -> Result<FieldHeaders, ParseHeaderError> {
-        let cont_disp = ContentDisp::parse(headers)?;
+        let cont_disp = try!(ContentDisp::parse(headers));
         let cont_type = match parse_cont_type(headers) {
             Ok(cont_type) => Some(cont_type),
             // The Content-Type header is not mandatory so that's ok if it was not found.
@@ -131,20 +131,20 @@ impl ContentDisp {
         }
 
         const CONT_DISP: &'static str = "Content-Disposition";
-        let header = find_header(headers, CONT_DISP).ok_or(ParseHeaderError::Missing)?;
+        let header = try!(find_header(headers, CONT_DISP).ok_or(ParseHeaderError::Missing));
 
         const NAME: &'static str = "name=";
         const FILENAME: &'static str = "filename=";
 
         let after_disp_type = {
-            let (disp_type, after_disp_type) = split_once(header.val, ';').ok_or(ParseHeaderError::Invalid)?;
+            let (disp_type, after_disp_type) = try!(split_once(header.val, ';').ok_or(ParseHeaderError::Invalid));
             if disp_type.trim() != "form-data" {
                 return Err(ParseHeaderError::Invalid);
             }
             after_disp_type
         };
 
-        let (field_name, after_field_name) = get_str_after(NAME, ';', after_disp_type).ok_or(ParseHeaderError::Invalid)?;
+        let (field_name, after_field_name) = try!(get_str_after(NAME, ';', after_disp_type).ok_or(ParseHeaderError::Invalid));
         let field_name = trim_quotes(field_name);
         let filename = get_str_after(FILENAME, ';', after_field_name)
             .map(|(filename, _)| trim_quotes(filename).to_owned());
@@ -156,7 +156,7 @@ impl ContentDisp {
 fn parse_cont_type(headers: &[StrHeader]) -> Result<Mime, ParseHeaderError> {
     const CONTENT_TYPE: &'static str = "Content-Type";
 
-    let header = find_header(headers, CONTENT_TYPE).ok_or(ParseHeaderError::Missing)?;
+    let header = try!(find_header(headers, CONTENT_TYPE).ok_or(ParseHeaderError::Missing));
 
     // Boundary parameter will be parsed into the `Mime`
     debug!("Found Content-Type: {:?}", header.val);
