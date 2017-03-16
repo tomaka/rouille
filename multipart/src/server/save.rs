@@ -669,9 +669,8 @@ impl<S, P> SaveResult<S, P> where P: Into<S> {
     pub fn into_result_strict(self) -> io::Result<S> {
         match self {
             Full(entries) => Ok(entries),
-            Partial(_, PartialReason::IoError(e)) => Err(e),
+            Partial(_, PartialReason::IoError(e)) | Error(e) => Err(e),
             Partial(partial, _) => Ok(partial.into()),
-            Error(e) => Err(e),
         }
     }
 }
