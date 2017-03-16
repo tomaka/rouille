@@ -21,18 +21,6 @@ use std::path::{Path, PathBuf};
 use std::{str, fmt};
 use std::error::Error;
 
-macro_rules! try_io(
-    ($try:expr) => (
-        {
-            use std::io::{Error, ErrorKind};
-            match $try {
-                Ok(val) => val,
-                Err(e) => return Err(Error::new(ErrorKind::InvalidData, e)),
-            }
-        }
-    )
-);
-
 const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader {
     name: "",
     val: "",
