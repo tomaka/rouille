@@ -1,4 +1,4 @@
-//! Integration with [tiny_http](https://github.com/frewsxcv/tiny-http) with the `tiny_http`
+//! Integration with [`tiny_http`](https://github.com/frewsxcv/tiny-http) with the `tiny_http`
 //! feature (optional).
 //!
 //! Contains `impl `[`HttpRequest`](../trait.HttpRequest.html)` for tiny_http::Request` (not shown

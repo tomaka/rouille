@@ -7,7 +7,7 @@
 //! Server-side integration with [Hyper](https://github.com/hyperium/hyper).
 //! Enabled with the `hyper` feature (on by default).
 //!
-//! Also contains an implementation of [`HttpRequest`](../trait.HttpRequest.html)`
+//! Also contains an implementation of [`HttpRequest`](../trait.HttpRequest.html)
 //! for `hyper::server::Request` and `&mut hyper::server::Request`.
 use hyper::net::Fresh;
 use hyper::header::ContentType;
