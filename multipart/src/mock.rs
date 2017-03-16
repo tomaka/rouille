@@ -167,7 +167,7 @@ impl<'a> Read for ServerRequest<'a> {
 impl<'a> ::server::HttpRequest for ServerRequest<'a> {
     type Body = Self;
 
-    fn multipart_boundary(&self) -> Option<&str> { Some(&self.boundary) }
+    fn multipart_boundary(&self) -> Option<&str> { Some(self.boundary) }
 
     fn body(self) -> Self::Body {
         self

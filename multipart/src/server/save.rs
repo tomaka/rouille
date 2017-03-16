@@ -334,7 +334,7 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: Bu
 
             // If there's more data to be read, the field was truncated
             match self.savable.fill_buf() {
-                Ok(ref buf) if buf.is_empty() => Full(copied),
+                Ok(buf) if buf.is_empty() => Full(copied),
                 Ok(_) => Partial(copied, PartialReason::SizeLimit),
                 Err(e) => Partial(copied, PartialReason::IoError(e))
             }
