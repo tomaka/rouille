@@ -28,6 +28,9 @@
 //! * `nickel_`: Integration with the [Nickel](http://nickel.rs) web application framework.
 //! See the [`server::nickel`](server/nickel/index.html) module for more information. Enables the `hyper`
 //! feature.
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
+#![cfg_attr(feature="clippy", deny(clippy))]
 #![deny(missing_docs)]
 
 #[macro_use]
