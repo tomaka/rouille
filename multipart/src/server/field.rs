@@ -100,8 +100,11 @@ impl FieldHeaders {
     }
 
     fn parse(headers: &[StrHeader]) -> Result<FieldHeaders, ParseHeaderError> {
+        let cont_disp = try!(
+            try!(ContentDisp::parse(headers))
+            .ok_or(ParseHeaderError::NotFound(HeaderType::ContentDisposition)));
         Ok(FieldHeaders {
-            cont_disp: try!(try!(ContentDisp::parse(headers)).ok_or(ParseHeaderError::NotFound)),
+            cont_disp: cont_disp,
             cont_type: try!(parse_cont_type(headers)),
         })
     }
@@ -673,10 +676,17 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
     }
 }
 
+
+#[derive(Debug)]
+pub enum HeaderType {
+    ContentDisposition,
+    // ContentType,
+}
+
 #[derive(Debug)]
 pub enum ParseHeaderError {
     /// The header was not found
-    NotFound,
+    NotFound(HeaderType),
     /// The header was found but could not be parsed
     Invalid,
     /// IO error
@@ -687,7 +697,7 @@ pub enum ParseHeaderError {
 impl fmt::Display for ParseHeaderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ParseHeaderError::NotFound => write!(f, "header not found (ParseHeaderError::NotFound)"),
+            ParseHeaderError::NotFound(ref header_type) => write!(f, "header not found (ParseHeaderError::NotFound({:?}))", header_type),
             ParseHeaderError::Invalid => write!(f, "invalid header (ParseHeaderError::Invalid)"),
             ParseHeaderError::Io(_) => write!(f, "could not read header (ParseHeaderError::Io)"),
             ParseHeaderError::Other(ref reason) => write!(f, "unknown parsing error (ParseHeaderError::Other(\"{}\"))", reason),
@@ -698,7 +708,7 @@ impl fmt::Display for ParseHeaderError {
 impl Error for ParseHeaderError {
     fn description(&self) -> &str {
         match *self {
-            ParseHeaderError::NotFound => "header not found",
+            ParseHeaderError::NotFound(_) => "header not found",
             ParseHeaderError::Invalid => "the header is not formatted correctly",
             ParseHeaderError::Io(_) => "failed to read the header",
             ParseHeaderError::Other(_) => "unknown parsing error",
