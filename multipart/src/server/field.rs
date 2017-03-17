@@ -519,7 +519,7 @@ pub trait ReadEntry: PrivReadEntry + Sized {
             return End(self);
         }
 
-        let field_headers = try_read_entry!(self; self.read_headers().map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
+        let field_headers = try_read_entry!(self; self.read_headers());
 
         let data = match field_headers.cont_type {
             Some(cont_type) => {
@@ -579,8 +579,9 @@ pub trait PrivReadEntry {
     /// Returns `true` if the last boundary was read, `false` otherwise.
     fn consume_boundary(&mut self) -> io::Result<bool>;
 
-    fn read_headers(&mut self) -> Result<FieldHeaders, ParseHeaderError> {
+    fn read_headers(&mut self) -> Result<FieldHeaders, io::Error> {
         FieldHeaders::read_from(&mut self.source())
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
     fn read_to_string(&mut self) -> io::Result<String> {
@@ -678,13 +679,13 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
 
 
 #[derive(Debug)]
-pub enum HeaderType {
+enum HeaderType {
     ContentDisposition,
     // ContentType,
 }
 
 #[derive(Debug)]
-pub enum ParseHeaderError {
+enum ParseHeaderError {
     /// The header was not found
     NotFound(HeaderType),
     /// The header was found but could not be parsed
