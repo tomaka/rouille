@@ -101,8 +101,7 @@ impl FieldHeaders {
 
     fn parse(headers: &[StrHeader]) -> Result<FieldHeaders, ParseHeaderError> {
         let cont_disp = try!(
-            try!(ContentDisp::parse(headers))
-            .ok_or(ParseHeaderError::NotFound(HeaderType::ContentDisposition)));
+            try!(ContentDisp::parse(headers)).ok_or(ParseHeaderError::MissingContentDisposition));
         Ok(FieldHeaders {
             cont_disp: cont_disp,
             cont_type: try!(parse_cont_type(headers)),
@@ -692,15 +691,9 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
 
 
 #[derive(Debug)]
-enum HeaderType {
-    ContentDisposition,
-    // ContentType,
-}
-
-#[derive(Debug)]
 enum ParseHeaderError {
-    /// The header was not found
-    NotFound(HeaderType),
+    /// The `Content-Disposition` header was not found
+    MissingContentDisposition,
     /// The header was found but could not be parsed
     Invalid(String),
     /// IO error
@@ -711,7 +704,7 @@ enum ParseHeaderError {
 impl fmt::Display for ParseHeaderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ParseHeaderError::NotFound(ref header_type) => write!(f, "header not found (ParseHeaderError::NotFound({:?}))", header_type),
+            ParseHeaderError::MissingContentDisposition => write!(f, "\"Content-Disposition\" header not found (ParseHeaderError::MissingContentDisposition)"),
             ParseHeaderError::Invalid(ref msg) => write!(f, "invalid header (ParseHeaderError::Invalid({}))", msg),
             ParseHeaderError::Io(_) => write!(f, "could not read header (ParseHeaderError::Io)"),
             ParseHeaderError::Other(ref reason) => write!(f, "unknown parsing error (ParseHeaderError::Other(\"{}\"))", reason),
@@ -722,7 +715,7 @@ impl fmt::Display for ParseHeaderError {
 impl Error for ParseHeaderError {
     fn description(&self) -> &str {
         match *self {
-            ParseHeaderError::NotFound(_) => "header not found",
+            ParseHeaderError::MissingContentDisposition => "\"Content-Disposition\" header not found",
             ParseHeaderError::Invalid(_) => "the header is not formatted correctly",
             ParseHeaderError::Io(_) => "failed to read the header",
             ParseHeaderError::Other(_) => "unknown parsing error",
