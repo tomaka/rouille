@@ -51,7 +51,7 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
         let buf = try!(r.fill_buf());
 
         if attempts == MAX_ATTEMPTS {
-            return Err(ParseHeaderError::Other("Unknown error while parsing headers".to_string()));
+            return Err(ParseHeaderError::Other("Could not read field headers".to_string()));
         }
 
         // FIXME: https://github.com/seanmonstar/httparse/issues/34
@@ -130,18 +130,31 @@ impl ContentDisp {
         const NAME: &'static str = "name=";
         const FILENAME: &'static str = "filename=";
 
-        let after_disp_type = {
-            let (disp_type, after_disp_type) = try!(split_once(header.val, ';').ok_or(ParseHeaderError::Invalid));
-            if disp_type.trim() != "form-data" {
-                return Err(ParseHeaderError::Invalid);
+        let after_disp_type = match split_once(header.val, ';') {
+            Some((disp_type, after_disp_type)) => {
+                if disp_type.trim() != "form-data" {
+                    let err = format!("Unexpected Content-Disposition value: {:?}", disp_type);
+                    return Err(ParseHeaderError::Invalid(err));
+                }
+                after_disp_type
+            },
+            None => {
+                let err = format!("Expected additional data after Content-Disposition type, got {:?}", header.val);
+                return Err(ParseHeaderError::Invalid(err));
             }
-            after_disp_type
         };
 
-        let (field_name, after_field_name) = try!(get_str_after(NAME, ';', after_disp_type).ok_or(ParseHeaderError::Invalid));
-        let field_name = trim_quotes(field_name);
-        let filename = get_str_after(FILENAME, ';', after_field_name)
-            .map(|(filename, _)| trim_quotes(filename).to_owned());
+        let (field_name, filename) = match get_str_after(NAME, ';', after_disp_type) {
+            None => {
+                let err = format!("Expected field name and maybe filename, got {:?}", after_disp_type);
+                return Err(ParseHeaderError::Invalid(err));
+            },
+            Some((field_name, after_field_name)) => {
+                let field_name = trim_quotes(field_name);
+                let filename = get_str_after(FILENAME, ';', after_field_name).map(|(filename, _)| trim_quotes(filename).to_owned());
+                (field_name, filename)
+            },
+        };
 
         Ok(Some(ContentDisp { field_name: field_name.to_owned(), filename: filename }))
     }
@@ -689,7 +702,7 @@ enum ParseHeaderError {
     /// The header was not found
     NotFound(HeaderType),
     /// The header was found but could not be parsed
-    Invalid,
+    Invalid(String),
     /// IO error
     Io(io::Error),
     Other(String),
@@ -699,7 +712,7 @@ impl fmt::Display for ParseHeaderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ParseHeaderError::NotFound(ref header_type) => write!(f, "header not found (ParseHeaderError::NotFound({:?}))", header_type),
-            ParseHeaderError::Invalid => write!(f, "invalid header (ParseHeaderError::Invalid)"),
+            ParseHeaderError::Invalid(ref msg) => write!(f, "invalid header (ParseHeaderError::Invalid({}))", msg),
             ParseHeaderError::Io(_) => write!(f, "could not read header (ParseHeaderError::Io)"),
             ParseHeaderError::Other(ref reason) => write!(f, "unknown parsing error (ParseHeaderError::Other(\"{}\"))", reason),
         }
@@ -710,7 +723,7 @@ impl Error for ParseHeaderError {
     fn description(&self) -> &str {
         match *self {
             ParseHeaderError::NotFound(_) => "header not found",
-            ParseHeaderError::Invalid => "the header is not formatted correctly",
+            ParseHeaderError::Invalid(_) => "the header is not formatted correctly",
             ParseHeaderError::Io(_) => "failed to read the header",
             ParseHeaderError::Other(_) => "unknown parsing error",
         }
@@ -731,7 +744,7 @@ impl From<io::Error> for ParseHeaderError {
 }
 
 impl From<httparse::Error> for ParseHeaderError {
-    fn from(_err: httparse::Error) -> ParseHeaderError {
-        ParseHeaderError::Invalid
+    fn from(err: httparse::Error) -> ParseHeaderError {
+        ParseHeaderError::Invalid(format!("{}", err))
     }
 }
