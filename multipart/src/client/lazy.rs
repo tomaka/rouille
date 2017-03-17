@@ -507,7 +507,7 @@ mod hyper {
     impl<'d> super::PreparedFields<'d> {
         /// #### Feature: `hyper`
         /// Convert `self` to `hyper::client::Body`.
-        #[cfg_attr(feature="clippy", allow(wrong_self_convention))]
+        #[cfg_attr(feature="clippy", warn(wrong_self_convention))]
         pub fn to_body<'b>(&'b mut self) -> Body<'b> where 'd: 'b {
             if let Some(content_len) = self.content_len {
                 Body::SizedBody(self, content_len)

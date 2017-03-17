@@ -47,7 +47,7 @@ default = ["all"]
 server = ["buf_redux", "httparse", "safemem", "twoway"]
 mock = []
 nickel_ = ["nickel", "hyper"]
-nightly = []
+nightly = ["clippy"]
 # Use this to enable SSE4.2 instructions in boundary finding
 # TODO: Benchmark this
 sse4 = ["nightly", "twoway/pcmp"]
