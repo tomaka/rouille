@@ -100,18 +100,9 @@ impl FieldHeaders {
     }
 
     fn parse(headers: &[StrHeader]) -> Result<FieldHeaders, ParseHeaderError> {
-        let cont_disp = try!(ContentDisp::parse(headers));
-        let cont_type = match parse_cont_type(headers) {
-            Ok(cont_type) => Some(cont_type),
-            // The Content-Type header is not mandatory so that's ok if it was not found.
-            Err(ParseHeaderError::Missing) => None,
-            // Any other error means the header was found but we failed to parse it. This is a read
-            // error.
-            Err(e) => return Err(e),
-        };
         Ok(FieldHeaders {
-            cont_disp: cont_disp,
-            cont_type: cont_type,
+            cont_disp: try!(try!(ContentDisp::parse(headers)).ok_or(ParseHeaderError::NotFound)),
+            cont_type: try!(parse_cont_type(headers)),
         })
     }
 }
@@ -125,13 +116,13 @@ pub struct ContentDisp {
 }
 
 impl ContentDisp {
-    fn parse(headers: &[StrHeader]) -> Result<ContentDisp, ParseHeaderError> {
-        if headers.is_empty() {
-            return Err(ParseHeaderError::Missing);
-        }
-
+    fn parse(headers: &[StrHeader]) -> Result<Option<ContentDisp>, ParseHeaderError> {
         const CONT_DISP: &'static str = "Content-Disposition";
-        let header = try!(find_header(headers, CONT_DISP).ok_or(ParseHeaderError::Missing));
+        let header = if let Some(header) = find_header(headers, CONT_DISP) {
+            header
+        } else {
+            return Ok(None);
+        };
 
         const NAME: &'static str = "name=";
         const FILENAME: &'static str = "filename=";
@@ -149,18 +140,21 @@ impl ContentDisp {
         let filename = get_str_after(FILENAME, ';', after_field_name)
             .map(|(filename, _)| trim_quotes(filename).to_owned());
 
-        Ok(ContentDisp { field_name: field_name.to_owned(), filename: filename })
+        Ok(Some(ContentDisp { field_name: field_name.to_owned(), filename: filename }))
     }
 }
 
-fn parse_cont_type(headers: &[StrHeader]) -> Result<Mime, ParseHeaderError> {
+fn parse_cont_type(headers: &[StrHeader]) -> Result<Option<Mime>, ParseHeaderError> {
     const CONTENT_TYPE: &'static str = "Content-Type";
-
-    let header = try!(find_header(headers, CONTENT_TYPE).ok_or(ParseHeaderError::Missing));
+    let header = if let Some(header) = find_header(headers, CONTENT_TYPE) {
+        header
+    } else {
+        return Ok(None)
+    };
 
     // Boundary parameter will be parsed into the `Mime`
     debug!("Found Content-Type: {:?}", header.val);
-    Ok(read_content_type(header.val.trim()))
+    Ok(Some(read_content_type(header.val.trim())))
 }
 
 /// A field in a multipart request. May be either text or a binary stream (file).
@@ -682,7 +676,7 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
 #[derive(Debug)]
 pub enum ParseHeaderError {
     /// The header was not found
-    Missing,
+    NotFound,
     /// The header was found but could not be parsed
     Invalid,
     /// IO error
@@ -693,7 +687,7 @@ pub enum ParseHeaderError {
 impl fmt::Display for ParseHeaderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ParseHeaderError::Missing => write!(f, "header not found (ParseHeaderError::Missing)"),
+            ParseHeaderError::NotFound => write!(f, "header not found (ParseHeaderError::NotFound)"),
             ParseHeaderError::Invalid => write!(f, "invalid header (ParseHeaderError::Invalid)"),
             ParseHeaderError::Io(_) => write!(f, "could not read header (ParseHeaderError::Io)"),
             ParseHeaderError::Other(ref reason) => write!(f, "unknown parsing error (ParseHeaderError::Other(\"{}\"))", reason),
@@ -704,7 +698,7 @@ impl fmt::Display for ParseHeaderError {
 impl Error for ParseHeaderError {
     fn description(&self) -> &str {
         match *self {
-            ParseHeaderError::Missing => "header not found",
+            ParseHeaderError::NotFound => "header not found",
             ParseHeaderError::Invalid => "the header is not formatted correctly",
             ParseHeaderError::Io(_) => "failed to read the header",
             ParseHeaderError::Other(_) => "unknown parsing error",
