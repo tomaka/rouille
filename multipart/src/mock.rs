@@ -85,7 +85,7 @@ impl Write for HttpBuffer {
     /// To simulate a network connection, this will copy a random number of bytes
     /// from `buf` to the buffer.
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if buf.len() == 0 {
+        if buf.is_empty() {
             debug!("HttpBuffer::write() was passed a zero-sized buffer.");
             return Ok(0);
         }
@@ -152,7 +152,7 @@ impl<'a> Read for ServerRequest<'a> {
     /// To simulate a network connection, this will copy a random number of bytes
     /// from the buffer to `out`.
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
-        if out.len() == 0 {
+        if out.is_empty() {
             debug!("ServerRequest::read() was passed a zero-sized buffer.");
             return Ok(0);
         }
@@ -167,7 +167,7 @@ impl<'a> Read for ServerRequest<'a> {
 impl<'a> ::server::HttpRequest for ServerRequest<'a> {
     type Body = Self;
 
-    fn multipart_boundary(&self) -> Option<&str> { Some(&self.boundary) }
+    fn multipart_boundary(&self) -> Option<&str> { Some(self.boundary) }
 
     fn body(self) -> Self::Body {
         self

@@ -334,9 +334,9 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: Bu
 
             // If there's more data to be read, the field was truncated
             match self.savable.fill_buf() {
-                Ok(ref buf) if buf.is_empty() => Full(copied),
+                Ok(buf) if buf.is_empty() => Full(copied),
                 Ok(_) => Partial(copied, PartialReason::SizeLimit),
-                Err(e) => Partial(copied, PartialReason::IoError((e)))
+                Err(e) => Partial(copied, PartialReason::IoError(e))
             }
         } else {
             try_copy_buf(&mut self.savable, &mut dest)
@@ -669,9 +669,8 @@ impl<S, P> SaveResult<S, P> where P: Into<S> {
     pub fn into_result_strict(self) -> io::Result<S> {
         match self {
             Full(entries) => Ok(entries),
-            Partial(_, PartialReason::IoError(e)) => Err(e),
+            Partial(_, PartialReason::IoError(e)) | Error(e) => Err(e),
             Partial(partial, _) => Ok(partial.into()),
-            Error(e) => Err(e),
         }
     }
 }

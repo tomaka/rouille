@@ -302,7 +302,7 @@ impl<'d> PreparedFields<'d> {
 
 impl<'d> Read for PreparedFields<'d> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if buf.len() == 0 {
+        if buf.is_empty() {
             debug!("PreparedFields::read() was passed a zero-sized buffer.");
             return Ok(0);
         }
@@ -310,7 +310,7 @@ impl<'d> Read for PreparedFields<'d> {
         let mut total_read = 0;
 
         while total_read < buf.len() {
-            if let None = self.next_field {
+            if self.next_field.is_none() {
                 self.next_field = self.fields.next();
             }
 
@@ -507,6 +507,7 @@ mod hyper {
     impl<'d> super::PreparedFields<'d> {
         /// #### Feature: `hyper`
         /// Convert `self` to `hyper::client::Body`.
+        #[cfg_attr(feature="clippy", warn(wrong_self_convention))]
         pub fn to_body<'b>(&'b mut self) -> Body<'b> where 'd: 'b {
             if let Some(content_len) = self.content_len {
                 Body::SizedBody(self, content_len)

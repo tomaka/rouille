@@ -171,7 +171,7 @@ impl<R: Read> Multipart<R> {
     pub fn save_all_under<P: AsRef<Path>>(&mut self, dir: P) -> EntriesSaveResult<&mut Self> {
         match TempDir::new_in(dir, "multipart") {
             Ok(temp_dir) => self.save().with_temp_dir(temp_dir),
-            Err(err) => return SaveResult::Error(err),
+            Err(err) => SaveResult::Error(err),
         }
     }
 
@@ -198,7 +198,7 @@ impl<R: Read> Multipart<R> {
     pub fn save_all_under_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> EntriesSaveResult<&mut Self> {
         match TempDir::new_in(dir, "multipart") {
             Ok(temp_dir) => self.save().size_limit(limit).with_temp_dir(temp_dir),
-            Err(err) => return SaveResult::Error(err),
+            Err(err) => SaveResult::Error(err),
         }
     }
 }
