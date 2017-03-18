@@ -11,7 +11,8 @@ rust:
   # - nightly
 os:
   - linux
-  - osx
+  # openssl is broken on OS X again
+  # - osx
 env:
   - RUST_LOG=multipart=info RUST_BACKTRACE=1
 script:
