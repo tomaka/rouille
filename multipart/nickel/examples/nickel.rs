@@ -1,14 +1,16 @@
+extern crate multipart_nickel;
 extern crate nickel;
-extern crate multipart;
 
 use std::fs::File;
 use std::io::Read;
-use multipart::server::{Entries, Multipart, SaveResult};
 use nickel::{HttpRouter, MiddlewareResult, Nickel, Request, Response};
 
+use multipart_nickel::MultipartBody;
+use multipart_nickel::multipart_server::{Entries, SaveResult};
+
 fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
-    match Multipart::from_request(req) {
-        Ok(mut multipart) => {
+    match req.multipart_body() {
+        Some(mut multipart) => {
             match multipart.save().temp() {
                 SaveResult::Full(entries) => process_entries(res, entries),
 
@@ -24,7 +26,7 @@ fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewar
                 },
             }
         }
-        Err(_) => {
+        None => {
             res.set(nickel::status::StatusCode::BadRequest);
             return res.send("Request seems not was a multipart request")
         }

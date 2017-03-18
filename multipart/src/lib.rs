@@ -28,6 +28,11 @@
 //! * `nickel_`: Integration with the [Nickel](http://nickel.rs) web application framework.
 //! See the [`server::nickel`](server/nickel/index.html) module for more information. Enables the `hyper`
 //! feature.
+//!
+//! **Note**: in-crate integration for Nickel is deprecated and will be removed in 0.11.0;
+//! integration will be provided in the
+//! [`multipart-nickel`](https://crates.io/crates/multipart-nickel)
+//! crate for the foreseeable future.
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy))]
