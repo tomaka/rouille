@@ -25,7 +25,7 @@ impl<'r, 'mw, 'server, D: 'mw> HttpRequest for &'r mut NickelRequest<'mw, 'serve
     }
 
     fn body(self) -> Self::Body {
-        warn!("In-crate Nickel integration is deprecated and will be removed in 0.11.0; \
+        info!("In-crate Nickel integration is deprecated and will be removed in 0.11.0; \
                please consider switching to the `multipart-nickel` crate to avoid breakage.");
 
         &mut self.origin
