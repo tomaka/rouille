@@ -6,6 +6,7 @@ authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 description = "Support for `multipart/form-data` bodies in Nickel via the `multipart` crate."
 documentation = "https://docs.rs/multipart-nickel"
 repository = "https://github.com/abonander/multipart"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 hyper = "0.9"
