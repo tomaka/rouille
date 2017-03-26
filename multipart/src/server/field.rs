@@ -47,7 +47,7 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
     loop {
         let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
 
-        let buf = try!(r.fill_buf());
+        let buf = r.fill_buf()?;
 
         if attempts == MAX_ATTEMPTS {
             return Err(ParseHeaderError::Other("Could not read field headers".to_string()));
@@ -58,7 +58,7 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
             Ok(Status::Complete((consume_, raw_headers))) =>  {
                 consume = consume_;
                 let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
-                let headers = try!(copy_headers(raw_headers, &mut headers));
+                let headers = copy_headers(raw_headers, &mut headers)?;
                 debug!("Parsed headers: {:?}", headers);
                 ret = closure(headers);
                 break;
@@ -78,7 +78,7 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
 fn copy_headers<'h, 'b: 'h>(raw: &[Header<'b>], headers: &'h mut [StrHeader<'b>]) -> io::Result<&'h [StrHeader<'b>]> {
     for (raw, header) in raw.iter().zip(&mut *headers) {
         header.name = raw.name;
-        header.val = try!(io_str_utf8(raw.value));
+        header.val = io_str_utf8(raw.value)?;
     }
 
     Ok(&headers[..raw.len()])
@@ -95,15 +95,14 @@ pub struct FieldHeaders {
 impl FieldHeaders {
     /// Parse the field headers from the passed `BufRead`, consuming the relevant bytes.
     fn read_from<R: BufRead>(r: &mut R) -> Result<Self, ParseHeaderError> {
-        try!(with_headers(r, Self::parse))
+        with_headers(r, Self::parse)?
     }
 
     fn parse(headers: &[StrHeader]) -> Result<FieldHeaders, ParseHeaderError> {
-        let cont_disp = try!(
-            try!(ContentDisp::parse(headers)).ok_or(ParseHeaderError::MissingContentDisposition));
+        let cont_disp = ContentDisp::parse(headers)?.ok_or(ParseHeaderError::MissingContentDisposition)?;
         Ok(FieldHeaders {
             cont_disp: cont_disp,
-            cont_type: try!(parse_cont_type(headers)),
+            cont_type: parse_cont_type(headers)?,
         })
     }
 }

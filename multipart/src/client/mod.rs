@@ -51,7 +51,7 @@ impl Multipart<()> {
     /// ## Returns Error
     /// If `req.open_stream()` returns an error.
     pub fn from_request<R: HttpRequest>(req: R) -> Result<Multipart<R::Stream>, R::Error> {
-        let (boundary, stream) = try!(open_stream(req, None));
+        let (boundary, stream) = open_stream(req, None)?;
 
         Ok(Multipart {
             writer: MultipartWriter::new(stream, boundary),
@@ -206,7 +206,7 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
 
     fn write_boundary(&mut self) -> io::Result<()> {
         if self.data_written {
-            try!(self.inner.write_all(b"\r\n"));
+            self.inner.write_all(b"\r\n")?;
         }
 
         write!(self.inner, "--{}\r\n", self.boundary)
@@ -221,7 +221,7 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
 
     fn write_file(&mut self, name: &str, path: &Path) -> io::Result<()> {
         let (content_type, filename) = mime_filename(path);
-        let mut file = try!(File::open(path));
+        let mut file = File::open(path)?;
         self.write_stream(&mut file, name, filename, Some(content_type))
     }
 
@@ -258,7 +258,7 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
     fn finish(mut self) -> io::Result<W> {
         if self.data_written {
             // Write two hyphens after the last boundary occurrence.
-            try!(write!(self.inner, "\r\n--{}--", self.boundary));
+            write!(self.inner, "\r\n--{}--", self.boundary)?;
         }
 
         Ok(self.inner)

@@ -136,15 +136,15 @@ struct PrintHex(Vec<u8>);
 
 impl fmt::Debug for PrintHex {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "["));
+        write!(f, "[")?;
 
         let mut written = false;
 
         for byte in &self.0 {
-            try!(write!(f, "{:X}", byte));
+            write!(f, "{:X}", byte)?;
 
             if written {
-                try!(write!(f, ", "));
+                write!(f, ", ")?;
             }
 
             written = true;

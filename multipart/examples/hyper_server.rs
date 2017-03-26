@@ -50,7 +50,7 @@ fn process_entries<'a>(entries: Entries) -> io::Result<()> {
         println!("Field {:?} has {} files:", name, files.len());
 
         for file in files {
-            try!(print_file(&file));
+            print_file(&file)?;
         }
     }
 
@@ -58,10 +58,10 @@ fn process_entries<'a>(entries: Entries) -> io::Result<()> {
 }
 
 fn print_file(saved_file: &SavedFile) -> io::Result<()> {
-    let mut file = try!(File::open(&saved_file.path));
+    let mut file = File::open(&saved_file.path)?;
 
     let mut contents = String::new();
-    try!(file.read_to_string(&mut contents));
+    file.read_to_string(&mut contents)?;
 
     println!("File {:?} ({:?}):", saved_file.filename, saved_file.content_type);
     println!("{}", contents);

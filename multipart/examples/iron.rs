@@ -22,7 +22,7 @@ fn process_request(request: &mut Request) -> IronResult<Response> {
             match multipart.save().temp() {
                 SaveResult::Full(entries) => process_entries(entries),
                 SaveResult::Partial(entries, reason) => {
-                    try!(process_entries(entries.keep_partial()));
+                    process_entries(entries.keep_partial())?;
                     Err(IronError::new(reason.unwrap_err(), status::InternalServerError))
                 }
                 SaveResult::Error(error) => Err(IronError::new(error, status::InternalServerError)),
@@ -45,7 +45,7 @@ fn process_entries(entries: Entries) -> IronResult<Response> {
         println!("Field {:?} has {} files:", name, files.len());
 
         for file in files {
-            try!(print_file(&file));
+            print_file(&file)?;
         }
     }
 

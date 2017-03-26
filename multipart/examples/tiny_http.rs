@@ -38,7 +38,7 @@ fn process_request<'a, 'b>(request: &'a mut Request) -> io::Result<Response<&'b 
             match multipart.save().temp() {
                 SaveResult::Full(entries) => process_entries(entries),
                 SaveResult::Partial(entries, reason) => {
-                    try!(process_entries(entries.keep_partial()));
+                    process_entries(entries.keep_partial())?;
                     // We don't set limits
                     Err(reason.unwrap_err())
                 }
@@ -60,7 +60,7 @@ fn process_entries<'a>(entries: Entries) -> io::Result<Response<&'a [u8]>> {
         println!("Field {:?} has {} files:", name, files.len());
 
         for file in files {
-            try!(print_file(&file));
+            print_file(&file)?;
         }
     }
 
@@ -68,10 +68,10 @@ fn process_entries<'a>(entries: Entries) -> io::Result<Response<&'a [u8]>> {
 }
 
 fn print_file(saved_file: &SavedFile) -> io::Result<()> {
-    let mut file = try!(File::open(&saved_file.path));
+    let mut file = File::open(&saved_file.path)?;
 
     let mut contents = String::new();
-    try!(file.read_to_string(&mut contents));
+    file.read_to_string(&mut contents)?;
 
     println!("File {:?} ({:?}):", saved_file.filename, saved_file.content_type);
     println!("{}", contents);

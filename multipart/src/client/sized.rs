@@ -83,8 +83,8 @@ where <R::Stream as HttpStream>::Error: From<R::Error> {
             ).into());
         }
 
-        let mut req = try!(self.inner.open_stream());
-        try!(io::copy(&mut &self.buffer[..], &mut req));
+        let mut req = self.inner.open_stream()?;
+        io::copy(&mut &self.buffer[..], &mut req)?;
         req.finish().into()
     }
 }

@@ -124,14 +124,12 @@ impl Intercept {
             Err(_) => return Ok(None),
         };
 
-        let tempdir = try!(
-            self.temp_dir_path.as_ref()
+        let tempdir = self.temp_dir_path.as_ref()
                 .map_or_else(
                     || TempDir::new("multipart-iron"),
                     |path| TempDir::new_in(path, "multipart-iron")
                 )
-                .map_err(|e| io_to_iron(e, "Error opening temporary directory for request."))
-        );
+                .map_err(|e| io_to_iron(e, "Error opening temporary directory for request."))?;
 
         match self.limit_behavior {
             LimitBehavior::ThrowError => self.read_request_strict(multipart, tempdir),
@@ -200,7 +198,7 @@ impl Default for Intercept {
 
 impl BeforeMiddleware for Intercept {
     fn before(&self, req: &mut IronRequest) -> IronResult<()> {
-        try!(self.read_request(req))
+        self.read_request(req)?
             .map(|entries| req.extensions.insert::<Entries>(entries));
 
         Ok(())

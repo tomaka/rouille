@@ -265,7 +265,7 @@ impl<'d> PreparedFields<'d> {
             let mut writer = MultipartWriter::new(Vec::new(), &*boundary);
 
             while fields.peek().is_some() {
-                if let Some(rem) = try!(write_fields(&mut writer, &mut fields, buffer_threshold)) {
+                if let Some(rem) = write_fields(&mut writer, &mut fields, buffer_threshold)? {
                     let contiguous = mem::replace(writer.inner_mut(), Vec::new());
                     prep_fields.push(PreparedField::Partial(Cursor::new(contiguous), rem));
                 }
@@ -317,7 +317,7 @@ impl<'d> Read for PreparedFields<'d> {
             let buf = &mut buf[total_read..];
 
             let num_read = if let Some(ref mut field) = self.next_field {
-                try!(field.read(buf))
+                field.read(buf)?
             } else {
                 break;
             };
