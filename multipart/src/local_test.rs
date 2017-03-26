@@ -199,7 +199,7 @@ fn lazy_client_entry_server() {
 }
 
 mod extended {
-    use super::*;
+    use super::{test_client, test_server, test_server_entry_api, test_client_lazy, TestFields};
 
     use std::time::Instant;
 
