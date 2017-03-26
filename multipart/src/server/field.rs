@@ -18,8 +18,7 @@ use mime::{TopLevel, Mime};
 use std::io::{self, Read, BufRead, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::{str, fmt};
-use std::error::Error;
+use std::{str, fmt, error};
 
 const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader {
     name: "",
@@ -712,7 +711,7 @@ impl fmt::Display for ParseHeaderError {
     }
 }
 
-impl Error for ParseHeaderError {
+impl error::Error for ParseHeaderError {
     fn description(&self) -> &str {
         match *self {
             ParseHeaderError::MissingContentDisposition => "\"Content-Disposition\" header not found",
@@ -722,7 +721,7 @@ impl Error for ParseHeaderError {
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&error::Error> {
         match *self {
             ParseHeaderError::Io(ref e) => Some(e),
             _ => None,
