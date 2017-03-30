@@ -47,7 +47,7 @@ impl<R> BoundaryReader<R> where R: Read {
         // Make sure there's enough bytes in the buffer to positively identify the boundary.
         let min_len = self.search_idx + (self.boundary.len() * 2);
 
-        let buf = try!(fill_buf_min(&mut self.source, min_len));
+        let buf = fill_buf_min(&mut self.source, min_len)?;
 
         if buf.is_empty() {
             debug!("fill_buf_min returned zero-sized buf");
@@ -118,7 +118,7 @@ impl<R> BoundaryReader<R> where R: Read {
         while !(self.boundary_read || self.at_end){
             debug!("Boundary not found yet");
 
-            let buf_len = try!(self.read_to_boundary()).len();
+            let buf_len = self.read_to_boundary()?.len();
 
             debug!("Discarding {} bytes", buf_len);
 
@@ -147,10 +147,10 @@ impl<R> BoundaryReader<R> where R: Read {
 
         let mut bytes_after = [0, 0];
 
-        let read = try!(self.source.read(&mut bytes_after));
+        let read = self.source.read(&mut bytes_after)?;
 
         if read == 1 {
-            let _ = try!(self.source.read(&mut bytes_after[1..]));
+            let _ = self.source.read(&mut bytes_after[1..])?;
         }
 
         if bytes_after == *b"--" {
@@ -179,7 +179,7 @@ impl<R> Borrow<R> for BoundaryReader<R> {
 impl<R> Read for BoundaryReader<R> where R: Read {
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
         let read = {
-            let mut buf = try!(self.read_to_boundary());
+            let mut buf = self.read_to_boundary()?;
             // This shouldn't ever be an error so unwrapping is fine.
             buf.read(out).unwrap()
         };
@@ -210,7 +210,7 @@ fn fill_buf_min<R: Read>(buf: &mut BufReader<R>, min: usize) -> io::Result<&[u8]
     let mut attempts = 0;
 
     while buf.available() < min && attempts < MAX_ATTEMPTS {
-        if try!(buf.read_into_buf()) == 0 { break; };
+        if buf.read_into_buf()? == 0 { break; };
         attempts += 1;
     }
 

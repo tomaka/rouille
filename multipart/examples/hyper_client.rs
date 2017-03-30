@@ -28,8 +28,8 @@ fn main() {
 fn write_body(multi: &mut Multipart<Request<Streaming>>) -> hyper::Result<()> {
     let mut binary = "Hello world from binary!".as_bytes();
 
-    try!(multi.write_text("text", "Hello, world!"));
-    try!(multi.write_file("file", "lorem_ipsum.txt"));
+    multi.write_text("text", "Hello, world!")?;
+    multi.write_file("file", "lorem_ipsum.txt")?;
     // &[u8] impl Read
     multi.write_stream("binary", &mut binary, None, None)
         .and(Ok(()))

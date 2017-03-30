@@ -136,15 +136,15 @@ struct PrintHex(Vec<u8>);
 
 impl fmt::Debug for PrintHex {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "["));
+        write!(f, "[")?;
 
         let mut written = false;
 
         for byte in &self.0 {
-            try!(write!(f, "{:X}", byte));
+            write!(f, "{:X}", byte)?;
 
             if written {
-                try!(write!(f, ", "));
+                write!(f, ", ")?;
             }
 
             written = true;
@@ -199,7 +199,7 @@ fn lazy_client_entry_server() {
 }
 
 mod extended {
-    use super::*;
+    use super::{test_client, test_server, test_server_entry_api, test_client_lazy, TestFields};
 
     use std::time::Instant;
 
