@@ -71,9 +71,6 @@ pub mod hyper;
 #[cfg(feature = "iron")]
 pub mod iron;
 
-#[cfg(feature = "nickel")]
-pub mod nickel;
-
 #[cfg(feature = "tiny_http")]
 pub mod tiny_http;
 

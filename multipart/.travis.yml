@@ -5,10 +5,10 @@ branches:
   except:
   - fuzzing
 rust:
+  - 1.13.0
   - stable
   - beta
-  # FIXME: when https://github.com/rust-lang/cargo/issues/3844 is closed
-  # - nightly
+  - nightly
 os:
   - linux
   # openssl is broken on OS X again
@@ -16,7 +16,12 @@ os:
 env:
   - RUST_LOG=multipart=info RUST_BACKTRACE=1
 script:
-  - cargo build -v --features all
-  - cargo test -v --features all
-  - cargo doc -v --no-deps --features all
+  - if [ ${TRAVIS_RUST_VERSION} = "nightly" ]; then
+      cargo build --verbose --features "nightly";
+      cargo test --verbose --features "nightly";
+      cargo doc --verbose --features "nightly";
+    fi
+  - cargo build --verbose;
+  - cargo test --verbose;
+  - cargo doc --verbose;
   - (cd nickel && cargo test -v)
