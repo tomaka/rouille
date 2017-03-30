@@ -25,11 +25,7 @@
 //! * `tiny_http`: Integration with the [`tiny_http`](https://github.com/frewsxcv/tiny-http)
 //! crate. See the [`server::tiny_http`](server/tiny_http/index.html) module for more information.
 //!
-//! * `nickel_`: Integration with the [Nickel](http://nickel.rs) web application framework.
-//! See the [`server::nickel`](server/nickel/index.html) module for more information. Enables the `hyper`
-//! feature.
-//!
-//! **Note**: in-crate integration for Nickel is deprecated and will be removed in 0.11.0;
+//! **Note**: in-crate integration for Nickel was removed in 0.11.0;
 //! integration will be provided in the
 //! [`multipart-nickel`](https://crates.io/crates/multipart-nickel)
 //! crate for the foreseeable future.
@@ -56,9 +52,6 @@ extern crate hyper;
 
 #[cfg(feature = "iron")]
 extern crate iron;
-
-#[cfg(feature = "nickel")]
-extern crate nickel;
 
 #[cfg(feature = "tiny_http")]
 extern crate tiny_http;
