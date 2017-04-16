@@ -18,7 +18,7 @@ to use in conjunction with any third-party library without the need for any glue
 ## Getting started
 
 If you have general knowledge about how HTTP works, [the documentation](https://docs.rs/rouille)
-and [the well-documented examples] (https://github.com/tomaka/rouille/tree/master/examples) are
+and [the well-documented examples](https://github.com/tomaka/rouille/tree/master/examples) are
 good resources to get you started.
 
 ## License
