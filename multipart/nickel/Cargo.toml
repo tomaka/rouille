@@ -1,6 +1,6 @@
 [package]
 name = "multipart-nickel"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
 description = "Support for `multipart/form-data` bodies in Nickel via the `multipart` crate."
@@ -13,7 +13,8 @@ hyper = "0.9"
 nickel = "0.9"
 
 [dependencies.multipart]
-version = "0.11"
-#path = "../"
+version = "0.12"
+# I had no idea you could also specify a path
+path = "../"
 default-features = false
 features = ["hyper", "server"]
