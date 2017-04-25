@@ -211,11 +211,11 @@ mod test {
     use std::io::prelude::*;
 
     const BOUNDARY: &'static str = "boundary";
-    const TEST_VAL: &'static str = "--boundary\r
-dashed-value-1\r
---boundary\r
-dashed-value-2\r
---boundary--"; 
+    const TEST_VAL: &'static str = "--boundary\r\n\
+                                    dashed-value-1\r\n\
+                                    --boundary\r\n\
+                                    dashed-value-2\r\n\
+                                    --boundary--";
         
     #[test]
     fn test_boundary() {
