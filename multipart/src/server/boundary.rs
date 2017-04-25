@@ -55,14 +55,10 @@ impl<R> BoundaryReader<R> where R: Read {
             return Ok(buf);
         }
 
-        if log_enabled!(LogLevel::Trace) {
-            trace!("Buf: {:?}", String::from_utf8_lossy(buf));
-        }
+        trace!("Buf: {:?}", String::from_utf8_lossy(buf));
 
-        debug!(
-            "Before-loop Buf len: {} Search idx: {} Boundary read: {:?}", 
-            buf.len(), self.search_idx, self.boundary_read
-        );
+        debug!("Before-loop Buf len: {} Search idx: {} Boundary read: {:?}",
+               buf.len(), self.search_idx, self.boundary_read);
 
         if !self.boundary_read && self.search_idx < buf.len() {
             let lookahead = &buf[self.search_idx..];
@@ -81,17 +77,15 @@ impl<R> BoundaryReader<R> where R: Read {
             }
         }        
         
-        debug!(
-            "After-loop Buf len: {} Search idx: {} Boundary read: {:?}", 
-            buf.len(), self.search_idx, self.boundary_read
-        );
+        debug!("After-loop Buf len: {} Search idx: {} Boundary read: {:?}",
+               buf.len(), self.search_idx, self.boundary_read);
 
         // If the two bytes before the boundary are a CR-LF, we need to back up
         // the cursor so we don't yield bytes that client code isn't expecting.
         if self.boundary_read && self.search_idx >= 2 {
             let two_bytes_before = &buf[self.search_idx - 2 .. self.search_idx];
 
-            debug!("Two bytes before: {:?} ({:?}) (\"\\r\\n\": {:?})",
+            trace!("Two bytes before: {:?} ({:?}) (\"\\r\\n\": {:?})",
                    String::from_utf8_lossy(two_bytes_before), two_bytes_before, b"\r\n");
 
             if two_bytes_before == &*b"\r\n" {
@@ -102,9 +96,7 @@ impl<R> BoundaryReader<R> where R: Read {
 
         let ret_buf = &buf[..self.search_idx];
 
-        if log_enabled!(LogLevel::Trace) {
-            trace!("Returning buf: {:?}", String::from_utf8_lossy(ret_buf));
-        }
+        trace!("Returning buf: {:?}", String::from_utf8_lossy(ret_buf));
 
         Ok(ret_buf)
     }
@@ -132,10 +124,8 @@ impl<R> BoundaryReader<R> where R: Read {
         self.source.consume(self.search_idx);
         self.search_idx = 0;
 
-        if log_enabled!(LogLevel::Trace) {
-            trace!("Consumed up to self.search_idx, remaining buf: {:?}",
-                   String::from_utf8_lossy(self.source.get_buf()));
-        }
+        trace!("Consumed up to self.search_idx, remaining buf: {:?}",
+               String::from_utf8_lossy(self.source.get_buf()));
 
         let consume_amt = {
             let buf = self.source.get_buf();
@@ -156,15 +146,11 @@ impl<R> BoundaryReader<R> where R: Read {
         if bytes_after == *b"--" {
             self.at_end = true;
         } else if bytes_after != *b"\r\n" {
-            warn!("Unexpected bytes following boundary: {:?}", String::from_utf8_lossy(&bytes_after));
+            debug!("Unexpected bytes following boundary: {:?}", String::from_utf8_lossy(&bytes_after));
         }
 
-        if log_enabled!(LogLevel::Trace) {
-            trace!("Consumed boundary (at_end: {:?}), remaining buf: {:?}",
-                    self.at_end,
-                   String::from_utf8_lossy(self.source.get_buf())
-            );
-        }
+        trace!("Consumed boundary (at_end: {:?}), remaining buf: {:?}", self.at_end,
+               String::from_utf8_lossy(self.source.get_buf()));
 
         Ok(self.at_end)
     }
