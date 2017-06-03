@@ -43,6 +43,7 @@ default = ["all"]
 server = ["buf_redux", "httparse", "safemem", "twoway"]
 mock = []
 nightly = []
+bench = []
 # Use this to enable SSE4.2 instructions in boundary finding
 # TODO: Benchmark this
 sse4 = ["nightly", "twoway/pcmp"]

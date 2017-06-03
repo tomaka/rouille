@@ -156,6 +156,21 @@ impl<R> BoundaryReader<R> where R: Read {
     }
 }
 
+#[cfg(feature = "bench")]
+impl<'a> BoundaryReader<io::Cursor<&'a [u8]>> {
+    fn new_with_bytes(bytes: &'a [u8], boundary: &str) -> Self {
+        Self::from_reader(io::Cursor::new(bytes), boundary)
+    }
+
+    fn reset(&mut self) {
+        // Dump buffer and reset cursor
+        self.source.seek(io::SeekFrom::Start(0));
+        self.at_end = false;
+        self.boundary_read = false;
+        self.search_idx = 0;
+    }
+}
+
 impl<R> Borrow<R> for BoundaryReader<R> {
     fn borrow(&self) -> &R {
         self.source.get_ref()
@@ -223,9 +238,11 @@ mod test {
         debug!("Testing boundary (no split)");
 
         let src = &mut TEST_VAL.as_bytes();
-        let reader = BoundaryReader::from_reader(src, BOUNDARY);
+        let mut reader = BoundaryReader::from_reader(src, BOUNDARY);
+
+        let mut buf = String::new();
         
-        test_boundary_reader(reader);        
+        test_boundary_reader(&mut reader, &mut buf);
     }
 
     struct SplitReader<'a> {
@@ -264,20 +281,22 @@ mod test {
     fn test_split_boundary() {
         let _ = ::env_logger::init();        
         debug!("Testing boundary (split)");
+
+        let mut buf = String::new();
         
         // Substitute for `.step_by()` being unstable.
         for split_at in 0 .. TEST_VAL.len(){
             debug!("Testing split at: {}", split_at);
 
             let src = SplitReader::split(TEST_VAL.as_bytes(), split_at);
-            let reader = BoundaryReader::from_reader(src, BOUNDARY);
-            test_boundary_reader(reader);
+            let mut reader = BoundaryReader::from_reader(src, BOUNDARY);
+            test_boundary_reader(&mut reader, &mut buf);
         }
 
     }
 
-    fn test_boundary_reader<R: Read>(mut reader: BoundaryReader<R>) {
-        let ref mut buf = String::new();    
+    fn test_boundary_reader<R: Read>(reader: &mut BoundaryReader<R>, buf: &mut String) {
+        buf.clear();
 
         debug!("Read 1");
         let _ = reader.read_to_string(buf).unwrap();
@@ -306,5 +325,24 @@ mod test {
         debug!("Read 4");
         let _ = reader.read_to_string(buf).unwrap();
         assert_eq!(buf, "");
+    }
+
+    #[cfg(feature = "bench")]
+    mod bench {
+        extern crate test;
+        use self::test::Bencher;
+
+        use super::*;
+
+        #[bench]
+        fn bench_boundary_reader(b: &mut Bencher) {
+            let mut reader = BoundaryReader::new_with_bytes(TEST_VAL.as_bytes(), BOUNDARY);
+            let mut buf = String::with_capacity(256);
+
+            b.iter(|| {
+                reader.reset();
+                test_boundary_reader(&mut reader, &mut buf);
+            });
+        }
     }
 }
