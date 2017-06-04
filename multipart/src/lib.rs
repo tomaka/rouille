@@ -48,6 +48,8 @@ extern crate mime_guess;
 extern crate rand;
 extern crate tempdir;
 
+extern crate safemem;
+
 #[cfg(feature = "hyper")]
 extern crate hyper;
 

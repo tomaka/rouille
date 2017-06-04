@@ -20,13 +20,13 @@ log = "0.3"
 mime = "0.2"
 mime_guess = "1.8"
 rand = "0.3"
+safemem = { version = "0.2", optional = true }
 tempdir = ">=0.3.4"
 clippy = { version = ">=0.0, <0.1", optional = true}
 
 #Server Dependencies
 buf_redux = { version = "0.6", optional = true }
 httparse = { version = "1.2", optional = true }
-safemem = { version = "0.2", optional = true }
 twoway = { version = "0.1", optional = true }
 
 # Optional Integrations
