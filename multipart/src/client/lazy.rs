@@ -19,7 +19,7 @@ macro_rules! try_lazy (
     ($field:expr, $try:expr) => (
         match $try {
             Ok(ok) => ok,
-            Err(e) => return Err(LazyError::with_field($field, e)),
+            Err(e) => return Err(LazyError::with_field($field.into(), e)),
         }
     );
     ($try:expr) => (
@@ -61,6 +61,14 @@ impl<'a, E> LazyError<'a, E> {
         LazyError {
             field_name: Some(field_name),
             error: error.into(),
+            _priv: (),
+        }
+    }
+
+    fn transform_err<E_: From<E>>(self) -> LazyError<'a, E_> {
+        LazyError {
+            field_name: self.field_name,
+            error: self.error.into(),
             _priv: (),
         }
     }
@@ -169,7 +177,7 @@ impl<'n, 'd> Multipart<'n, 'd> {
     ///
     /// If any files were added by path they will now be opened for reading.
     pub fn send<R: HttpRequest>(&mut self, mut req: R) -> Result<< R::Stream as HttpStream >::Response, LazyError<'n, < R::Stream as HttpStream >::Error>> {
-        let mut prepared = try_lazy!(self.prepare());
+        let mut prepared = self.prepare().map_err(LazyError::transform_err)?;
 
         req.apply_headers(prepared.boundary(), prepared.content_len());
 
@@ -260,20 +268,21 @@ impl<'d> PreparedFields<'d> {
                     use_len = false;
 
                     streams.push(
-                        PreparedField::from_stream(field.name, &boundary, stream.content_type,
-                                               stream.filename, stream.stream));
+                        PreparedField::from_stream(&field.name, &boundary, stream.content_type,
+                                                   stream.filename.as_ref().map(|f| &**f),
+                                                   stream.stream));
                 },
             }
         }
 
         // So we don't write a spurious end boundary
         if text_data.is_empty() && streams.is_empty() {
-            *boundary = String::new();
+            boundary = String::new();
         } else {
             boundary.push_str("--");
         }
 
-        content_len += boundary.len();
+        content_len += boundary.len() as u64;
 
         Ok(PreparedFields {
             text_data: Cursor::new(text_data),
@@ -294,7 +303,7 @@ impl<'d> PreparedFields<'d> {
         let boundary = self.end_boundary.get_ref();
 
         // Get just the bare boundary string
-        boundary[4 .. boundary.len() - 2]
+        &boundary[4 .. boundary.len() - 2]
     }
 }
 
@@ -307,7 +316,7 @@ impl<'d> Read for PreparedFields<'d> {
 
         let mut total_read = 0;
 
-        while total_read < buf.len() {
+        while total_read < buf.len() && !cursor_at_end(&self.end_boundary){
             let buf = &mut buf[total_read..];
 
             total_read += if !cursor_at_end(&self.text_data) {
@@ -335,15 +344,15 @@ struct PreparedField<'d> {
 }
 
 impl<'d> PreparedField<'d> {
-    fn from_path<'n>(name: &'n str, path: &Path, boundary: &str) -> Result<(Self, u64), LazyIoError<'n>> {
-        let (content_type, filename) = super::mime_filename(path);
+    fn from_path<'n>(name: Cow<'n, str>, path: &Path, boundary: &str) -> Result<(Self, u64), LazyIoError<'n>> {
+        let (content_type, filename) = super::mime_filename(&path);
 
         let file = try_lazy!(name, File::open(path));
         let content_len = try_lazy!(name, file.metadata()).len();
 
-        let stream = Self::from_stream(name, boundary, content_type, filename, Box::new(file));
+        let stream = Self::from_stream(&name, boundary, content_type, filename, Box::new(file));
 
-        let content_len = content_len + stream.header.get_ref().len();
+        let content_len = content_len + (stream.header.get_ref().len() as u64);
 
         Ok((stream, content_len))
     }
@@ -355,10 +364,10 @@ impl<'d> PreparedField<'d> {
                boundary, name).unwrap();
 
         if let Some(filename) = filename {
-            write!(header, "; filename=\"{}\"").unwrap();
+            write!(header, "; filename=\"{}\"", filename).unwrap();
         }
 
-        write!(header, "Content-Type: {}\r\n\r\n", content_type).unwrap();
+        write!(header, "\r\nContent-Type: {}\r\n\r\n", content_type).unwrap();
 
         PreparedField {
             header: Cursor::new(header),
@@ -369,6 +378,8 @@ impl<'d> PreparedField<'d> {
 
 impl<'d> Read for PreparedField<'d> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        debug!("PreparedField::read()");
+
         if !cursor_at_end(&self.header) {
             self.header.read(buf)
         } else {

@@ -7,8 +7,10 @@
 
 //! Boundary parsing for `multipart` requests.
 
+use ::safemem;
+
 use super::buf_redux::BufReader;
-use super::{safemem, twoway};
+use super::twoway;
 
 use log::LogLevel;
 

@@ -326,7 +326,7 @@ fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
         }
     }
 
-    let mut prepared = multipart.prepare_threshold(None).unwrap();
+    let mut prepared = multipart.prepare().unwrap();
 
     let mut buf = Vec::new();
 
