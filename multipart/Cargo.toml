@@ -1,11 +1,11 @@
 [package]
 name = "multipart"
 
-version = "0.12.0"
+version = "0.13.0"
 
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
-description = "A backend-agnostic extension for HTTP libraries that provides support for POST multipart/form-data requests on for both client and server."
+description = "A backend-agnostic extension for HTTP libraries that provides support for POST multipart/form-data requests on both client and server."
 
 keywords = ["form-data", "hyper", "iron", "http", "upload"]
 

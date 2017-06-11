@@ -9,12 +9,13 @@ repository = "https://github.com/abonander/multipart"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-hyper = "0.9"
-nickel = "0.9"
+hyper = "0.10"
+nickel = "0.10"
 
 [dependencies.multipart]
-version = "0.12"
-# I had no idea you could also specify a path
+version = "0.13"
+# You can specify a path alongside the version so it can be tested against the latest code but published
+# against the released version
 path = "../"
 default-features = false
 features = ["hyper", "server"]
