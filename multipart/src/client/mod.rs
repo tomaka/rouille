@@ -63,7 +63,7 @@ impl<S: HttpStream> Multipart<S> {
     /// Write a text field to this multipart request.
     /// `name` and `val` can be either owned `String` or `&str`.
     ///
-    /// ##Errors
+    /// ## Errors
     /// If something went wrong with the HTTP stream.
     pub fn write_text<N: AsRef<str>, V: AsRef<str>>(&mut self, name: N, val: V) -> Result<&mut Self, S::Error> {
         map_self!(self, self.writer.write_text(name.as_ref(), val.as_ref()))
@@ -77,7 +77,7 @@ impl<S: HttpStream> Multipart<S> {
     ///
     /// `name` can be either `String` or `&str`, and `path` can be `PathBuf` or `&Path`.
     ///
-    /// ##Errors
+    /// ## Errors
     /// If there was a problem opening the file (was a directory or didn't exist),
     /// or if something went wrong with the HTTP stream.
     pub fn write_file<N: AsRef<str>, P: AsRef<Path>>(&mut self, name: N, path: P) -> Result<&mut Self, S::Error> {
@@ -93,7 +93,7 @@ impl<S: HttpStream> Multipart<S> {
     /// `name` can be either `String` or `&str`, and `read` can take the `Read` by-value or
     /// with an `&mut` borrow.
     ///
-    /// ##Warning
+    /// ## Warning
     /// The given `Read` **must** be able to read to EOF (end of file/no more data), meaning
     /// `Read::read()` returns `Ok(0)`. If it never returns EOF it will be read to infinity 
     /// and the request will never be completed.
@@ -104,7 +104,7 @@ impl<S: HttpStream> Multipart<S> {
     /// Use `Read::take()` if you wish to send data from a `Read` 
     /// that will never return EOF otherwise.
     ///
-    /// ##Errors
+    /// ## Errors
     /// If the reader returned an error, or if something went wrong with the HTTP stream.
     // RFC: How to format this declaration?
     pub fn write_stream<N: AsRef<str>, St: Read>(

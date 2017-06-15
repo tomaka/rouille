@@ -6,7 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 //! Client- and server-side abstractions for HTTP `multipart/form-data` requests.
 //!
-//! ###Features:
+//! ### Features:
 //! This documentation is built with all features enabled.
 //!
 //! * `client`: The client-side abstractions for generating multipart requests.

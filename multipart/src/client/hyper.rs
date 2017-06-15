@@ -24,12 +24,12 @@ use mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
 use super::{HttpRequest, HttpStream};
 
-/// ####Feature: `hyper`
+/// #### Feature: `hyper`
 impl HttpRequest for Request<Fresh> {
     type Stream = Request<Streaming>;
     type Error = HyperError;
 
-    /// #Panics
+    /// # Panics
     /// If `self.method() != Method::Post`.
     fn apply_headers(&mut self, boundary: &str, content_len: Option<u64>) -> bool {
         if self.method() != Method::Post {
@@ -59,7 +59,7 @@ impl HttpRequest for Request<Fresh> {
     }
 } 
 
-/// ####Feature: `hyper`
+/// #### Feature: `hyper`
 impl HttpStream for Request<Streaming> {
     type Request = Request<Fresh>;
     type Response = Response;

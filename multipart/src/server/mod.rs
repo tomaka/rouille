@@ -112,7 +112,7 @@ impl<R: Read> Multipart<R> {
     /// Read the next entry from this multipart request, returning a struct with the field's name and
     /// data. See `MultipartField` for more info.
     ///
-    /// ##Warning: Risk of Data Loss
+    /// ## Warning: Risk of Data Loss
     /// If the previously returned entry had contents of type `MultipartField::File`,
     /// calling this again will discard any unread contents of that entry.
     pub fn read_entry(&mut self) -> io::Result<Option<MultipartField<&mut Self>>> {

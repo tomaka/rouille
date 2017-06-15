@@ -30,7 +30,7 @@ impl ::client::HttpRequest for ClientRequest {
         true
     }
 
-    /// ##Panics
+    /// ## Panics
     /// If `apply_headers()` was not called.
     fn open_stream(self) -> Result<HttpBuffer, io::Error> {
         debug!("ClientRequest::open_stream called! {:?}", self);
