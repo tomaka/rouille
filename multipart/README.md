@@ -4,7 +4,7 @@ Client- and server-side abstractions for HTTP file uploads (POST requests with  
 
 Supports several different HTTP crates.
 
-Minimum supported Rust version: 1.13.0 (for `?` operator)
+Minimum supported Rust version: 1.15.0
 
 ### [Documentation](http://docs.rs/multipart/)
 
