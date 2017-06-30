@@ -125,13 +125,20 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
         .unwrap_or(time::now().tm_nsec as u64)
         ^ 0xd3f40305c9f8e911u64).to_string();
 
-    Response::from_file(extension_to_mime(extension), file)
+    Response::from_file(extension_to_mime_impl(extension), file)
         .with_etag(request, etag)
         .with_public_cache(3600)        // TODO: is this a good idea? what if the file is private?
 }
 
+/// Returns the mime type of a file based on its extension, or `application/octet-stream` if the
+/// extension is unknown.
+#[inline]
+pub fn extension_to_mime(extension: &str) -> &'static str {
+    extension_to_mime_impl(Some(extension))
+}
+
 /// Returns the mime type of a file based on its extension.
-fn extension_to_mime(extension: Option<&str>) -> &'static str {
+fn extension_to_mime_impl(extension: Option<&str>) -> &'static str {
     // List taken from https://github.com/cybergeek94/mime_guess/blob/master/src/mime_types.rs,
     // itself taken from a dead link.
     match extension {

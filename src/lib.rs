@@ -66,6 +66,7 @@ extern crate time;
 extern crate tiny_http;
 extern crate url;
 
+pub use assets::extension_to_mime;
 pub use assets::match_assets;
 pub use log::log;
 pub use response::{Response, ResponseBody};
