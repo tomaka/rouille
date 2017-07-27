@@ -99,6 +99,14 @@ impl Multipart<()> {
 
 impl<R: Read> Multipart<R> {
     /// Construct a new `Multipart` with the given body reader and boundary.
+    ///
+    /// ## Note: `boundary`
+    /// This will prepend the requisite `--` to the boundary string as documented in
+    /// [IETF RFC 1341, Section 7.2.1: "Multipart: the common syntax"][rfc1341-7.2.1].
+    /// Simply pass the value of the `boundary` key from the `Content-Type` header in the
+    /// request (or use `Multipart::from_request()`, if supported).
+    ///
+    /// [rfc1341-7.2.1]: https://tools.ietf.org/html/rfc1341#page-30
     pub fn with_body<Bnd: Into<String>>(body: R, boundary: Bnd) -> Self {
         let boundary = boundary.into();
 
