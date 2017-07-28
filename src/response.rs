@@ -13,6 +13,7 @@ use std::io;
 use std::io::Cursor;
 use std::io::Read;
 use std::fs::File;
+use std::ops::Try;
 use rustc_serialize;
 use url::percent_encoding;
 use Request;
@@ -635,6 +636,30 @@ impl Response {
         self.with_unique_header("Cache-Control", "no-cache, no-store, must-revalidate")
             .with_unique_header("Expires", "0")
             .with_unique_header("Pragma", "no-cache")
+    }
+}
+
+impl Try for Response {
+    type Ok = Response;
+    type Error = Response;
+
+    #[inline]
+    fn into_result(self) -> Result<Response, Response> {
+        if self.is_success() {
+            Ok(self)
+        } else {
+            Err(self)
+        }
+    }
+
+    #[inline]
+    fn from_ok(ok: Response) -> Response {
+        ok
+    }
+
+    #[inline]
+    fn from_error(err: Response) -> Response {
+        err
     }
 }
 

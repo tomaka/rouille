@@ -50,6 +50,8 @@
 //! In order to serve static files, take a look at
 //! [the `match_assets` function](fn.match_assets.html).
 
+#![feature(try_trait)]
+
 #![deny(unsafe_code)]
 
 #[cfg(feature = "brotli2")]
