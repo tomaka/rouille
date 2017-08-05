@@ -131,7 +131,11 @@ impl<R> BoundaryReader<R> where R: Read {
 
         let consume_amt = {
             let buf = self.source.get_buf();
-            self.boundary.len() + if buf.len() >=2 && buf[..2] == *b"\r\n" { 2 } else { 0 }
+            let mut skip_size = 0;
+            while buf.len() >= skip_size + 2 && buf[skip_size..(skip_size + 2)] == *b"\r\n" {
+                skip_size += 2;
+            }
+            self.boundary.len() + skip_size
         };
 
         self.source.consume(consume_amt);
