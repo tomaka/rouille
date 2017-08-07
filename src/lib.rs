@@ -58,10 +58,14 @@ extern crate chrono;
 extern crate filetime;
 #[cfg(feature = "flate2")]
 extern crate flate2;
+extern crate httparse;
+extern crate mio;
 extern crate multipart;
+extern crate num_cpus;
 extern crate rand;
 extern crate rustc_serialize;
 extern crate sha1;
+extern crate slab;
 extern crate time;
 extern crate tiny_http;
 extern crate url;
@@ -97,6 +101,7 @@ mod log;
 mod response;
 mod router;
 mod server;
+mod socket_handler;
 #[doc(hidden)]
 pub mod try_or_400;
 
