@@ -31,10 +31,10 @@ pub struct SocketHandler {
     state: SocketHandlerState,
 
     // Address of the client. Will be extracted at some point during the handling.
-    client_addr: Option<SocketAddr>,
+    client_addr: SocketAddr,
 
     // Object that handles the request and returns a response.
-    handler: Option<Box<FnMut(Request) -> Response + Send + 'static>>,
+    handler: Arc<Mutex<FnMut(Request) -> Response + Send + 'static>>,
 }
 
 enum SocketHandlerState {
@@ -100,8 +100,8 @@ impl SocketHandler {
     {
         SocketHandler {
             state: SocketHandlerState::WaitingForRqLine,
-            client_addr: Some(client_addr),
-            handler: Some(Box::new(handler)),
+            client_addr: client_addr,
+            handler: Arc::new(Mutex::new(handler)),
         }
     }
 
@@ -148,8 +148,8 @@ impl SocketHandler {
                         // TODO: yeah, don't spawn threads left and right
                         let (registration, set_ready) = Registration::new2();
                         let registration = Arc::new(registration);
-                        let mut handler = self.handler.take().unwrap();
-                        let remote_addr = self.client_addr.take().unwrap();
+                        let handler = self.handler.clone();
+                        let remote_addr = self.client_addr.clone();
                         let (tx, rx) = channel();
                         thread::spawn(move || {
                             let request = Request {
@@ -161,8 +161,9 @@ impl SocketHandler {
                                 remote_addr: remote_addr,
                             };
 
-                            let response = handler(request);
-                            let _ = tx.send(response);
+                            let mut handler = handler.lock().unwrap();
+                            let response = (&mut *handler)(request);
+                            let _ = tx.send(response);  
                             ::std::thread::sleep(::std::time::Duration::from_millis(500));  // TODO: remove
                             let _ = set_ready.set_readiness(Ready::readable());
                         });
