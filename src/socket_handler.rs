@@ -131,11 +131,16 @@ impl SocketHandler {
                 SocketHandlerState::WaitingForHeaders { method, path, version } => {
                     let off = update.new_data_start.saturating_sub(3);
                     if let Some(rnrn) = update.pending_read_buffer[off..].windows(4).position(|w| w == b"\r\n\r\n") {
-                        {
+                        let headers = {
+                            let mut out_headers = Vec::new();
                             let mut headers = [httparse::EMPTY_HEADER; 32];
-                            httparse::parse_headers(&update.pending_read_buffer, &mut headers).unwrap();        // TODO:
-                            println!("{:?}", headers);
-                        }
+                            let (_, parsed_headers) = httparse::parse_headers(&update.pending_read_buffer, &mut headers).unwrap().unwrap();        // TODO:
+                            for parsed in parsed_headers {
+                                out_headers.push((parsed.name.to_owned(), String::from_utf8_lossy(parsed.value).into()));      // TODO: wrong
+                            }
+                            println!("{:?}", out_headers);
+                            out_headers
+                        };
 
                         // TODO: don't reallocate a Vec
                         update.pending_read_buffer = update.pending_read_buffer[off + rnrn + 4..].to_owned();
@@ -150,7 +155,7 @@ impl SocketHandler {
                             let request = Request {
                                 method: method,
                                 url: path,
-                                headers: Vec::new(),
+                                headers: headers,
                                 https: false,
                                 data: Arc::new(Mutex::new(None)),       // FIXME:
                                 remote_addr: remote_addr,
@@ -178,7 +183,7 @@ impl SocketHandler {
                 SocketHandlerState::ExecutingHandler { response_getter, registration } => {
                     // TODO: write incoming data to request's reader
                     if let Ok(response) = response_getter.try_recv() {
-                        assert!(response.upgrade.is_none());
+                        assert!(response.upgrade.is_none());        // TODO:
 
                         let mut headers_data = Vec::new();
                         write!(headers_data, "HTTP/1.1 {} Ok\r\n", response.status_code).unwrap();
