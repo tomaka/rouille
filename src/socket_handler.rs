@@ -185,14 +185,16 @@ impl SocketHandler {
                     if let Ok(response) = response_getter.try_recv() {
                         assert!(response.upgrade.is_none());        // TODO:
 
+                        let (body_data, body_size) = response.data.into_reader_and_size();
+
                         let mut headers_data = Vec::new();
                         write!(headers_data, "HTTP/1.1 {} Ok\r\n", response.status_code).unwrap();
                         for (header, value) in response.headers {
                             write!(headers_data, "{}: {}\r\n", header, value).unwrap();
                         }
+                        write!(headers_data, "Content-Length: {}\r\n", body_size.unwrap()).unwrap();        // TODO: don't unwrap body_size
                         write!(headers_data, "\r\n").unwrap();
 
-                        let (body_data, _) = response.data.into_reader_and_size();
                         let full_data = Cursor::new(headers_data).chain(body_data);
 
                         self.state = SocketHandlerState::SendingResponse {
@@ -206,29 +208,10 @@ impl SocketHandler {
                 },
 
                 SocketHandlerState::SendingResponse { mut data } => {
-                    let old_pw_len = update.pending_write_buffer.len();
-                    update.pending_write_buffer.resize(old_pw_len + 256, 0);
-
-                    match data.read(&mut update.pending_write_buffer[old_pw_len..]) {
-                        Ok(0) => {
-                            update.pending_write_buffer.resize(old_pw_len, 0);
-                            self.state = SocketHandlerState::WaitingForRqLine;
-                            break;
-                        },
-                        Ok(n) => {
-                            update.pending_write_buffer.resize(old_pw_len + n, 0);
-                            self.state = SocketHandlerState::SendingResponse { data };
-                            break;
-                        },
-                        Err(ref e) if e.kind() == ErrorKind::Interrupted => {
-                            update.pending_write_buffer.resize(old_pw_len, 0);
-                            self.state = SocketHandlerState::SendingResponse { data };
-                        },
-                        Err(e) => {
-                            update.pending_write_buffer.resize(old_pw_len, 0);
-                            panic!("{:?}", e);      // FIXME:
-                        },
-                    };
+                    // TODO: meh, this can block
+                    data.read_to_end(&mut update.pending_write_buffer).unwrap();
+                    self.state = SocketHandlerState::WaitingForRqLine;
+                    break;
                 },
 
                 SocketHandlerState::Closed => {

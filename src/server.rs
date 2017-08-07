@@ -318,7 +318,9 @@ fn handle_write<F>(share: &ThreadsShare<F>, socket: Socket) {
             },
             Ok(n) => {
                 // TODO: more efficient
+                println!("sent back {:?}", String::from_utf8_lossy(&update.pending_write_buffer[..n]));
                 update.pending_write_buffer = update.pending_write_buffer[n..].to_owned();
+                let _ = stream.flush();
             },
             Err(ref e) if e.kind() == ErrorKind::Interrupted => {},
             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
