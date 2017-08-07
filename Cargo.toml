@@ -20,6 +20,8 @@ brotli2 = { version = "0.2.1", optional = true }
 chrono = "0.2.0"
 filetime = "0.1.10"
 flate2 = { version = "0.2.14", optional = true }
+httparse = "1.2.3"
+mio = "0.6.10"
 multipart = { version = "0.5.1", default-features = false, features = ["server"] }
 rand = "0.3.11"
 rustc-serialize = "0.3"
