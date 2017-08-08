@@ -21,6 +21,7 @@ chrono = "0.2.0"
 filetime = "0.1.10"
 flate2 = { version = "0.2.14", optional = true }
 httparse = "1.2.3"
+itoa = "0.3"
 mio = "0.6.10"
 multipart = { version = "0.5.1", default-features = false, features = ["server"] }
 num_cpus = "1.6.2"

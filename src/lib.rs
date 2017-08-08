@@ -59,6 +59,7 @@ extern crate filetime;
 #[cfg(feature = "flate2")]
 extern crate flate2;
 extern crate httparse;
+extern crate itoa;
 extern crate mio;
 extern crate multipart;
 extern crate num_cpus;

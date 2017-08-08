@@ -7,9 +7,9 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::io::Cursor;
+use std::ascii::AsciiExt;
+use std::borrow::Cow;
 use std::io::Read;
-use std::io::Write;
 use std::mem;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -18,6 +18,7 @@ use std::sync::mpsc::{channel, Receiver};
 use std::str;
 use std::thread;
 use httparse;
+use itoa::write as itoa;
 use mio::Ready;
 use mio::Registration;
 
@@ -148,19 +149,13 @@ impl Http1Handler {
                         assert!(response.upgrade.is_none());        // TODO:
 
                         let (body_data, body_size) = response.data.into_reader_and_size();
-
-                        let mut headers_data = Vec::new();
-                        write!(headers_data, "HTTP/1.1 {} Ok\r\n", response.status_code).unwrap();
-                        for (header, value) in response.headers {
-                            write!(headers_data, "{}: {}\r\n", header, value).unwrap();
-                        }
-                        write!(headers_data, "Content-Length: {}\r\n", body_size.unwrap()).unwrap();        // TODO: don't unwrap body_size
-                        write!(headers_data, "\r\n").unwrap();
-
-                        let full_data = Cursor::new(headers_data).chain(body_data);
+                        write_status_and_headers(&mut update.pending_write_buffer,
+                                                 response.status_code,
+                                                 &response.headers,
+                                                 body_size);
 
                         self.state = Http1HandlerState::SendingResponse {
-                            data: Box::new(full_data)
+                            data: Box::new(body_data)
                         };
 
                     } else {
@@ -229,4 +224,104 @@ fn parse_request_line(line: &[u8]) -> Result<(&str, &str, HttpVersion), ()> {
 
     let version = parse_http_version(version)?;
     Ok((method, path, version))
+}
+
+// Writes the status line and headers of the response to `out`.
+fn write_status_and_headers(mut out: &mut Vec<u8>, status_code: u16,
+                            headers: &[(Cow<'static, str>, Cow<'static, str>)],
+                            body_size: Option<usize>)
+{
+    out.extend_from_slice(b"HTTP/1.1 ");
+    itoa(&mut out, status_code).unwrap();
+    out.push(b' ');
+    out.extend_from_slice(default_reason_phrase(status_code).as_bytes());
+    out.extend_from_slice(b"\r\n");
+
+    let mut found_server_header = false;
+    let mut found_date_header = false;
+    for &(ref header, ref value) in headers {
+        if !found_server_header && header.eq_ignore_ascii_case("Server") {
+            found_server_header = true;
+        }
+        if !found_date_header && header.eq_ignore_ascii_case("Date") {
+            found_date_header = true;
+        }
+
+        // Some headers can't be written with the response, as they are too "low-level".
+        if header.eq_ignore_ascii_case("Content-Length") ||
+            header.eq_ignore_ascii_case("Transfer-Encoding") ||
+            header.eq_ignore_ascii_case("Connection") ||
+            header.eq_ignore_ascii_case("Trailer")
+        {
+            continue;
+        }
+
+        out.extend_from_slice(header.as_bytes());
+        out.extend_from_slice(b": ");
+        out.extend_from_slice(value.as_bytes());
+        out.extend_from_slice(b"\r\n");
+    }
+
+    if !found_server_header {
+        out.extend_from_slice(b"Server: rouille\r\n");
+    }
+    if !found_date_header {
+        out.extend_from_slice(b"Date: TODO\r\n");      // TODO:
+    }
+
+    out.extend_from_slice(b"Content-Length: ");
+    itoa(&mut out, body_size.unwrap()).unwrap();      // TODO: don't unwrap body_size
+    out.extend_from_slice(b"\r\n");
+    out.extend_from_slice(b"\r\n");
+}
+
+// Returns the phrase corresponding to a status code.
+fn default_reason_phrase(status_code: u16) -> &'static str {
+    match status_code {
+        100 => "Continue",
+        101 => "Switching Protocols",
+        102 => "Processing",
+        118 => "Connection timed out",
+        200 => "OK",
+        201 => "Created",
+        202 => "Accepted",
+        203 => "Non-Authoritative Information",
+        204 => "No Content",
+        205 => "Reset Content",
+        206 => "Partial Content",
+        207 => "Multi-Status",
+        210 => "Content Different",
+        300 => "Multiple Choices",
+        301 => "Moved Permanently",
+        302 => "Found",
+        303 => "See Other",
+        304 => "Not Modified",
+        305 => "Use Proxy",
+        307 => "Temporary Redirect",
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        402 => "Payment Required",
+        403 => "Forbidden",
+        404 => "Not Found",
+        405 => "Method Not Allowed",
+        406 => "Not Acceptable",
+        407 => "Proxy Authentication Required",
+        408 => "Request Time-out",
+        409 => "Conflict",
+        410 => "Gone",
+        411 => "Length Required",
+        412 => "Precondition Failed",
+        413 => "Request Entity Too Large",
+        414 => "Reques-URI Too Large",
+        415 => "Unsupported Media Type",
+        416 => "Request range not satisfiable",
+        417 => "Expectation Failed",
+        500 => "Internal Server Error",
+        501 => "Not Implemented",
+        502 => "Bad Gateway",
+        503 => "Service Unavailable",
+        504 => "Gateway Time-out",
+        505 => "HTTP Version not supported",
+        _ => "Unknown"
+    }
 }
