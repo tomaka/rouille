@@ -16,6 +16,7 @@ brotli = ["brotli2"]
 gzip = ["flate2"]
 
 [dependencies]
+arrayvec = "0.3.23"
 brotli2 = { version = "0.2.1", optional = true }
 chrono = "0.2.0"
 crossbeam = "0.3.0"

@@ -52,6 +52,7 @@
 
 #![deny(unsafe_code)]
 
+extern crate arrayvec;
 #[cfg(feature = "brotli2")]
 extern crate brotli2;
 extern crate chrono;
@@ -79,6 +80,7 @@ pub use response::{Response, ResponseBody};
 pub use server::Server;
 pub use tiny_http::ReadWrite;
 
+use arrayvec::ArrayString;
 use std::io::Cursor;
 use std::io::Result as IoResult;
 use std::io::Read;
@@ -224,7 +226,7 @@ pub trait Upgrade {
 /// This can be either a real request (received by the HTTP server) or a mock object created with
 /// one of the `fake_*` constructors.
 pub struct Request {
-    method: String,
+    method: ArrayString<[u8; 16]>,
     url: String,
     headers: Vec<(String, String)>,
     https: bool,
@@ -242,7 +244,7 @@ impl Request {
     {
         Request {
             url: url.into(),
-            method: method.into(),
+            method: ArrayString::from(&method.into()).expect("Method too long"),
             https: false,
             data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
             headers: headers,
@@ -257,7 +259,7 @@ impl Request {
     {
         Request {
             url: url.into(),
-            method: method.into(),
+            method: ArrayString::from(&method.into()).expect("Method too long"),
             https: false,
             data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
             headers: headers,
@@ -274,7 +276,7 @@ impl Request {
     {
         Request {
             url: url.into(),
-            method: method.into(),
+            method: ArrayString::from(&method.into()).expect("Method too long"),
             https: true,
             data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
             headers: headers,
@@ -289,7 +291,7 @@ impl Request {
     {
         Request {
             url: url.into(),
-            method: method.into(),
+            method: ArrayString::from(&method.into()).expect("Method too long"),
             https: true,
             data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
             headers: headers,

@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::mpsc::{channel, Receiver};
 use std::str;
+use arrayvec::ArrayString;
 use httparse;
 use itoa::write as itoa;
 use mio::Ready;
@@ -49,7 +50,7 @@ enum Http1HandlerState {
     Poisonned,
     WaitingForRqLine,
     WaitingForHeaders {
-        method: String,
+        method: ArrayString<[u8; 16]>,
         path: String,
         version: HttpVersion,
     },
@@ -89,7 +90,8 @@ impl Http1Handler {
                     if let Some(rn) = update.pending_read_buffer[off..].windows(2).position(|w| w == b"\r\n") {
                         let (method, path, version) = {
                             let (method, path, version) = parse_request_line(&update.pending_read_buffer[..rn]).unwrap();       // TODO: error
-                            (method.to_owned(), path.to_owned(), version)
+                            let method = ArrayString::from(method).unwrap();        // TODO: error
+                            (method, path.to_owned(), version)
                         };
                         // TODO: don't reallocate a Vec
                         update.pending_read_buffer = update.pending_read_buffer[rn + 2..].to_owned();
