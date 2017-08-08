@@ -22,6 +22,7 @@ use mio::tcp::{TcpListener, TcpStream};
 use num_cpus;
 use slab::Slab;
 
+use socket_handler::Protocol;
 use socket_handler::TaskPool;
 use socket_handler::SocketHandler;
 use socket_handler::SocketHandlerDispatch;
@@ -224,7 +225,7 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
                         let share = share.clone();
                         entry.insert(Socket::Stream {
                             stream: stream,
-                            handler: SocketHandlerDispatch::new(client_addr, share.task_pool.clone(),
+                            handler: SocketHandlerDispatch::new(client_addr, Protocol::Http, share.task_pool.clone(),
                                                         move |rq| (share.handler)(&rq)),
                             update: SocketHandlerUpdate::empty(),
                         });

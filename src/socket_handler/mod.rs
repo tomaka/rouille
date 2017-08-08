@@ -15,30 +15,48 @@ use Request;
 use Response;
 
 use self::http1::Http1Handler;
+use self::rustls::RustlsHandler;
 pub use self::task_pool::TaskPool;      // TODO: shouldn't be pub, but is used by Server, move it somewher else
 
 mod http1;
+mod rustls;
 mod task_pool;
 
 /// Parses the data received by a socket and returns the data to send back.
 pub struct SocketHandlerDispatch {
-    inner: Http1Handler,
+    inner: SocketHandlerDispatchInner,
+}
+
+enum SocketHandlerDispatchInner {
+    Http(Http1Handler),
+    Https(RustlsHandler<Http1Handler>),
 }
 
 impl SocketHandlerDispatch {
     /// Initialization.
-    pub fn new<F>(client_addr: SocketAddr, task_pool: TaskPool, handler: F) -> SocketHandlerDispatch
+    pub fn new<F>(client_addr: SocketAddr, protocol: Protocol, task_pool: TaskPool,
+                  handler: F) -> SocketHandlerDispatch
         where F: FnMut(Request) -> Response + Send + 'static
     {
+        let http_handler = Http1Handler::new(client_addr, protocol, task_pool, handler);
+
+        let inner = match protocol {
+            Protocol::Http => SocketHandlerDispatchInner::Http(http_handler),
+            Protocol::Https => SocketHandlerDispatchInner::Https(RustlsHandler::new(http_handler)),
+        };
+
         SocketHandlerDispatch {
-            inner: Http1Handler::new(client_addr, Protocol::Http /* TODO: */, task_pool, handler)
+            inner: inner,
         }
     }
 }
 
 impl SocketHandler for SocketHandlerDispatch {
     fn update(&mut self, update: &mut Update) {
-        self.inner.update(update)
+        match self.inner {
+            SocketHandlerDispatchInner::Http(ref mut http) => http.update(update),
+            SocketHandlerDispatchInner::Https(ref mut https) => https.update(update),
+        }
     }
 }
 

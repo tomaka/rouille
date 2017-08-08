@@ -29,6 +29,7 @@ multipart = { version = "0.5.1", default-features = false, features = ["server"]
 num_cpus = "1.6.2"
 rand = "0.3.11"
 rustc-serialize = "0.3"
+rustls = "0.9.0"
 sha1 = "0.2.0"
 slab = "0.4.0"
 term = "0.2"

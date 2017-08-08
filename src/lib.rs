@@ -67,6 +67,7 @@ extern crate multipart;
 extern crate num_cpus;
 extern crate rand;
 extern crate rustc_serialize;
+extern crate rustls;
 extern crate sha1;
 extern crate slab;
 extern crate time;
