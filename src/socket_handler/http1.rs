@@ -22,6 +22,7 @@ use itoa::write as itoa;
 use mio::Ready;
 use mio::Registration;
 
+use socket_handler::Protocol;
 use socket_handler::Update;
 use Request;
 use Response;
@@ -31,8 +32,11 @@ pub struct Http1Handler {
     // The handler is a state machine.
     state: Http1HandlerState,
 
-    // Address of the client. Will be extracted at some point during the handling.
+    // Address of the client. Passed to the request object.
     client_addr: SocketAddr,
+
+    // Protocol of the original server. Passed to the request object.
+    original_protocol: Protocol,
 
     // Object that handles the request and returns a response.
     handler: Arc<Mutex<FnMut(Request) -> Response + Send + 'static>>,
@@ -57,12 +61,13 @@ enum Http1HandlerState {
 }
 
 impl Http1Handler {
-    pub fn new<F>(client_addr: SocketAddr, handler: F) -> Http1Handler
+    pub fn new<F>(client_addr: SocketAddr, original_protocol: Protocol, handler: F) -> Http1Handler
         where F: FnMut(Request) -> Response + Send + 'static
     {
         Http1Handler {
             state: Http1HandlerState::WaitingForRqLine,
             client_addr: client_addr,
+            original_protocol: original_protocol,
             handler: Arc::new(Mutex::new(handler)),
         }
     }
@@ -111,6 +116,7 @@ impl Http1Handler {
                         let (registration, set_ready) = Registration::new2();
                         let registration = Arc::new(registration);
                         let handler = self.handler.clone();
+                        let https = self.original_protocol == Protocol::Https;
                         let remote_addr = self.client_addr.clone();
                         let (tx, rx) = channel();
                         thread::spawn(move || {
@@ -118,7 +124,7 @@ impl Http1Handler {
                                 method: method,
                                 url: path,
                                 headers: headers,
-                                https: false,
+                                https: https,
                                 data: Arc::new(Mutex::new(None)),       // FIXME:
                                 remote_addr: remote_addr,
                             };

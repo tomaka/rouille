@@ -29,7 +29,7 @@ impl SocketHandler {
         where F: FnMut(Request) -> Response + Send + 'static
     {
         SocketHandler {
-            inner: Http1Handler::new(client_addr, handler)
+            inner: Http1Handler::new(client_addr, Protocol::Http /* TODO: */, handler)
         }
     }
 
@@ -38,6 +38,13 @@ impl SocketHandler {
     pub fn update(&mut self, update: &mut Update) {
         self.inner.update(update)
     }
+}
+
+/// Protocol that can serve HTTP.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Protocol {
+    Http,
+    Https,
 }
 
 /// Represents the communication between the `SocketHandler` and the outside.
