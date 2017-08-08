@@ -301,8 +301,10 @@ fn spawn_handler_task(task_pool: &TaskPool,
             remote_addr: remote_addr,
         };
 
-        let mut handler = handler.lock().unwrap();
-        let response = (&mut *handler)(request);
+        let response = {
+            let mut handler = handler.lock().unwrap();
+            (&mut *handler)(request)
+        };
         assert!(response.upgrade.is_none());        // TODO: unimplemented
 
         let (mut body_data, body_size) = response.data.into_reader_and_size();
