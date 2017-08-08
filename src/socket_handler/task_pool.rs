@@ -70,10 +70,10 @@ impl TaskPool {
     }
 }
 
-impl Drop for TaskPool {
+impl Drop for Sharing {
     fn drop(&mut self) {
         for _ in 0 .. num_cpus::get() {
-            self.sharing.todo.push(Box::new(|| false));
+            self.todo.push(Box::new(|| false));
         }
     }
 }
