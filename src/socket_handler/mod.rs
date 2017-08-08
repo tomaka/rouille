@@ -80,10 +80,10 @@ impl Update {
     pub fn empty() -> Update {
         // TODO: don't create two Vecs for each socket
         Update {
-            pending_read_buffer: Vec::new(),
+            pending_read_buffer: Vec::with_capacity(1024),
             new_data_start: 0,
             accepts_read: true,
-            pending_write_buffer: Vec::new(),
+            pending_write_buffer: Vec::with_capacity(1024),
             registration: None,
         }
     }
