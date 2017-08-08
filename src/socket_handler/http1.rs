@@ -100,8 +100,14 @@ impl Http1Handler {
                             let method = ArrayString::from(method).unwrap();        // TODO: error
                             (method, path.to_owned(), version)
                         };
-                        // TODO: don't reallocate a Vec
-                        update.pending_read_buffer = update.pending_read_buffer[rn + 2..].to_owned();
+
+                        // Remove the first `rn + 2` bytes of `update.pending_read_buffer`
+                        let cut_len = update.pending_read_buffer.len() - (rn + 2);
+                        for n in 0 .. cut_len {
+                            update.pending_read_buffer[n] = update.pending_read_buffer[n + rn + 2];
+                        }
+                        update.pending_read_buffer.resize(cut_len, 0);
+
                         self.state = Http1HandlerState::WaitingForHeaders {
                             new_data_start: 0,
                             method,
@@ -130,8 +136,12 @@ impl Http1Handler {
                             out_headers
                         };
 
-                        // TODO: don't reallocate a Vec
-                        update.pending_read_buffer = update.pending_read_buffer[off + rnrn + 4..].to_owned();
+                        // Remove the first `off + rnrn + 4` bytes of `update.pending_read_buffer`
+                        let cut_len = update.pending_read_buffer.len() - (off + rnrn + 4);
+                        for n in 0 .. cut_len {
+                            update.pending_read_buffer[n] = update.pending_read_buffer[n + off + rnrn + 4];
+                        }
+                        update.pending_read_buffer.resize(cut_len, 0);
 
                         // TODO: yeah, don't spawn threads left and right
                         let (registration, set_ready) = Registration::new2();
