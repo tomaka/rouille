@@ -105,7 +105,6 @@ impl Http1Handler {
                             for parsed in parsed_headers {
                                 out_headers.push((parsed.name.to_owned(), String::from_utf8_lossy(parsed.value).into()));      // TODO: wrong
                             }
-                            println!("{:?}", out_headers);
                             out_headers
                         };
 
