@@ -22,6 +22,7 @@ use mio::tcp::{TcpListener, TcpStream};
 use num_cpus;
 use slab::Slab;
 
+use socket_handler::TaskPool;
 use socket_handler::SocketHandler;
 use socket_handler::Update as SocketHandlerUpdate;
 
@@ -61,6 +62,8 @@ struct ThreadsShare<F> {
     sockets: Mutex<Slab<Socket>>,
     // The function that handles requests.
     handler: AssertUnwindSafe<F>,
+    // Pool used to dispatch tasks.
+    task_pool: TaskPool,
 }
 
 enum Socket {
@@ -100,6 +103,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
             poll: Poll::new()?,
             sockets: Mutex::new(Slab::new()),
             handler: AssertUnwindSafe(handler),       // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
+            task_pool: TaskPool::new(),
         });
 
         for _ in 0 .. num_cpus::get() - 1 {
@@ -219,7 +223,8 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
                         let share = share.clone();
                         entry.insert(Socket::Stream {
                             stream: stream,
-                            handler: SocketHandler::new(client_addr, move |rq| (share.handler)(&rq)),
+                            handler: SocketHandler::new(client_addr, share.task_pool.clone(),
+                                                        move |rq| (share.handler)(&rq)),
                             update: SocketHandlerUpdate::empty(),
                         });
                     },

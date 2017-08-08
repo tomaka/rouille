@@ -16,7 +16,6 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::mpsc::{channel, Receiver};
 use std::str;
-use std::thread;
 use httparse;
 use itoa::write as itoa;
 use mio::Ready;
@@ -24,6 +23,7 @@ use mio::Registration;
 
 use socket_handler::Protocol;
 use socket_handler::Update;
+use socket_handler::task_pool::TaskPool;
 use Request;
 use Response;
 
@@ -40,6 +40,9 @@ pub struct Http1Handler {
 
     // Object that handles the request and returns a response.
     handler: Arc<Mutex<FnMut(Request) -> Response + Send + 'static>>,
+    
+    // The pool where to dispatch the handler.
+    task_pool: TaskPool,
 }
 
 enum Http1HandlerState {
@@ -61,7 +64,8 @@ enum Http1HandlerState {
 }
 
 impl Http1Handler {
-    pub fn new<F>(client_addr: SocketAddr, original_protocol: Protocol, handler: F) -> Http1Handler
+    pub fn new<F>(client_addr: SocketAddr, original_protocol: Protocol, task_pool: TaskPool,
+                  handler: F) -> Http1Handler
         where F: FnMut(Request) -> Response + Send + 'static
     {
         Http1Handler {
@@ -69,6 +73,7 @@ impl Http1Handler {
             client_addr: client_addr,
             original_protocol: original_protocol,
             handler: Arc::new(Mutex::new(handler)),
+            task_pool: task_pool,
         }
     }
 
@@ -114,25 +119,29 @@ impl Http1Handler {
                         // TODO: yeah, don't spawn threads left and right
                         let (registration, set_ready) = Registration::new2();
                         let registration = Arc::new(registration);
-                        let handler = self.handler.clone();
+                        let mut handler = Some(self.handler.clone());
                         let https = self.original_protocol == Protocol::Https;
-                        let remote_addr = self.client_addr.clone();
+                        let mut remote_addr = Some(self.client_addr.clone());
+                        let mut method = Some(method);
+                        let mut path = Some(path);
+                        let mut headers = Some(headers);
                         let (tx, rx) = channel();
-                        thread::spawn(move || {
+                        self.task_pool.spawn(Box::new(move || {
                             let request = Request {
-                                method: method,
-                                url: path,
-                                headers: headers,
+                                method: method.take().unwrap(),
+                                url: path.take().unwrap(),
+                                headers: headers.take().unwrap(),
                                 https: https,
                                 data: Arc::new(Mutex::new(None)),       // FIXME:
-                                remote_addr: remote_addr,
+                                remote_addr: remote_addr.take().unwrap(),
                             };
 
+                            let handler = handler.take().unwrap();
                             let mut handler = handler.lock().unwrap();
                             let response = (&mut *handler)(request);
                             let _ = tx.send(response);
                             let _ = set_ready.set_readiness(Ready::readable());
-                        });
+                        }) as Box<_>);
 
                         update.registration = Some(registration.clone());
                         self.state = Http1HandlerState::ExecutingHandler {

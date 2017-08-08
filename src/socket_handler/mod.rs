@@ -15,8 +15,10 @@ use Request;
 use Response;
 
 use self::http1::Http1Handler;
+pub use self::task_pool::TaskPool;      // TODO: shouldn't be pub, but is used by Server, move it somewher else
 
 mod http1;
+mod task_pool;
 
 /// Parses the data received by a socket and returns the data to send back.
 pub struct SocketHandler {
@@ -25,11 +27,11 @@ pub struct SocketHandler {
 
 impl SocketHandler {
     /// Initialization.
-    pub fn new<F>(client_addr: SocketAddr, handler: F) -> SocketHandler
+    pub fn new<F>(client_addr: SocketAddr, task_pool: TaskPool, handler: F) -> SocketHandler
         where F: FnMut(Request) -> Response + Send + 'static
     {
         SocketHandler {
-            inner: Http1Handler::new(client_addr, Protocol::Http /* TODO: */, handler)
+            inner: Http1Handler::new(client_addr, Protocol::Http /* TODO: */, task_pool, handler)
         }
     }
 
