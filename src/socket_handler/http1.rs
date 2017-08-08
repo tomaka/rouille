@@ -159,10 +159,7 @@ impl SocketHandler for Http1Handler {
                         // built, the handler is called, and the response is sent as Vecs through
                         // a channel.
                         let (data_out_tx, data_out_rx) = channel();
-
-                        // TODO: yeah, don't spawn threads left and right
                         let (registration, set_ready) = Registration::new2();
-
                         spawn_handler_task(&self.task_pool, self.handler.clone(), method, path,
                                            headers, self.original_protocol,
                                            self.client_addr.clone(), data_out_tx, set_ready);
@@ -237,7 +234,9 @@ impl SocketHandler for Http1Handler {
     }
 }
 
-fn spawn_handler_task(task_pool: &TaskPool, handler: Arc<Mutex<FnMut(Request) -> Response + Send + 'static>>,
+// Starts the task of handling a request.
+fn spawn_handler_task(task_pool: &TaskPool,
+                      handler: Arc<Mutex<FnMut(Request) -> Response + Send + 'static>>,
                       method: ArrayString<[u8; 16]>, path: String,
                       headers: Vec<(String, String)>, original_protocol: Protocol,
                       remote_addr: SocketAddr, data_out_tx: Sender<Vec<u8>>,
