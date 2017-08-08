@@ -39,46 +39,65 @@ pub struct Http1Handler {
     // The handler is a state machine.
     state: Http1HandlerState,
 
-    // Address of the client. Passed to the request object.
+    // Address of the client. Necessary for the request objects.
     client_addr: SocketAddr,
 
-    // Protocol of the original server. Passed to the request object.
+    // Protocol of the original server. Necessary for the request objects.
     original_protocol: Protocol,
 
     // Object that handles the request and returns a response.
     handler: Arc<Mutex<FnMut(Request) -> Response + Send + 'static>>,
-    
+
     // The pool where to dispatch the handler.
     task_pool: TaskPool,
 }
 
+// Current status of the handler.
 enum Http1HandlerState {
+    // A panic happened during the processing. In this state any call to `update` will panic.
     Poisonned,
+
+    // The `pending_read_buffer` doesn't have enough bytes to contain the initial request line.
     WaitingForRqLine {
         // Offset within `pending_read_buffer` where new data is available. Everything before this
         // offset was already in `pending_read_buffer` the last time `update` returned.
         new_data_start: usize,
     },
+
+    // The request line has been parsed (its informations are inside the variant), but the
+    // `pending_read_buffer` doesn't have enough bytes to contain the headers.
     WaitingForHeaders {
         // Offset within `pending_read_buffer` where new data is available. Everything before this
         // offset was already in `pending_read_buffer` the last time `update` returned.
         new_data_start: usize,
+        // HTTP method (eg. GET, POST, ...) parsed from the request line.
         method: ArrayString<[u8; 16]>,
+        // URL requested by the HTTP client parsed from the request line.
         path: String,
+        // HTTP version parsed from the request line.
         version: HttpVersion,
     },
+
+    // The handler is currently being executed in the task pool and is streaming data.
     ExecutingHandler {
         // Contains blocks of output data streamed by the handler. Closed when the handler doesn't
         // have any more data to send.
         response_getter: Receiver<Vec<u8>>,
-        // Registration that is triggered by the background thread whenever somed ata is available
+        // Registration that is triggered by the background thread whenever some data is available
         // in `response_getter`.
         registration: Arc<Registration>,
     },
+
+    // Happens after a request with `Connection: close`. The connection is considered as closed by
+    // the handler and nothing more will be processed.
     Closed,
 }
 
 impl Http1Handler {
+    /// Starts handling a new HTTP client connection.
+    ///
+    /// `client_addr` and `original_protocol` are necessary for building the `Request` objects.
+    /// `task_pool` and `handler` indicate how the requests must be processed.
     pub fn new<F>(client_addr: SocketAddr, original_protocol: Protocol, task_pool: TaskPool,
                   handler: F) -> Http1Handler
         where F: FnMut(Request) -> Response + Send + 'static
@@ -102,15 +121,19 @@ impl SocketHandler for Http1Handler {
                 },
 
                 Http1HandlerState::WaitingForRqLine { new_data_start } => {
+                    // Try to find a \r\n in the buffer.
                     let off = new_data_start.saturating_sub(1);
-                    if let Some(rn) = update.pending_read_buffer[off..].windows(2).position(|w| w == b"\r\n") {
+                    let rn = update.pending_read_buffer[off..].windows(2)
+                                                              .position(|w| w == b"\r\n");
+                    if let Some(rn) = rn {
+                        // Found a request line!
                         let (method, path, version) = {
-                            let (method, path, version) = parse_request_line(&update.pending_read_buffer[..rn]).unwrap();       // TODO: error
-                            let method = ArrayString::from(method).unwrap();        // TODO: error
+                            let (method, path, version) = parse_request_line(&update.pending_read_buffer[..rn]).unwrap();       // TODO: handle error
+                            let method = ArrayString::from(method).unwrap();        // TODO: handle error
                             (method, path.to_owned(), version)
                         };
 
-                        // Remove the first `rn + 2` bytes of `update.pending_read_buffer`
+                        // Remove the request line from the head of the buffer.
                         let cut_len = update.pending_read_buffer.len() - (rn + 2);
                         for n in 0 .. cut_len {
                             update.pending_read_buffer[n] = update.pending_read_buffer[n + rn + 2];
@@ -125,6 +148,8 @@ impl SocketHandler for Http1Handler {
                         };
 
                     } else {
+                        // No full request line in the buffer yet.
+                        // TODO: put a limit on the buffer size
                         self.state = Http1HandlerState::WaitingForRqLine {
                             new_data_start: update.pending_read_buffer.len(),
                         };
@@ -137,8 +162,13 @@ impl SocketHandler for Http1Handler {
                 },
 
                 Http1HandlerState::WaitingForHeaders { new_data_start, method, path, version } => {
+                    // Try to find a `\r\n\r\n` in the buffer which would indicate the end of the
+                    // headers.
                     let off = new_data_start.saturating_sub(3);
-                    if let Some(rnrn) = update.pending_read_buffer[off..].windows(4).position(|w| w == b"\r\n\r\n") {
+                    let rnrn = update.pending_read_buffer[off..].windows(4)
+                                                                .position(|w| w == b"\r\n\r\n");
+                    if let Some(rnrn) = rnrn {
+                        // Found headers! Parse them.
                         let headers = {
                             let mut out_headers = Vec::new();
                             let mut headers = [httparse::EMPTY_HEADER; 32];
@@ -149,7 +179,7 @@ impl SocketHandler for Http1Handler {
                             out_headers
                         };
 
-                        // Remove the first `off + rnrn + 4` bytes of `update.pending_read_buffer`
+                        // Remove the headers from the head of the buffer.
                         let cut_len = update.pending_read_buffer.len() - (off + rnrn + 4);
                         for n in 0 .. cut_len {
                             update.pending_read_buffer[n] = update.pending_read_buffer[n + off + rnrn + 4];
@@ -177,6 +207,8 @@ impl SocketHandler for Http1Handler {
                         };
 
                     } else {
+                        // No full headers in the buffer yet.
+                        // TODO: put a limit on the buffer size
                         self.state = Http1HandlerState::WaitingForHeaders {
                             new_data_start: update.pending_read_buffer.len(),
                             method,
@@ -194,7 +226,7 @@ impl SocketHandler for Http1Handler {
                 Http1HandlerState::ExecutingHandler { response_getter, registration } => {
                     match response_getter.try_recv() {
                         Ok(mut data) => {
-                            // Got some data.
+                            // Got some data for the response.
                             update.pending_write_buffer.append(&mut data);
                             self.state = Http1HandlerState::ExecutingHandler {
                                 response_getter: response_getter,
@@ -203,6 +235,7 @@ impl SocketHandler for Http1Handler {
                         },
                         Err(TryRecvError::Disconnected) => {
                             // The handler has finished streaming the response.
+                            // TODO: jump to `Closed` instead if `Connection: closed` was set
                             self.state = Http1HandlerState::WaitingForRqLine { new_data_start: 0 };
                             break UpdateResult {
                                 registration: None,
