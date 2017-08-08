@@ -256,8 +256,10 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
                         update.pending_read_buffer.resize(old_pr_len, 0);
                         break;
                     },
-                    Err(e) => {
-                        panic!("Error while accepting from the TCP listener: {}", e);
+                    Err(_) => {
+                        // Handle errors with the stream by returning without re-registering it.
+                        // This drops the stream.
+                        return;
                     },
                 };
             }
