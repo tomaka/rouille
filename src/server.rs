@@ -178,6 +178,9 @@ fn one_poll<F>(share: &Arc<ThreadsShare<F>>, events: &mut Events)
         if event.readiness().is_readable() {
             let socket = {
                 let mut slab = share.sockets.lock().unwrap();
+                if !slab.contains(event.token().into()) {
+                    continue;
+                }
                 slab.remove(event.token().into())
             };
 
@@ -187,6 +190,9 @@ fn one_poll<F>(share: &Arc<ThreadsShare<F>>, events: &mut Events)
         if event.readiness().is_writable() {
             let socket = {
                 let mut slab = share.sockets.lock().unwrap();
+                if !slab.contains(event.token().into()) {
+                    continue;
+                }
                 slab.remove(event.token().into())
             };
 
