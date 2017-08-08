@@ -343,23 +343,16 @@ fn handle_write<F>(share: &ThreadsShare<F>, socket: Socket) {
     // Write from `update.pending_write_buffer` to `stream`.
     while !update.pending_write_buffer.is_empty() {
         match stream.write(&update.pending_write_buffer) {
-            Ok(0) => {
-                let _ = stream.flush();
-                break;
-            },
+            Ok(0) => break,
             Ok(written) => {
                 let cut_len = update.pending_write_buffer.len() - written;
                 for n in 0 .. cut_len {
                     update.pending_write_buffer[n] = update.pending_write_buffer[n + written];
                 }
                 update.pending_write_buffer.resize(cut_len, 0);
-                let _ = stream.flush();
             },
             Err(ref e) if e.kind() == ErrorKind::Interrupted => {},
-            Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
-                let _ = stream.flush();
-                break;
-            },
+            Err(ref e) if e.kind() == ErrorKind::WouldBlock => break,
             Err(_) => {
                 // Handle errors with the stream by returning without re-registering it. This
                 // drops the stream.
