@@ -17,6 +17,7 @@ use rustls::Session;
 
 use socket_handler::SocketHandler;
 use socket_handler::Update;
+use socket_handler::UpdateResult;
 
 /// Handles the processing of a client connection through TLS.
 pub struct RustlsHandler<H> {
@@ -45,20 +46,29 @@ impl<H> RustlsHandler<H> {
 impl<H> SocketHandler for RustlsHandler<H>
     where H: SocketHandler
 {
-    fn update(&mut self, update: &mut Update) {
+    fn update(&mut self, update: &mut Update) -> UpdateResult {
         let read_num = self.session.read_tls(&mut (&update.pending_read_buffer[..])).unwrap();
         assert_eq!(read_num, update.pending_read_buffer.len());
         update.pending_read_buffer.clear();
 
-        self.session.process_new_packets().unwrap();        // TODO: propagate error
+        if let Err(_) = self.session.process_new_packets() {
+            // Drop the socket.
+            update.pending_write_buffer.clear();
+            return UpdateResult {
+                registration: None,
+                close_read: true,
+            };
+        }
 
         self.session.read_to_end(&mut self.handler_update.pending_read_buffer).unwrap();
 
-        self.handler.update(&mut self.handler_update);
+        let result = self.handler.update(&mut self.handler_update);
 
         self.session.write_all(&self.handler_update.pending_write_buffer).unwrap();
         self.handler_update.pending_write_buffer.clear();
 
         self.session.write_tls(&mut update.pending_write_buffer).unwrap();
+
+        result
     }
 }

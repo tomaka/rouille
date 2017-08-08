@@ -52,7 +52,7 @@ impl SocketHandlerDispatch {
 }
 
 impl SocketHandler for SocketHandlerDispatch {
-    fn update(&mut self, update: &mut Update) {
+    fn update(&mut self, update: &mut Update) -> UpdateResult {
         match self.inner {
             SocketHandlerDispatchInner::Http(ref mut http) => http.update(update),
             SocketHandlerDispatchInner::Https(ref mut https) => https.update(update),
@@ -70,33 +70,45 @@ pub enum Protocol {
 pub trait SocketHandler {
     /// Call this function whenever new data is received on the socket, or when the registration
     /// wakes up.
-    fn update(&mut self, update: &mut Update);
+    fn update(&mut self, update: &mut Update) -> UpdateResult;
+}
+
+#[derive(Debug)]
+pub struct UpdateResult {
+    /// When `Some`, means that the user must call `update` when the `Registration` becomes ready
+    /// (either for reading or writing). The registration should be registered with `oneshot()`.
+    pub registration: Option<(Arc<Registration>, RegistrationState)>,
+
+    /// Set to true if the socket handler will no longer process incoming data. If
+    /// `close_read` is true, `pending_write_buffer` is empty, and `registration` is empty,
+    /// then you can drop the socket.
+    pub close_read: bool,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum RegistrationState {
+    /// It is the first time this registration is returned.
+    FirstTime,
+    /// This registration has been registered before, and `reregister` should be used.
+    Reregister,
 }
 
 /// Represents the communication between the `SocketHandler` and the outside.
 ///
 /// The "outside" is supposed to fill `pending_read_buffer` with incoming data, and remove data
 /// from `pending_write_buffer`, then call `update`.
+#[derive(Debug)]
 pub struct Update {
     /// Filled by the handler user and emptied by `update()`. Contains the data that comes from
     /// the client.
     // TODO: try VecDeque and check perfs
     pub pending_read_buffer: Vec<u8>,
 
-    /// Set to false by the socket handler when it will no longer process incoming data. If
-    /// `accepts_read` is false, `pending_write_buffer` is empty, and `registration` is empty,
-    /// then you can drop the socket.
-    pub accepts_read: bool,
-
     /// Filled by `SocketHandler::update()` and emptied by the user. Contains the data that must
     /// be sent back to the client.
     // TODO: try VecDeque and check perfs
     pub pending_write_buffer: Vec<u8>,
 
-    /// When set by the socket handler, it means that the user must call `update` when the
-    /// `Registration` becomes ready. The user must then set it to 0. The registration is only ever
-    /// used once.
-    pub registration: Option<Arc<Registration>>,
 }
 
 impl Update {
@@ -105,9 +117,7 @@ impl Update {
         // TODO: don't create two Vecs for each socket
         Update {
             pending_read_buffer: Vec::with_capacity(1024),
-            accepts_read: true,
             pending_write_buffer: Vec::with_capacity(1024),
-            registration: None,
         }
     }
 }

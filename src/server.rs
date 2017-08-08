@@ -23,6 +23,7 @@ use num_cpus;
 use slab::Slab;
 
 use socket_handler::Protocol;
+use socket_handler::RegistrationState;
 use socket_handler::TaskPool;
 use socket_handler::SocketHandler;
 use socket_handler::SocketHandlerDispatch;
@@ -72,6 +73,7 @@ enum Socket {
     Listener(TcpListener),
     Stream {
         stream: TcpStream,
+        read_closed: bool,
         handler: SocketHandlerDispatch,
         update: SocketHandlerUpdate,
     },
@@ -225,6 +227,7 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
                         let share = share.clone();
                         entry.insert(Socket::Stream {
                             stream: stream,
+                            read_closed: false,
                             handler: SocketHandlerDispatch::new(client_addr, Protocol::Http, share.task_pool.clone(),
                                                         move |rq| (share.handler)(&rq)),
                             update: SocketHandlerUpdate::empty(),
@@ -248,7 +251,7 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
             entry.insert(Socket::Listener(listener));
         },
 
-        Socket::Stream { mut stream, mut handler, mut update } => {
+        Socket::Stream { mut stream, mut read_closed, mut handler, mut update } => {
             // Read into `update.pending_read_buffer` until `WouldBlock` is returned.
             loop {
                 let old_pr_len = update.pending_read_buffer.len();
@@ -278,11 +281,14 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
             }
 
             // Dispatch to handler.
-            handler.update(&mut update);
+            let mut update_result = handler.update(&mut update);
+            if update_result.close_read {
+                read_closed = true;
+            }
 
             // Re-register stream for next time.
             let mut ready = Ready::empty();
-            if update.accepts_read {
+            if !read_closed {
                 ready = ready | Ready::readable();
             }
             if !update.pending_write_buffer.is_empty() {
@@ -294,11 +300,22 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
 
             let mut insert_entry = false;
 
-            if let Some(registration) = update.registration.take() {
-                share.poll.register(&*registration, entry.key().into(),
-                                    Ready::readable() | Ready::writable(),
-                                    PollOpt::edge() | PollOpt::oneshot())
-                    .expect("Error while registering registration");
+            if let Some((registration, state)) = update_result.registration.take() {
+                match state {
+                    RegistrationState::FirstTime => {
+                        share.poll.register(&*registration, entry.key().into(),
+                                            Ready::readable() | Ready::writable(),
+                                            PollOpt::edge() | PollOpt::oneshot())
+                            .expect("Error while registering registration");
+                    },
+                    RegistrationState::Reregister => {
+                        share.poll.reregister(&*registration, entry.key().into(),
+                                            Ready::readable() | Ready::writable(),
+                                            PollOpt::edge() | PollOpt::oneshot())
+                            .expect("Error while registering registration");
+                    },
+                }
+
                 insert_entry = true;
             }
 
@@ -310,7 +327,7 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
             }
 
             if insert_entry {
-                entry.insert(Socket::Stream { stream, handler, update });
+                entry.insert(Socket::Stream { stream, read_closed, handler, update });
             }
         },
     }
@@ -318,9 +335,9 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
 
 fn handle_write<F>(share: &ThreadsShare<F>, socket: Socket) {
     // Write events can't happen for listeners.
-    let (mut stream, handler, mut update) = match socket {
+    let (mut stream, read_closed, handler, mut update) = match socket {
         Socket::Listener(_) => unreachable!(),
-        Socket::Stream { stream, handler, update } => (stream, handler, update),
+        Socket::Stream { stream, read_closed, handler, update } => (stream, read_closed, handler, update),
     };
 
     // Write from `update.pending_write_buffer` to `stream`.
@@ -350,7 +367,7 @@ fn handle_write<F>(share: &ThreadsShare<F>, socket: Socket) {
 
     // Re-register the stream for the next event.
     let mut ready = Ready::empty();
-    if update.accepts_read {
+    if !read_closed {
         ready = ready | Ready::readable();
     }
     if !update.pending_write_buffer.is_empty() {
@@ -362,6 +379,6 @@ fn handle_write<F>(share: &ThreadsShare<F>, socket: Socket) {
         share.poll.reregister(&stream, entry.key().into(), ready,
                               PollOpt::edge() | PollOpt::oneshot())
             .expect("Error while reregistering TCP stream");
-        entry.insert(Socket::Stream { stream, handler, update });
+        entry.insert(Socket::Stream { stream, read_closed, handler, update });
     }
 }

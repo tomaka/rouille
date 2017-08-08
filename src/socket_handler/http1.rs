@@ -23,8 +23,10 @@ use mio::Ready;
 use mio::Registration;
 
 use socket_handler::Protocol;
+use socket_handler::RegistrationState;
 use socket_handler::SocketHandler;
 use socket_handler::Update;
+use socket_handler::UpdateResult;
 use socket_handler::task_pool::TaskPool;
 use Request;
 use Response;
@@ -88,7 +90,7 @@ impl Http1Handler {
 }
 
 impl SocketHandler for Http1Handler {
-    fn update(&mut self, update: &mut Update) {
+    fn update(&mut self, update: &mut Update) -> UpdateResult {
         loop {
             match mem::replace(&mut self.state, Http1HandlerState::Poisonned) {
                 Http1HandlerState::Poisonned => {
@@ -122,7 +124,11 @@ impl SocketHandler for Http1Handler {
                         self.state = Http1HandlerState::WaitingForRqLine {
                             new_data_start: update.pending_read_buffer.len(),
                         };
-                        break;
+
+                        break UpdateResult {
+                            registration: None,
+                            close_read: false,
+                        };
                     }
                 },
 
@@ -169,12 +175,16 @@ impl SocketHandler for Http1Handler {
                             let _ = set_ready.set_readiness(Ready::readable());
                         });
 
-                        update.registration = Some(registration.clone());
                         self.state = Http1HandlerState::ExecutingHandler {
                             response_getter: rx,
-                            registration: registration,
+                            registration: registration.clone(),
                         };
-                        break;
+
+                        break UpdateResult {
+                            registration: Some((registration,
+                                                RegistrationState::FirstTime)),
+                            close_read: false,
+                        };
 
                     } else {
                         self.state = Http1HandlerState::WaitingForHeaders {
@@ -183,7 +193,11 @@ impl SocketHandler for Http1Handler {
                             path,
                             version
                         };
-                        break;
+
+                        break UpdateResult {
+                            registration: None,
+                            close_read: false,
+                        };
                     }
                 },
 
@@ -204,7 +218,10 @@ impl SocketHandler for Http1Handler {
 
                     } else {
                         self.state = Http1HandlerState::ExecutingHandler { response_getter, registration };
-                        break;
+                        break UpdateResult {
+                            registration: None,
+                            close_read: false,
+                        };
                     }
                 },
 
@@ -212,13 +229,18 @@ impl SocketHandler for Http1Handler {
                     // TODO: meh, this can block
                     data.read_to_end(&mut update.pending_write_buffer).unwrap();
                     self.state = Http1HandlerState::WaitingForRqLine { new_data_start: 0 };
-                    break;
+                    break UpdateResult {
+                        registration: None,
+                        close_read: false,
+                    };
                 },
 
                 Http1HandlerState::Closed => {
-                    debug_assert!(!update.accepts_read);
                     self.state = Http1HandlerState::Closed;
-                    break;
+                    break UpdateResult {
+                        registration: None,
+                        close_read: false,
+                    };
                 },
             }
         }
