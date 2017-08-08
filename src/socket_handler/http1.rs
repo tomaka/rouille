@@ -245,7 +245,6 @@ impl SocketHandler for Http1Handler {
                         },
                         Err(TryRecvError::Disconnected) => {
                             // The handler has finished streaming the response.
-                            // TODO: jump to `Closed` instead if `Connection: closed` was set
                             if connection_close {
                                 self.state = Http1HandlerState::Closed;
                             } else {
