@@ -80,6 +80,8 @@ enum Http1HandlerState {
 
     // The handler is currently being executed in the task pool and is streaming data.
     ExecutingHandler {
+        // True if `Connection: close` was requested by the client as part of the headers.
+        connection_close: bool,
         // Contains blocks of output data streamed by the handler. Closed when the handler doesn't
         // have any more data to send.
         response_getter: Receiver<Vec<u8>>,
@@ -197,6 +199,7 @@ impl SocketHandler for Http1Handler {
 
                         let registration = Arc::new(registration);
                         self.state = Http1HandlerState::ExecutingHandler {
+                            connection_close: false,        // TODO:
                             response_getter: data_out_rx,
                             registration: registration.clone(),
                         };
@@ -223,12 +226,15 @@ impl SocketHandler for Http1Handler {
                     }
                 },
 
-                Http1HandlerState::ExecutingHandler { response_getter, registration } => {
+                Http1HandlerState::ExecutingHandler { connection_close, response_getter,
+                                                      registration } =>
+                {
                     match response_getter.try_recv() {
                         Ok(mut data) => {
                             // Got some data for the response.
                             update.pending_write_buffer.append(&mut data);
                             self.state = Http1HandlerState::ExecutingHandler {
+                                connection_close: connection_close,
                                 response_getter: response_getter,
                                 registration: registration,
                             };
@@ -236,15 +242,22 @@ impl SocketHandler for Http1Handler {
                         Err(TryRecvError::Disconnected) => {
                             // The handler has finished streaming the response.
                             // TODO: jump to `Closed` instead if `Connection: closed` was set
-                            self.state = Http1HandlerState::WaitingForRqLine { new_data_start: 0 };
-                            break UpdateResult {
-                                registration: None,
-                                close_read: false,
-                            };
+                            if connection_close {
+                                self.state = Http1HandlerState::Closed;
+                            } else {
+                                self.state = Http1HandlerState::WaitingForRqLine {
+                                    new_data_start: 0
+                                };
+                                break UpdateResult {
+                                    registration: None,
+                                    close_read: false,
+                                };
+                            }
                         },
                         Err(TryRecvError::Empty) => {
                             // Spurious wakeup.
                             self.state = Http1HandlerState::ExecutingHandler {
+                                connection_close: connection_close,
                                 response_getter: response_getter,
                                 registration: registration.clone()
                             };
@@ -260,7 +273,7 @@ impl SocketHandler for Http1Handler {
                     self.state = Http1HandlerState::Closed;
                     break UpdateResult {
                         registration: None,
-                        close_read: false,
+                        close_read: true,
                     };
                 },
             }
