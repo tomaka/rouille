@@ -347,9 +347,12 @@ fn handle_write<F>(share: &ThreadsShare<F>, socket: Socket) {
                 let _ = stream.flush();
                 break;
             },
-            Ok(n) => {
-                // TODO: more efficient
-                update.pending_write_buffer = update.pending_write_buffer[n..].to_owned();
+            Ok(written) => {
+                let cut_len = update.pending_write_buffer.len() - written;
+                for n in 0 .. cut_len {
+                    update.pending_write_buffer[n] = update.pending_write_buffer[n + written];
+                }
+                update.pending_write_buffer.resize(cut_len, 0);
                 let _ = stream.flush();
             },
             Err(ref e) if e.kind() == ErrorKind::Interrupted => {},
