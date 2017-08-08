@@ -55,6 +55,7 @@
 #[cfg(feature = "brotli2")]
 extern crate brotli2;
 extern crate chrono;
+extern crate crossbeam;
 extern crate filetime;
 #[cfg(feature = "flate2")]
 extern crate flate2;

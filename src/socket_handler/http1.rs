@@ -119,29 +119,25 @@ impl Http1Handler {
                         // TODO: yeah, don't spawn threads left and right
                         let (registration, set_ready) = Registration::new2();
                         let registration = Arc::new(registration);
-                        let mut handler = Some(self.handler.clone());
+                        let handler = self.handler.clone();
                         let https = self.original_protocol == Protocol::Https;
-                        let mut remote_addr = Some(self.client_addr.clone());
-                        let mut method = Some(method);
-                        let mut path = Some(path);
-                        let mut headers = Some(headers);
+                        let remote_addr = self.client_addr.clone();
                         let (tx, rx) = channel();
-                        self.task_pool.spawn(Box::new(move || {
+                        self.task_pool.spawn(move || {
                             let request = Request {
-                                method: method.take().unwrap(),
-                                url: path.take().unwrap(),
-                                headers: headers.take().unwrap(),
+                                method: method,
+                                url: path,
+                                headers: headers,
                                 https: https,
                                 data: Arc::new(Mutex::new(None)),       // FIXME:
-                                remote_addr: remote_addr.take().unwrap(),
+                                remote_addr: remote_addr,
                             };
 
-                            let handler = handler.take().unwrap();
                             let mut handler = handler.lock().unwrap();
                             let response = (&mut *handler)(request);
                             let _ = tx.send(response);
                             let _ = set_ready.set_readiness(Ready::readable());
-                        }) as Box<_>);
+                        });
 
                         update.registration = Some(registration.clone());
                         self.state = Http1HandlerState::ExecutingHandler {
