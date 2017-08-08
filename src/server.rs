@@ -277,7 +277,6 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
 
             // Dispatch to handler.
             handler.update(&mut update);
-            update.new_data_start = update.pending_read_buffer.len();
 
             // Re-register stream for next time.
             let mut ready = Ready::empty();

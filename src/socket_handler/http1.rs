@@ -48,8 +48,15 @@ pub struct Http1Handler {
 
 enum Http1HandlerState {
     Poisonned,
-    WaitingForRqLine,
+    WaitingForRqLine {
+        // Offset within `pending_read_buffer` where new data is available. Everything before this
+        // offset was already in `pending_read_buffer` the last time `update` returned.
+        new_data_start: usize,
+    },
     WaitingForHeaders {
+        // Offset within `pending_read_buffer` where new data is available. Everything before this
+        // offset was already in `pending_read_buffer` the last time `update` returned.
+        new_data_start: usize,
         method: ArrayString<[u8; 16]>,
         path: String,
         version: HttpVersion,
@@ -70,7 +77,7 @@ impl Http1Handler {
         where F: FnMut(Request) -> Response + Send + 'static
     {
         Http1Handler {
-            state: Http1HandlerState::WaitingForRqLine,
+            state: Http1HandlerState::WaitingForRqLine { new_data_start: 0 },
             client_addr: client_addr,
             original_protocol: original_protocol,
             handler: Arc::new(Mutex::new(handler)),
@@ -85,8 +92,8 @@ impl Http1Handler {
                     panic!("Poisonned request handler");
                 },
 
-                Http1HandlerState::WaitingForRqLine => {
-                    let off = update.new_data_start.saturating_sub(1);
+                Http1HandlerState::WaitingForRqLine { new_data_start } => {
+                    let off = new_data_start.saturating_sub(1);
                     if let Some(rn) = update.pending_read_buffer[off..].windows(2).position(|w| w == b"\r\n") {
                         let (method, path, version) = {
                             let (method, path, version) = parse_request_line(&update.pending_read_buffer[..rn]).unwrap();       // TODO: error
@@ -95,15 +102,23 @@ impl Http1Handler {
                         };
                         // TODO: don't reallocate a Vec
                         update.pending_read_buffer = update.pending_read_buffer[rn + 2..].to_owned();
-                        self.state = Http1HandlerState::WaitingForHeaders { method, path, version };
+                        self.state = Http1HandlerState::WaitingForHeaders {
+                            new_data_start: 0,
+                            method,
+                            path,
+                            version
+                        };
+
                     } else {
-                        self.state = Http1HandlerState::WaitingForRqLine;
+                        self.state = Http1HandlerState::WaitingForRqLine {
+                            new_data_start: update.pending_read_buffer.len(),
+                        };
                         break;
                     }
                 },
 
-                Http1HandlerState::WaitingForHeaders { method, path, version } => {
-                    let off = update.new_data_start.saturating_sub(3);
+                Http1HandlerState::WaitingForHeaders { new_data_start, method, path, version } => {
+                    let off = new_data_start.saturating_sub(3);
                     if let Some(rnrn) = update.pending_read_buffer[off..].windows(4).position(|w| w == b"\r\n\r\n") {
                         let headers = {
                             let mut out_headers = Vec::new();
@@ -149,7 +164,12 @@ impl Http1Handler {
                         break;
 
                     } else {
-                        self.state = Http1HandlerState::WaitingForHeaders { method, path, version };
+                        self.state = Http1HandlerState::WaitingForHeaders {
+                            new_data_start: update.pending_read_buffer.len(),
+                            method,
+                            path,
+                            version
+                        };
                         break;
                     }
                 },
@@ -178,7 +198,7 @@ impl Http1Handler {
                 Http1HandlerState::SendingResponse { mut data } => {
                     // TODO: meh, this can block
                     data.read_to_end(&mut update.pending_write_buffer).unwrap();
-                    self.state = Http1HandlerState::WaitingForRqLine;
+                    self.state = Http1HandlerState::WaitingForRqLine { new_data_start: 0 };
                     break;
                 },
 

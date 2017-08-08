@@ -57,10 +57,6 @@ pub struct Update {
     /// Filled by the handler user. Contains the data that comes from the client.
     pub pending_read_buffer: Vec<u8>,
 
-    /// Offset within `pending_read_buffer` where new data is available. Everything before this
-    /// offset was already in `pending_read_buffer` the last time `update` returned.
-    pub new_data_start: usize,
-
     /// Set to false by the socket handler when it will no longer process incoming data. If both
     /// `accepts_read` is false and `pending_write_buffer` is empty, then you can drop the socket.
     pub accepts_read: bool,
@@ -81,7 +77,6 @@ impl Update {
         // TODO: don't create two Vecs for each socket
         Update {
             pending_read_buffer: Vec::with_capacity(1024),
-            new_data_start: 0,
             accepts_read: true,
             pending_write_buffer: Vec::with_capacity(1024),
             registration: None,
