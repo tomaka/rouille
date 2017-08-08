@@ -8,7 +8,6 @@
 // according to those terms.
 
 use std::io::Cursor;
-use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
 use std::mem;
@@ -22,13 +21,14 @@ use httparse;
 use mio::Ready;
 use mio::Registration;
 
+use socket_handler::Update;
 use Request;
 use Response;
 
 /// Handles the processing of a client connection.
-pub struct SocketHandler {
+pub struct Http1Handler {
     // The handler is a state machine.
-    state: SocketHandlerState,
+    state: Http1HandlerState,
 
     // Address of the client. Will be extracted at some point during the handling.
     client_addr: SocketAddr,
@@ -37,7 +37,7 @@ pub struct SocketHandler {
     handler: Arc<Mutex<FnMut(Request) -> Response + Send + 'static>>,
 }
 
-enum SocketHandlerState {
+enum Http1HandlerState {
     Poisonned,
     WaitingForRqLine,
     WaitingForHeaders {
@@ -55,51 +55,12 @@ enum SocketHandlerState {
     Closed,
 }
 
-/// Represents the communication between the `SocketHandler` and the outside.
-///
-/// The "outside" is supposed to fill `pending_read_buffer` with incoming data, and remove data
-/// from `pending_write_buffer`, then call `update`.
-pub struct Update {
-    /// Filled by the handler user. Contains the data that comes from the client.
-    pub pending_read_buffer: Vec<u8>,
-
-    /// Offset within `pending_read_buffer` where new data is available. Everything before this
-    /// offset was already in `pending_read_buffer` the last time `update` returned.
-    pub new_data_start: usize,
-
-    /// Set to false by the socket handler when it will no longer process incoming data. If both
-    /// `accepts_read` is false and `pending_write_buffer` is empty, then you can drop the socket.
-    pub accepts_read: bool,
-
-    /// Filled by `SocketHandler::update()`. Contains the data that must be sent back to the
-    /// client.
-    pub pending_write_buffer: Vec<u8>,
-
-    /// When set by the socket handler, it means that the user must call `update` when the
-    /// `Registration` becomes ready. The user must then set it to 0. The registration is only ever
-    /// used once.
-    pub registration: Option<Arc<Registration>>,
-}
-
-impl Update {
-    pub fn empty() -> Update {
-        // TODO: don't create two Vecs for each socket
-        Update {
-            pending_read_buffer: Vec::new(),
-            new_data_start: 0,
-            accepts_read: true,
-            pending_write_buffer: Vec::new(),
-            registration: None,
-        }
-    }
-}
-
-impl SocketHandler {
-    pub fn new<F>(client_addr: SocketAddr, handler: F) -> SocketHandler
+impl Http1Handler {
+    pub fn new<F>(client_addr: SocketAddr, handler: F) -> Http1Handler
         where F: FnMut(Request) -> Response + Send + 'static
     {
-        SocketHandler {
-            state: SocketHandlerState::WaitingForRqLine,
+        Http1Handler {
+            state: Http1HandlerState::WaitingForRqLine,
             client_addr: client_addr,
             handler: Arc::new(Mutex::new(handler)),
         }
@@ -107,12 +68,12 @@ impl SocketHandler {
 
     pub fn update(&mut self, update: &mut Update) {
         loop {
-            match mem::replace(&mut self.state, SocketHandlerState::Poisonned) {
-                SocketHandlerState::Poisonned => {
+            match mem::replace(&mut self.state, Http1HandlerState::Poisonned) {
+                Http1HandlerState::Poisonned => {
                     panic!("Poisonned request handler");
                 },
 
-                SocketHandlerState::WaitingForRqLine => {
+                Http1HandlerState::WaitingForRqLine => {
                     let off = update.new_data_start.saturating_sub(1);
                     if let Some(rn) = update.pending_read_buffer[off..].windows(2).position(|w| w == b"\r\n") {
                         let (method, path, version) = {
@@ -121,14 +82,14 @@ impl SocketHandler {
                         };
                         // TODO: don't reallocate a Vec
                         update.pending_read_buffer = update.pending_read_buffer[rn + 2..].to_owned();
-                        self.state = SocketHandlerState::WaitingForHeaders { method, path, version };
+                        self.state = Http1HandlerState::WaitingForHeaders { method, path, version };
                     } else {
-                        self.state = SocketHandlerState::WaitingForRqLine;
+                        self.state = Http1HandlerState::WaitingForRqLine;
                         break;
                     }
                 },
 
-                SocketHandlerState::WaitingForHeaders { method, path, version } => {
+                Http1HandlerState::WaitingForHeaders { method, path, version } => {
                     let off = update.new_data_start.saturating_sub(3);
                     if let Some(rnrn) = update.pending_read_buffer[off..].windows(4).position(|w| w == b"\r\n\r\n") {
                         let headers = {
@@ -169,19 +130,19 @@ impl SocketHandler {
                         });
 
                         update.registration = Some(registration.clone());
-                        self.state = SocketHandlerState::ExecutingHandler {
+                        self.state = Http1HandlerState::ExecutingHandler {
                             response_getter: rx,
                             registration: registration,
                         };
                         break;
 
                     } else {
-                        self.state = SocketHandlerState::WaitingForHeaders { method, path, version };
+                        self.state = Http1HandlerState::WaitingForHeaders { method, path, version };
                         break;
                     }
                 },
 
-                SocketHandlerState::ExecutingHandler { response_getter, registration } => {
+                Http1HandlerState::ExecutingHandler { response_getter, registration } => {
                     // TODO: write incoming data to request's reader
                     if let Ok(response) = response_getter.try_recv() {
                         assert!(response.upgrade.is_none());        // TODO:
@@ -198,26 +159,26 @@ impl SocketHandler {
 
                         let full_data = Cursor::new(headers_data).chain(body_data);
 
-                        self.state = SocketHandlerState::SendingResponse {
+                        self.state = Http1HandlerState::SendingResponse {
                             data: Box::new(full_data)
                         };
 
                     } else {
-                        self.state = SocketHandlerState::ExecutingHandler { response_getter, registration };
+                        self.state = Http1HandlerState::ExecutingHandler { response_getter, registration };
                         break;
                     }
                 },
 
-                SocketHandlerState::SendingResponse { mut data } => {
+                Http1HandlerState::SendingResponse { mut data } => {
                     // TODO: meh, this can block
                     data.read_to_end(&mut update.pending_write_buffer).unwrap();
-                    self.state = SocketHandlerState::WaitingForRqLine;
+                    self.state = Http1HandlerState::WaitingForRqLine;
                     break;
                 },
 
-                SocketHandlerState::Closed => {
+                Http1HandlerState::Closed => {
                     debug_assert!(!update.accepts_read);
-                    self.state = SocketHandlerState::Closed;
+                    self.state = Http1HandlerState::Closed;
                     break;
                 },
             }
