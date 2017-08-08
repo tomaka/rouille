@@ -125,8 +125,7 @@ impl Http1Handler {
 
                             let mut handler = handler.lock().unwrap();
                             let response = (&mut *handler)(request);
-                            let _ = tx.send(response);  
-                            ::std::thread::sleep(::std::time::Duration::from_millis(500));  // TODO: remove
+                            let _ = tx.send(response);
                             let _ = set_ready.set_readiness(Ready::readable());
                         });
 
