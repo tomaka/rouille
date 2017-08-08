@@ -54,15 +54,17 @@ pub enum Protocol {
 /// The "outside" is supposed to fill `pending_read_buffer` with incoming data, and remove data
 /// from `pending_write_buffer`, then call `update`.
 pub struct Update {
-    /// Filled by the handler user. Contains the data that comes from the client.
+    /// Filled by the handler user and emptied by `update()`. Contains the data that comes from
+    /// the client.
     pub pending_read_buffer: Vec<u8>,
 
-    /// Set to false by the socket handler when it will no longer process incoming data. If both
-    /// `accepts_read` is false and `pending_write_buffer` is empty, then you can drop the socket.
+    /// Set to false by the socket handler when it will no longer process incoming data. If
+    /// `accepts_read` is false, `pending_write_buffer` is empty, and `registration` is empty,
+    /// then you can drop the socket.
     pub accepts_read: bool,
 
-    /// Filled by `SocketHandler::update()`. Contains the data that must be sent back to the
-    /// client.
+    /// Filled by `SocketHandler::update()` and emptied by the user. Contains the data that must
+    /// be sent back to the client.
     pub pending_write_buffer: Vec<u8>,
 
     /// When set by the socket handler, it means that the user must call `update` when the
