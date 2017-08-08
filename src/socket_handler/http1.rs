@@ -180,11 +180,11 @@ impl Http1Handler {
     }
 }
 
-/// HTTP version (usually 1.0 or 1.1).
+// HTTP version (usually 1.0 or 1.1).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HttpVersion(pub u8, pub u8);
+struct HttpVersion(pub u8, pub u8);
 
-/// Parses a "HTTP/1.1" string.
+// Parses a "HTTP/1.1" string.
 // TODO: handle [u8] correctly
 fn parse_http_version(version: &str) -> Result<HttpVersion, ()> {
     let mut elems = version.splitn(2, '/');
@@ -205,8 +205,8 @@ fn parse_http_version(version: &str) -> Result<HttpVersion, ()> {
     }
 }
 
-/// Parses the request line of the request.
-/// eg. GET / HTTP/1.1
+// Parses the request line of the request.
+// eg. GET / HTTP/1.1
 // TODO: handle [u8] correctly
 fn parse_request_line(line: &[u8]) -> Result<(&str, &str, HttpVersion), ()> {
     let line = str::from_utf8(line).unwrap();       // TODO:
