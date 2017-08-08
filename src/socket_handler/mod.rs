@@ -56,6 +56,7 @@ pub enum Protocol {
 pub struct Update {
     /// Filled by the handler user and emptied by `update()`. Contains the data that comes from
     /// the client.
+    // TODO: try VecDeque and check perfs
     pub pending_read_buffer: Vec<u8>,
 
     /// Set to false by the socket handler when it will no longer process incoming data. If
@@ -65,6 +66,7 @@ pub struct Update {
 
     /// Filled by `SocketHandler::update()` and emptied by the user. Contains the data that must
     /// be sent back to the client.
+    // TODO: try VecDeque and check perfs
     pub pending_write_buffer: Vec<u8>,
 
     /// When set by the socket handler, it means that the user must call `update` when the
