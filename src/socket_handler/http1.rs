@@ -14,13 +14,15 @@ use std::mem;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::mpsc::TryRecvError;
 use std::str;
 use arrayvec::ArrayString;
 use httparse;
 use itoa::write as itoa;
 use mio::Ready;
 use mio::Registration;
+use mio::SetReadiness;
 
 use socket_handler::Protocol;
 use socket_handler::RegistrationState;
@@ -65,11 +67,12 @@ enum Http1HandlerState {
         version: HttpVersion,
     },
     ExecutingHandler {
-        response_getter: Receiver<Response>,
+        // Contains blocks of output data streamed by the handler. Closed when the handler doesn't
+        // have any more data to send.
+        response_getter: Receiver<Vec<u8>>,
+        // Registration that is triggered by the background thread whenever somed ata is available
+        // in `response_getter`.
         registration: Arc<Registration>,
-    },
-    SendingResponse {
-        data: Box<Read + Send>,
     },
     Closed,
 }
@@ -152,34 +155,23 @@ impl SocketHandler for Http1Handler {
                         }
                         update.pending_read_buffer.resize(cut_len, 0);
 
+                        // We now create a new task for our task pool in which the request is
+                        // built, the handler is called, and the response is sent as Vecs through
+                        // a channel.
+                        let (data_out_tx, data_out_rx) = channel();
+
                         // TODO: yeah, don't spawn threads left and right
                         let (registration, set_ready) = Registration::new2();
+
+                        spawn_handler_task(&self.task_pool, self.handler.clone(), method, path,
+                                           headers, self.original_protocol,
+                                           self.client_addr.clone(), data_out_tx, set_ready);
+
                         let registration = Arc::new(registration);
-                        let handler = self.handler.clone();
-                        let https = self.original_protocol == Protocol::Https;
-                        let remote_addr = self.client_addr.clone();
-                        let (tx, rx) = channel();
-                        self.task_pool.spawn(move || {
-                            let request = Request {
-                                method: method,
-                                url: path,
-                                headers: headers,
-                                https: https,
-                                data: Arc::new(Mutex::new(None)),       // FIXME:
-                                remote_addr: remote_addr,
-                            };
-
-                            let mut handler = handler.lock().unwrap();
-                            let response = (&mut *handler)(request);
-                            let _ = tx.send(response);
-                            let _ = set_ready.set_readiness(Ready::readable());
-                        });
-
                         self.state = Http1HandlerState::ExecutingHandler {
-                            response_getter: rx,
+                            response_getter: data_out_rx,
                             registration: registration.clone(),
                         };
-
                         break UpdateResult {
                             registration: Some((registration,
                                                 RegistrationState::FirstTime)),
@@ -202,37 +194,35 @@ impl SocketHandler for Http1Handler {
                 },
 
                 Http1HandlerState::ExecutingHandler { response_getter, registration } => {
-                    // TODO: write incoming data to request's reader
-                    if let Ok(response) = response_getter.try_recv() {
-                        assert!(response.upgrade.is_none());        // TODO:
-
-                        let (body_data, body_size) = response.data.into_reader_and_size();
-                        write_status_and_headers(&mut update.pending_write_buffer,
-                                                 response.status_code,
-                                                 &response.headers,
-                                                 body_size);
-
-                        self.state = Http1HandlerState::SendingResponse {
-                            data: Box::new(body_data)
-                        };
-
-                    } else {
-                        self.state = Http1HandlerState::ExecutingHandler { response_getter, registration };
-                        break UpdateResult {
-                            registration: None,
-                            close_read: false,
-                        };
+                    match response_getter.try_recv() {
+                        Ok(mut data) => {
+                            // Got some data.
+                            update.pending_write_buffer.append(&mut data);
+                            self.state = Http1HandlerState::ExecutingHandler {
+                                response_getter: response_getter,
+                                registration: registration,
+                            };
+                        },
+                        Err(TryRecvError::Disconnected) => {
+                            // The handler has finished streaming the response.
+                            self.state = Http1HandlerState::WaitingForRqLine { new_data_start: 0 };
+                            break UpdateResult {
+                                registration: None,
+                                close_read: false,
+                            };
+                        },
+                        Err(TryRecvError::Empty) => {
+                            // Spurious wakeup.
+                            self.state = Http1HandlerState::ExecutingHandler {
+                                response_getter: response_getter,
+                                registration: registration.clone()
+                            };
+                            break UpdateResult {
+                                registration: Some((registration, RegistrationState::Reregister)),
+                                close_read: false,
+                            };
+                        },
                     }
-                },
-
-                Http1HandlerState::SendingResponse { mut data } => {
-                    // TODO: meh, this can block
-                    data.read_to_end(&mut update.pending_write_buffer).unwrap();
-                    self.state = Http1HandlerState::WaitingForRqLine { new_data_start: 0 };
-                    break UpdateResult {
-                        registration: None,
-                        close_read: false,
-                    };
                 },
 
                 Http1HandlerState::Closed => {
@@ -245,6 +235,55 @@ impl SocketHandler for Http1Handler {
             }
         }
     }
+}
+
+fn spawn_handler_task(task_pool: &TaskPool, handler: Arc<Mutex<FnMut(Request) -> Response + Send + 'static>>,
+                      method: ArrayString<[u8; 16]>, path: String,
+                      headers: Vec<(String, String)>, original_protocol: Protocol,
+                      remote_addr: SocketAddr, data_out_tx: Sender<Vec<u8>>,
+                      set_ready: SetReadiness)
+{
+    let https = original_protocol == Protocol::Https;
+
+    task_pool.spawn(move || {
+        let request = Request {
+            method: method,
+            url: path,
+            headers: headers,
+            https: https,
+            data: Arc::new(Mutex::new(None)),       // FIXME:
+            remote_addr: remote_addr,
+        };
+
+        let mut handler = handler.lock().unwrap();
+        let response = (&mut *handler)(request);
+        assert!(response.upgrade.is_none());        // TODO: unimplemented
+
+        let (mut body_data, body_size) = response.data.into_reader_and_size();
+
+        let mut out_buffer = Vec::new();
+        write_status_and_headers(&mut out_buffer,
+                                 response.status_code,
+                                 &response.headers,
+                                 body_size);
+
+        match data_out_tx.send(out_buffer) {
+            Ok(_) => (),
+            Err(_) => return,
+        };
+
+        let _ = set_ready.set_readiness(Ready::readable());
+
+        // TODO: streaming output
+        let mut out_data = Vec::new();
+        body_data.read_to_end(&mut out_data).unwrap();      // TODO: what if error?
+
+        match data_out_tx.send(out_data) {
+            Ok(_) => (),
+            Err(_) => return,
+        };
+        let _ = set_ready.set_readiness(Ready::readable());
+    });
 }
 
 // HTTP version (usually 1.0 or 1.1).
