@@ -232,7 +232,11 @@ impl SocketHandler for Http1Handler {
                     match response_getter.try_recv() {
                         Ok(mut data) => {
                             // Got some data for the response.
-                            update.pending_write_buffer.append(&mut data);
+                            if update.pending_write_buffer.is_empty() {
+                                update.pending_write_buffer = data;
+                            } else {
+                                update.pending_write_buffer.append(&mut data);
+                            }
                             self.state = Http1HandlerState::ExecutingHandler {
                                 connection_close: connection_close,
                                 response_getter: response_getter,
