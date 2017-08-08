@@ -9,6 +9,7 @@
 
 use std::ascii::AsciiExt;
 use std::borrow::Cow;
+use std::io::ErrorKind;
 use std::io::Read;
 use std::mem;
 use std::net::SocketAddr;
@@ -273,15 +274,25 @@ fn spawn_handler_task(task_pool: &TaskPool,
 
         let _ = set_ready.set_readiness(Ready::readable());
 
-        // TODO: streaming output
-        let mut out_data = Vec::new();
-        body_data.read_to_end(&mut out_data).unwrap();      // TODO: what if error?
+        loop {
+            let mut out_data = vec![0; 256];
+            match body_data.read(&mut out_data) {
+                Ok(0) => break,
+                Ok(n) => out_data.truncate(n),
+                Err(ref e) if e.kind() == ErrorKind::Interrupted => {},
+                Err(_) => {
+                    // Handle errors by silently stopping the stream.
+                    // TODO: better way?
+                    return;
+                },
+            };
 
-        match data_out_tx.send(out_data) {
-            Ok(_) => (),
-            Err(_) => return,
-        };
-        let _ = set_ready.set_readiness(Ready::readable());
+            match data_out_tx.send(out_data) {
+                Ok(_) => (),
+                Err(_) => return,
+            };
+            let _ = set_ready.set_readiness(Ready::readable());
+        }
     });
 }
 
