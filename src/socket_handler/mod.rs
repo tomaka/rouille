@@ -21,23 +21,23 @@ mod http1;
 mod task_pool;
 
 /// Parses the data received by a socket and returns the data to send back.
-pub struct SocketHandler {
+pub struct SocketHandlerDispatch {
     inner: Http1Handler,
 }
 
-impl SocketHandler {
+impl SocketHandlerDispatch {
     /// Initialization.
-    pub fn new<F>(client_addr: SocketAddr, task_pool: TaskPool, handler: F) -> SocketHandler
+    pub fn new<F>(client_addr: SocketAddr, task_pool: TaskPool, handler: F) -> SocketHandlerDispatch
         where F: FnMut(Request) -> Response + Send + 'static
     {
-        SocketHandler {
+        SocketHandlerDispatch {
             inner: Http1Handler::new(client_addr, Protocol::Http /* TODO: */, task_pool, handler)
         }
     }
+}
 
-    /// Call this function whenever new data is received on the socket, or when the registration
-    /// wakes up.
-    pub fn update(&mut self, update: &mut Update) {
+impl SocketHandler for SocketHandlerDispatch {
+    fn update(&mut self, update: &mut Update) {
         self.inner.update(update)
     }
 }
@@ -47,6 +47,12 @@ impl SocketHandler {
 pub enum Protocol {
     Http,
     Https,
+}
+
+pub trait SocketHandler {
+    /// Call this function whenever new data is received on the socket, or when the registration
+    /// wakes up.
+    fn update(&mut self, update: &mut Update);
 }
 
 /// Represents the communication between the `SocketHandler` and the outside.

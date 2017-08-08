@@ -23,6 +23,7 @@ use mio::Ready;
 use mio::Registration;
 
 use socket_handler::Protocol;
+use socket_handler::SocketHandler;
 use socket_handler::Update;
 use socket_handler::task_pool::TaskPool;
 use Request;
@@ -84,8 +85,10 @@ impl Http1Handler {
             task_pool: task_pool,
         }
     }
+}
 
-    pub fn update(&mut self, update: &mut Update) {
+impl SocketHandler for Http1Handler {
+    fn update(&mut self, update: &mut Update) {
         loop {
             match mem::replace(&mut self.state, Http1HandlerState::Poisonned) {
                 Http1HandlerState::Poisonned => {
