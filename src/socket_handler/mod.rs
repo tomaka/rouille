@@ -83,6 +83,10 @@ pub struct UpdateResult {
     /// `close_read` is true, `pending_write_buffer` is empty, and `registration` is empty,
     /// then you can drop the socket.
     pub close_read: bool,
+
+    /// If true, the socket handler suggests to flush the content of the write buffer to the
+    /// socket.
+    pub write_flush_suggested: bool,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -74,6 +74,7 @@ enum Socket {
     Stream {
         stream: TcpStream,
         read_closed: bool,
+        write_flush_suggested: bool,
         handler: SocketHandlerDispatch,
         update: SocketHandlerUpdate,
     },
@@ -228,6 +229,7 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
                         entry.insert(Socket::Stream {
                             stream: stream,
                             read_closed: false,
+                            write_flush_suggested: false,
                             handler: SocketHandlerDispatch::new(client_addr, Protocol::Http, share.task_pool.clone(),
                                                         move |rq| (share.handler)(&rq)),
                             update: SocketHandlerUpdate::empty(),
@@ -251,7 +253,9 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
             entry.insert(Socket::Listener(listener));
         },
 
-        Socket::Stream { mut stream, mut read_closed, mut handler, mut update } => {
+        Socket::Stream { mut stream, mut read_closed, mut write_flush_suggested, mut handler,
+                         mut update } =>
+        {
             // Read into `update.pending_read_buffer` until `WouldBlock` is returned.
             loop {
                 let old_pr_len = update.pending_read_buffer.len();
@@ -284,6 +288,9 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
             let mut update_result = handler.update(&mut update);
             if update_result.close_read {
                 read_closed = true;
+            }
+            if update_result.write_flush_suggested {
+                write_flush_suggested = true;
             }
 
             // Re-register stream for next time.
@@ -327,7 +334,8 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
             }
 
             if insert_entry {
-                entry.insert(Socket::Stream { stream, read_closed, handler, update });
+                entry.insert(Socket::Stream { stream, read_closed, write_flush_suggested,
+                                              handler, update });
             }
         },
     }
@@ -335,9 +343,10 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
 
 fn handle_write<F>(share: &ThreadsShare<F>, socket: Socket) {
     // Write events can't happen for listeners.
-    let (mut stream, read_closed, handler, mut update) = match socket {
+    let (mut stream, read_closed, write_flush_suggested, handler, mut update) = match socket {
         Socket::Listener(_) => unreachable!(),
-        Socket::Stream { stream, read_closed, handler, update } => (stream, read_closed, handler, update),
+        Socket::Stream { stream, read_closed, write_flush_suggested, handler, update } =>
+            (stream, read_closed, write_flush_suggested, handler, update),
     };
 
     // Write from `update.pending_write_buffer` to `stream`.
@@ -375,6 +384,7 @@ fn handle_write<F>(share: &ThreadsShare<F>, socket: Socket) {
         share.poll.reregister(&stream, entry.key().into(), ready,
                               PollOpt::edge() | PollOpt::oneshot())
             .expect("Error while reregistering TCP stream");
-        entry.insert(Socket::Stream { stream, read_closed, handler, update });
+        entry.insert(Socket::Stream { stream, read_closed, write_flush_suggested,
+                                      handler, update });
     }
 }

@@ -57,6 +57,7 @@ impl<H> SocketHandler for RustlsHandler<H>
             return UpdateResult {
                 registration: None,
                 close_read: true,
+                write_flush_suggested: false,
             };
         }
 

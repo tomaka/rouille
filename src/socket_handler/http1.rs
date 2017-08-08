@@ -159,6 +159,7 @@ impl SocketHandler for Http1Handler {
                         break UpdateResult {
                             registration: None,
                             close_read: false,
+                            write_flush_suggested: false,
                         };
                     }
                 },
@@ -207,6 +208,7 @@ impl SocketHandler for Http1Handler {
                             registration: Some((registration,
                                                 RegistrationState::FirstTime)),
                             close_read: false,
+                            write_flush_suggested: false,
                         };
 
                     } else {
@@ -222,6 +224,7 @@ impl SocketHandler for Http1Handler {
                         break UpdateResult {
                             registration: None,
                             close_read: false,
+                            write_flush_suggested: false,
                         };
                     }
                 },
@@ -254,6 +257,7 @@ impl SocketHandler for Http1Handler {
                                 break UpdateResult {
                                     registration: None,
                                     close_read: false,
+                                    write_flush_suggested: true,
                                 };
                             }
                         },
@@ -267,6 +271,7 @@ impl SocketHandler for Http1Handler {
                             break UpdateResult {
                                 registration: Some((registration, RegistrationState::Reregister)),
                                 close_read: false,
+                                write_flush_suggested: false,
                             };
                         },
                     }
@@ -277,6 +282,7 @@ impl SocketHandler for Http1Handler {
                     break UpdateResult {
                         registration: None,
                         close_read: true,
+                        write_flush_suggested: true,
                     };
                 },
             }
