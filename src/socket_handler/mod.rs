@@ -16,6 +16,7 @@ use Response;
 
 use self::http1::Http1Handler;
 use self::rustls::RustlsHandler;
+pub use self::rustls::RustlsConfig;
 pub use self::task_pool::TaskPool;      // TODO: shouldn't be pub, but is used by Server, move it somewher else
 
 mod http1;
@@ -34,18 +35,25 @@ enum SocketHandlerDispatchInner {
 }
 
 impl SocketHandlerDispatch {
-    /// Initialization.
-    pub fn new<F>(client_addr: SocketAddr, protocol: Protocol, task_pool: TaskPool,
-                  handler: F) -> SocketHandlerDispatch
+    /// Initialization for HTTP.
+    pub fn http<F>(client_addr: SocketAddr, task_pool: TaskPool, handler: F)
+                   -> SocketHandlerDispatch
         where F: FnMut(Request) -> Response + Send + 'static
     {
-        let http_handler = Http1Handler::new(client_addr, protocol, task_pool, handler);
+        let http_handler = Http1Handler::new(client_addr, Protocol::Http, task_pool, handler);
+        let inner = SocketHandlerDispatchInner::Http(http_handler);
+        SocketHandlerDispatch {
+            inner: inner,
+        }
+    }
 
-        let inner = match protocol {
-            Protocol::Http => SocketHandlerDispatchInner::Http(http_handler),
-            Protocol::Https => SocketHandlerDispatchInner::Https(RustlsHandler::new(http_handler)),
-        };
-
+    /// Initialization for HTTPS.
+    pub fn https<F>(config: RustlsConfig, client_addr: SocketAddr, task_pool: TaskPool, handler: F)
+                    -> SocketHandlerDispatch
+        where F: FnMut(Request) -> Response + Send + 'static
+    {
+        let http_handler = Http1Handler::new(client_addr, Protocol::Https, task_pool, handler);
+        let inner = SocketHandlerDispatchInner::Https(RustlsHandler::new(config, http_handler));
         SocketHandlerDispatch {
             inner: inner,
         }

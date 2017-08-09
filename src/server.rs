@@ -22,7 +22,8 @@ use mio::tcp::{TcpListener, TcpStream};
 use num_cpus;
 use slab::Slab;
 
-use socket_handler::Protocol;
+pub use socket_handler::RustlsConfig as SslConfig;
+
 use socket_handler::RegistrationState;
 use socket_handler::TaskPool;
 use socket_handler::SocketHandler;
@@ -70,7 +71,10 @@ struct ThreadsShare<F> {
 }
 
 enum Socket {
-    Listener(TcpListener),
+    Listener{
+        listener: TcpListener,
+        https: Option<SslConfig>,
+    },
     Stream {
         stream: TcpStream,
         read_closed: bool,
@@ -91,17 +95,13 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         where A: ToSocketAddrs,
               F: Fn(&Request) -> Response + Send + 'static
     {
-        let server = Server::init(handler)?;
-
-        for addr in addr.to_socket_addrs()? {
-            server.add_listener(&addr)?;
-        }
-
+        let server = Server::empty(handler)?;
+        server.add_http_listeners(addr)?;
         Ok(server)
     }
 
-    // Builds a new `Server` but without any listener.
-    fn init(handler: F) -> Result<Server<F>, Box<Error + Send + Sync>>
+    /// Builds a new `Server` but without any listener.
+    pub fn empty(handler: F) -> Result<Server<F>, Box<Error + Send + Sync>>
         where F: Fn(&Request) -> Response + Send + 'static
     {
         let share = Arc::new(ThreadsShare {
@@ -133,8 +133,19 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         })
     }
 
-    // Adds a new listening addr to the server.
-    fn add_listener(&self, addr: &SocketAddr) -> Result<(), Box<Error + Send + Sync>> {
+    // Adds new HTTP listening addresses to the server.
+    pub fn add_http_listeners<A>(&self, addr: A) -> Result<(), Box<Error + Send + Sync>>
+        where A: ToSocketAddrs
+    {
+        for addr in addr.to_socket_addrs()? {
+            // TODO: error recovery? what if the 2nd address returns an error? do we keep the first running?
+            self.add_http_listener(&addr)?;
+        }
+        Ok(())
+    }
+
+    /// Adds a new listening addr to the server.
+    pub fn add_http_listener(&self, addr: &SocketAddr) -> Result<(), Box<Error + Send + Sync>> {
         let listener = TcpListener::bind(addr)?;
 
         let mut slab = self.inner.sockets.lock().unwrap();
@@ -143,7 +154,29 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         self.inner.poll.register(&listener, entry.key().into(),
                                  Ready::readable(), PollOpt::edge() | PollOpt::oneshot())?;
     
-        entry.insert(Socket::Listener(listener));
+        entry.insert(Socket::Listener {
+            listener: listener,
+            https: None,
+        });
+        
+        Ok(())
+    }
+
+    /// Adds a new listening addr to the server.
+    pub fn add_https_listener(&self, addr: &SocketAddr, config: SslConfig)
+                              -> Result<(), Box<Error + Send + Sync>> {
+        let listener = TcpListener::bind(addr)?;
+
+        let mut slab = self.inner.sockets.lock().unwrap();
+        let entry = slab.vacant_entry();
+
+        self.inner.poll.register(&listener, entry.key().into(),
+                                 Ready::readable(), PollOpt::edge() | PollOpt::oneshot())?;
+    
+        entry.insert(Socket::Listener {
+            listener: listener,
+            https: Some(config),
+        });
         
         Ok(())
     }
@@ -214,7 +247,7 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
     where F: Fn(&Request) -> Response + Send + Sync + 'static
 {
     match socket {
-        Socket::Listener(listener) => {
+        Socket::Listener { listener, https } => {
             // Call `accept` repeatidely and register the newly-created sockets,
             // until `WouldBlock` is returned.
             loop {
@@ -225,13 +258,22 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
                         share.poll.register(&stream, entry.key().into(), Ready::readable(),
                                                 PollOpt::edge() | PollOpt::oneshot())
                             .expect("Error while registering TCP stream");
-                        let share = share.clone();
+                        let handler = {
+                            let share = share.clone();
+                            if let Some(ref https) = https {
+                                SocketHandlerDispatch::https(https.clone(), client_addr,
+                                                             share.task_pool.clone(),
+                                                             move |rq| (share.handler)(&rq))
+                            } else {
+                                SocketHandlerDispatch::http(client_addr, share.task_pool.clone(),
+                                                            move |rq| (share.handler)(&rq))
+                            }
+                        };
                         entry.insert(Socket::Stream {
                             stream: stream,
                             read_closed: false,
                             write_flush_suggested: false,
-                            handler: SocketHandlerDispatch::new(client_addr, Protocol::Http, share.task_pool.clone(),
-                                                        move |rq| (share.handler)(&rq)),
+                            handler: handler,
                             update: SocketHandlerUpdate::empty(),
                         });
                     },
@@ -250,7 +292,10 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
             share.poll.reregister(&listener, entry.key().into(), Ready::readable(),
                                     PollOpt::edge() | PollOpt::oneshot())
                 .expect("Error while reregistering TCP listener");
-            entry.insert(Socket::Listener(listener));
+            entry.insert(Socket::Listener {
+                listener: listener,
+                https: https,
+            });
         },
 
         Socket::Stream { mut stream, mut read_closed, mut write_flush_suggested, mut handler,
@@ -344,7 +389,7 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
 fn handle_write<F>(share: &ThreadsShare<F>, socket: Socket) {
     // Write events can't happen for listeners.
     let (mut stream, read_closed, write_flush_suggested, handler, mut update) = match socket {
-        Socket::Listener(_) => unreachable!(),
+        Socket::Listener { .. } => unreachable!(),
         Socket::Stream { stream, read_closed, write_flush_suggested, handler, update } =>
             (stream, read_closed, write_flush_suggested, handler, update),
     };
