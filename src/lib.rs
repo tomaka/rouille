@@ -80,6 +80,7 @@ pub use assets::match_assets;
 pub use log::log;
 pub use response::{Response, ResponseBody};
 pub use server::Server;
+pub use server::SslConfig;
 pub use tiny_http::ReadWrite;
 
 use arrayvec::ArrayString;
