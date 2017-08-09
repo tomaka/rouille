@@ -9,6 +9,9 @@
 
 use std::ascii::AsciiExt;
 use std::borrow::Cow;
+use std::io::copy;
+use std::io::Cursor;
+use std::io::Error as IoError;
 use std::io::ErrorKind;
 use std::io::Read;
 use std::mem;
@@ -30,6 +33,7 @@ use socket_handler::RegistrationState;
 use socket_handler::SocketHandler;
 use socket_handler::Update;
 use socket_handler::UpdateResult;
+use socket_handler::request_body_analyzer::RequestBodyAnalyzer;
 use socket_handler::task_pool::TaskPool;
 use Request;
 use Response;
@@ -82,12 +86,16 @@ enum Http1HandlerState {
     ExecutingHandler {
         // True if `Connection: close` was requested by the client as part of the headers.
         connection_close: bool,
+        // Analyzes and decodes the client input.
+        input_analyzer: RequestBodyAnalyzer,
+        // Used to send buffers containing the body of the request. `None` if no more data.
+        input_data: Option<Sender<Vec<u8>>>,
         // Contains blocks of output data streamed by the handler. Closed when the handler doesn't
         // have any more data to send.
         response_getter: Receiver<Vec<u8>>,
         // Registration that is triggered by the background thread whenever some data is available
         // in `response_getter`.
-        registration: Arc<Registration>,
+        registration: (Arc<Registration>, RegistrationState),
     },
 
     // Happens after a request with `Connection: close`. The connection is considered as closed by
@@ -172,7 +180,7 @@ impl SocketHandler for Http1Handler {
                                                                 .position(|w| w == b"\r\n\r\n");
                     if let Some(rnrn) = rnrn {
                         // Found headers! Parse them.
-                        let headers = {
+                        let headers: Vec<(String, String)> = {
                             let mut out_headers = Vec::new();
                             let mut headers = [httparse::EMPTY_HEADER; 32];
                             let (_, parsed_headers) = httparse::parse_headers(&update.pending_read_buffer, &mut headers).unwrap().unwrap();        // TODO:
@@ -189,26 +197,30 @@ impl SocketHandler for Http1Handler {
                         }
                         update.pending_read_buffer.resize(cut_len, 0);
 
+                        let input_analyzer = {
+                            let iter = headers
+                                .iter()
+                                .map(|&(ref h, ref v)| (h.as_str(), v.as_str()));
+                            RequestBodyAnalyzer::new(iter)
+                        };
+
                         // We now create a new task for our task pool in which the request is
                         // built, the handler is called, and the response is sent as Vecs through
                         // a channel.
                         let (data_out_tx, data_out_rx) = channel();
+                        let (data_in_tx, data_in_rx) = channel();
                         let (registration, set_ready) = Registration::new2();
                         spawn_handler_task(&self.task_pool, self.handler.clone(), method, path,
                                            headers, self.original_protocol,
-                                           self.client_addr.clone(), data_out_tx, set_ready);
+                                           self.client_addr.clone(), data_out_tx, data_in_rx,
+                                           set_ready);
 
-                        let registration = Arc::new(registration);
                         self.state = Http1HandlerState::ExecutingHandler {
                             connection_close: false,        // TODO:
+                            input_analyzer: input_analyzer,
+                            input_data: Some(data_in_tx),
                             response_getter: data_out_rx,
-                            registration: registration.clone(),
-                        };
-                        break UpdateResult {
-                            registration: Some((registration,
-                                                RegistrationState::FirstTime)),
-                            close_read: false,
-                            write_flush_suggested: false,
+                            registration: (Arc::new(registration), RegistrationState::FirstTime),
                         };
 
                     } else {
@@ -229,9 +241,23 @@ impl SocketHandler for Http1Handler {
                     }
                 },
 
-                Http1HandlerState::ExecutingHandler { connection_close, response_getter,
+                Http1HandlerState::ExecutingHandler { connection_close, mut input_data,
+                                                      mut input_analyzer, response_getter,
                                                       registration } =>
                 {
+                    {
+                        let analysis = input_analyzer.feed(&mut update.pending_read_buffer);
+                        if analysis.body_data >= 1 {
+                            // TODO: more optimal
+                            let body_data = update.pending_read_buffer[0 .. analysis.body_data].to_owned();
+                            update.pending_read_buffer = update.pending_read_buffer[analysis.body_data..].to_owned();
+                            let _ = input_data.as_mut().unwrap().send(body_data);
+                        }
+                        if analysis.finished {
+                            input_data = None;
+                        }
+                    }
+
                     match response_getter.try_recv() {
                         Ok(mut data) => {
                             // Got some data for the response.
@@ -242,6 +268,8 @@ impl SocketHandler for Http1Handler {
                             }
                             self.state = Http1HandlerState::ExecutingHandler {
                                 connection_close: connection_close,
+                                input_data: input_data,
+                                input_analyzer: input_analyzer,
                                 response_getter: response_getter,
                                 registration: registration,
                             };
@@ -265,11 +293,13 @@ impl SocketHandler for Http1Handler {
                             // Spurious wakeup.
                             self.state = Http1HandlerState::ExecutingHandler {
                                 connection_close: connection_close,
+                                input_data: input_data,
+                                input_analyzer: input_analyzer,
                                 response_getter: response_getter,
-                                registration: registration.clone()
+                                registration: (registration.0.clone(), RegistrationState::Reregister),
                             };
                             break UpdateResult {
-                                registration: Some((registration, RegistrationState::Reregister)),
+                                registration: Some(registration),
                                 close_read: false,
                                 write_flush_suggested: false,
                             };
@@ -296,9 +326,50 @@ fn spawn_handler_task(task_pool: &TaskPool,
                       method: ArrayString<[u8; 16]>, path: String,
                       headers: Vec<(String, String)>, original_protocol: Protocol,
                       remote_addr: SocketAddr, data_out_tx: Sender<Vec<u8>>,
-                      set_ready: SetReadiness)
+                      data_in_rx: Receiver<Vec<u8>>, set_ready: SetReadiness)
 {
     let https = original_protocol == Protocol::Https;
+
+    struct ReadWrapper(Receiver<Vec<u8>>, Cursor<Vec<u8>>);
+    impl Read for ReadWrapper {
+        fn read(&mut self, buf: &mut [u8]) -> Result<usize, IoError> {
+            let initial_buf_len = buf.len() as u64;
+            let mut total_written = 0;
+            let mut buf = Cursor::new(buf);
+
+            total_written += copy(&mut self.1, &mut buf).unwrap();
+            debug_assert!(total_written <= initial_buf_len);
+            if total_written == initial_buf_len {
+                return Ok(total_written as usize);
+            }
+
+            match self.0.recv() {
+                Ok(data) => self.1 = Cursor::new(data),
+                Err(_) => return Ok(total_written as usize),
+            };
+
+            total_written += copy(&mut self.1, &mut buf).unwrap();
+            debug_assert!(total_written <= initial_buf_len);
+            if total_written == initial_buf_len {
+                return Ok(total_written as usize);
+            }
+
+            loop {
+                match self.0.try_recv() {
+                    Ok(data) => self.1 = Cursor::new(data),
+                    Err(_) => return Ok(total_written as usize),
+                };
+
+                total_written += copy(&mut self.1, &mut buf).unwrap();
+                debug_assert!(total_written <= initial_buf_len);
+                if total_written == initial_buf_len {
+                    return Ok(total_written as usize);
+                }
+            }
+        }
+    }
+
+    let reader = ReadWrapper(data_in_rx, Cursor::new(Vec::new()));
 
     task_pool.spawn(move || {
         let request = Request {
@@ -306,7 +377,7 @@ fn spawn_handler_task(task_pool: &TaskPool,
             url: path,
             headers: headers,
             https: https,
-            data: Arc::new(Mutex::new(None)),       // FIXME:
+            data: Arc::new(Mutex::new(Some(Box::new(reader)))),
             remote_addr: remote_addr,
         };
 

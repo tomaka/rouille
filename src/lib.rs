@@ -53,6 +53,7 @@
 #![deny(unsafe_code)]
 
 extern crate arrayvec;
+extern crate atoi;
 #[cfg(feature = "brotli2")]
 extern crate brotli2;
 extern crate chrono;

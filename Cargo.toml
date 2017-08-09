@@ -17,6 +17,7 @@ gzip = ["flate2"]
 
 [dependencies]
 arrayvec = "0.3.23"
+atoi = "0.2.2"
 brotli2 = { version = "0.2.1", optional = true }
 chrono = "0.2.0"
 crossbeam = "0.3.0"

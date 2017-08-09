@@ -19,6 +19,7 @@ use self::rustls::RustlsHandler;
 pub use self::task_pool::TaskPool;      // TODO: shouldn't be pub, but is used by Server, move it somewher else
 
 mod http1;
+mod request_body_analyzer;
 mod rustls;
 mod task_pool;
 
