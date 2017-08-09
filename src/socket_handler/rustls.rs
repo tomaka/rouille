@@ -143,9 +143,19 @@ impl<H> SocketHandler for RustlsHandler<H>
 {
     fn update(&mut self, update: &mut Update) -> UpdateResult {
         // Pass outside data to the ServerSession.
-        let read_num = self.session.read_tls(&mut (&update.pending_read_buffer[..])).unwrap();
-        assert_eq!(read_num, update.pending_read_buffer.len());
-        update.pending_read_buffer.clear();
+        match self.session.read_tls(&mut (&update.pending_read_buffer[..])) {
+            Ok(read_num) => {
+                assert_eq!(read_num, update.pending_read_buffer.len());
+                update.pending_read_buffer.clear();
+            },
+            Err(_) => {
+                return UpdateResult {
+                    registration: None,
+                    close_read: true,
+                    write_flush_suggested: false,
+                };
+            },
+        };
 
         if let Err(_) = self.session.process_new_packets() {
             // Drop the socket in case of an error.
@@ -158,16 +168,38 @@ impl<H> SocketHandler for RustlsHandler<H>
         }
 
         // Pass data from the ServerSession to the inner handler.
-        self.session.read_to_end(&mut self.handler_update.pending_read_buffer).unwrap();
+        if let Err(_) = self.session.read_to_end(&mut self.handler_update.pending_read_buffer) {
+            return UpdateResult {
+                registration: None,
+                close_read: true,
+                write_flush_suggested: false,
+            };
+        }
+
+        // Call the inner handler.
         let result = self.handler.update(&mut self.handler_update);
 
         // Pass data from the inner handler to the ServerSession.
-        self.session.write_all(&self.handler_update.pending_write_buffer).unwrap();
-        self.handler_update.pending_write_buffer.clear();
+        match self.session.write_all(&self.handler_update.pending_write_buffer) {
+            Ok(_) => self.handler_update.pending_write_buffer.clear(),
+            Err(_) => {
+                return UpdateResult {
+                    registration: None,
+                    close_read: true,
+                    write_flush_suggested: false,
+                };
+            }
+        };
 
         // Pass data from the ServerSession to the outside.
         while self.session.wants_write() {
-            self.session.write_tls(&mut update.pending_write_buffer).unwrap();
+            if let Err(_) = self.session.write_tls(&mut update.pending_write_buffer) {
+                return UpdateResult {
+                    registration: None,
+                    close_read: true,
+                    write_flush_suggested: true,
+                };
+            }
         }
 
         result
