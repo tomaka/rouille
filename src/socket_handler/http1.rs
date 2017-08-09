@@ -250,8 +250,10 @@ impl SocketHandler for Http1Handler {
                         if analysis.body_data >= 1 {
                             // TODO: more optimal
                             let body_data = update.pending_read_buffer[0 .. analysis.body_data].to_owned();
-                            update.pending_read_buffer = update.pending_read_buffer[analysis.body_data..].to_owned();
+                            update.pending_read_buffer = update.pending_read_buffer[analysis.body_data + analysis.unused_trailing..].to_owned();
                             let _ = input_data.as_mut().unwrap().send(body_data);
+                        } else {
+                            assert_eq!(analysis.unused_trailing, 0);
                         }
                         if analysis.finished {
                             input_data = None;
