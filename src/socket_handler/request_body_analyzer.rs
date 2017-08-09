@@ -121,6 +121,15 @@ impl RequestBodyAnalyzer {
                         }
                     }
 
+                    debug_assert!(out_body_data + out_unused_trailing <= data.len());
+                    if data.len() == out_body_data + out_unused_trailing {
+                        return FeedOutcome {
+                            body_data: out_body_data,
+                            unused_trailing: out_unused_trailing,
+                            finished: false,
+                        };
+                    }
+
                     let copy_len = cmp::min(data.len() - out_body_data - out_unused_trailing,
                                             remaining_chunk_size.unwrap());
                     if out_unused_trailing != 0 {
@@ -183,7 +192,7 @@ mod tests {
     use super::RequestBodyAnalyzer;
 
     #[test]
-    fn chunked_decode() {
+    fn chunked_decode_one_buf() {
         let mut analyzer = {
             let headers = vec![("Transfer-Encoding", "chunked")];
             RequestBodyAnalyzer::new(headers.into_iter())
@@ -196,5 +205,29 @@ mod tests {
         assert_eq!(outcome.unused_trailing, 20 - 11);
         assert!(outcome.finished);
         assert_eq!(&buffer[..11], &b"hello world"[..]);
+    }
+
+    #[test]
+    fn chunked_decode_multi_buf() {
+        let mut analyzer = {
+            let headers = vec![("Transfer-Encoding", "chunked")];
+            RequestBodyAnalyzer::new(headers.into_iter())
+        };
+
+        let mut buf1 = b"6\r\nhel".to_vec();
+        let out1 = analyzer.feed(&mut buf1);
+        
+        let mut buf2 = b"lo 5\r\nworld0\r\n".to_vec();
+        let out2 = analyzer.feed(&mut buf2);
+
+        assert_eq!(out1.body_data, 3);
+        assert_eq!(out1.unused_trailing, 6 - 3);
+        assert!(!out1.finished);
+        assert_eq!(&buf1[..3], &b"hel"[..]);
+        
+        assert_eq!(out2.body_data, 8);
+        assert_eq!(out2.unused_trailing, 14 - 8);
+        assert!(out2.finished);
+        assert_eq!(&buf2[..8], &b"lo world"[..]);
     }
 }
