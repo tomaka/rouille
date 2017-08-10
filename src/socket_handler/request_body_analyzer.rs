@@ -55,7 +55,14 @@ impl RequestBodyAnalyzer {
                 (Some(len), _) => RequestBodyAnalyzerInner::ContentLength {
                     remaining_content_length: len,
                 },
-                _ => RequestBodyAnalyzerInner::EndOfStream,     // TODO: /!\
+                _ => {
+                    // If we have neither a Content-Length nor a Transfer-Encoding,
+                    // assuming that we have no data.
+                    // TODO: could also be multipart/byteranges
+                    RequestBodyAnalyzerInner::ContentLength {
+                        remaining_content_length: 0,
+                    }
+                },
             },
         }
     }
