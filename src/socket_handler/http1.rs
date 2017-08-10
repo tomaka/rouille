@@ -75,7 +75,7 @@ enum Http1HandlerState {
         // offset was already in `pending_read_buffer` the last time `update` returned.
         new_data_start: usize,
         // HTTP method (eg. GET, POST, ...) parsed from the request line.
-        method: ArrayString<[u8; 16]>,
+        method: ArrayString<[u8; 17]>,
         // URL requested by the HTTP client parsed from the request line.
         path: String,
         // HTTP version parsed from the request line.
@@ -325,7 +325,7 @@ impl SocketHandler for Http1Handler {
 // Starts the task of handling a request.
 fn spawn_handler_task(task_pool: &TaskPool,
                       handler: Arc<Mutex<FnMut(Request) -> Response + Send + 'static>>,
-                      method: ArrayString<[u8; 16]>, path: String,
+                      method: ArrayString<[u8; 17]>, path: String,
                       headers: Vec<(String, String)>, original_protocol: Protocol,
                       remote_addr: SocketAddr, data_out_tx: Sender<Vec<u8>>,
                       data_in_rx: Receiver<Vec<u8>>, set_ready: SetReadiness)

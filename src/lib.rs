@@ -229,7 +229,9 @@ pub trait Upgrade {
 /// This can be either a real request (received by the HTTP server) or a mock object created with
 /// one of the `fake_*` constructors.
 pub struct Request {
-    method: ArrayString<[u8; 16]>,
+    // The method (`GET`, `POST`, ..). The longest registered method know to the author is
+    // `UPDATEREDIRECTREF` and is 17 bytes long.
+    method: ArrayString<[u8; 17]>,
     url: String,
     headers: Vec<(String, String)>,
     https: bool,
