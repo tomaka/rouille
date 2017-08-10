@@ -43,6 +43,9 @@ pub struct Http1Handler {
     // The handler is a state machine.
     state: Http1HandlerState,
 
+    // Maximum number of bytes in the buffer while waiting for the request line or headers.
+    max_buffer_size: usize,
+
     // Address of the client. Necessary for the request objects.
     client_addr: SocketAddr,
 
@@ -114,6 +117,7 @@ impl Http1Handler {
     {
         Http1Handler {
             state: Http1HandlerState::WaitingForRqLine { new_data_start: 0 },
+            max_buffer_size: 10240,
             client_addr: client_addr,
             original_protocol: original_protocol,
             handler: Arc::new(Mutex::new(handler)),
@@ -187,7 +191,19 @@ impl SocketHandler for Http1Handler {
 
                     } else {
                         // No full request line in the buffer yet.
-                        // TODO: put a limit on the buffer size
+
+                        // Handle buffer too large.
+                        if update.pending_read_buffer.len() > self.max_buffer_size {
+                            write_status_and_headers(&mut update.pending_write_buffer, 413,
+                                                     &[], Some(0));
+                            self.state = Http1HandlerState::Closed;
+                            break UpdateResult {
+                                registration: None,
+                                close_read: true,
+                                write_flush_suggested: true,
+                            };
+                        }
+
                         self.state = Http1HandlerState::WaitingForRqLine {
                             new_data_start: update.pending_read_buffer.len(),
                         };
@@ -253,7 +269,19 @@ impl SocketHandler for Http1Handler {
 
                     } else {
                         // No full headers in the buffer yet.
-                        // TODO: put a limit on the buffer size
+
+                        // Handle buffer too large.
+                        if update.pending_read_buffer.len() > self.max_buffer_size {
+                            write_status_and_headers(&mut update.pending_write_buffer, 413,
+                                                     &[], Some(0));
+                            self.state = Http1HandlerState::Closed;
+                            break UpdateResult {
+                                registration: None,
+                                close_read: true,
+                                write_flush_suggested: true,
+                            };
+                        }
+
                         self.state = Http1HandlerState::WaitingForHeaders {
                             new_data_start: update.pending_read_buffer.len(),
                             method,
@@ -338,6 +366,7 @@ impl SocketHandler for Http1Handler {
                 },
 
                 Http1HandlerState::Closed => {
+                    update.pending_read_buffer.clear();
                     self.state = Http1HandlerState::Closed;
                     break UpdateResult {
                         registration: None,
