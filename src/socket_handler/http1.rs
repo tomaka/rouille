@@ -14,6 +14,7 @@ use std::io::Cursor;
 use std::io::Error as IoError;
 use std::io::ErrorKind;
 use std::io::Read;
+use std::io::Write;
 use std::mem;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -462,7 +463,7 @@ fn spawn_handler_task(task_pool: &TaskPool,
         let _ = set_ready.set_readiness(Ready::readable());
 
         loop {
-            let mut out_data = vec![0; 256];
+            let mut out_data = vec![0; 1024];
             match body_data.read(&mut out_data) {
                 Ok(0) => break,
                 Ok(n) => out_data.truncate(n),
@@ -474,12 +475,29 @@ fn spawn_handler_task(task_pool: &TaskPool,
                 },
             };
 
+            // Encoding as chunks if relevant.
+            // TODO: more optimized
+            if body_size.is_none() {
+                let len = out_data.len();
+                let data = mem::replace(&mut out_data, Vec::with_capacity(len + 7));
+                write!(&mut out_data, "{:x}", len).unwrap();
+                out_data.extend_from_slice(b"\r\n");
+                out_data.extend(data);
+                out_data.extend_from_slice(b"\r\n");
+            }
+
             match data_out_tx.send(out_data) {
                 Ok(_) => (),
                 Err(_) => return,
             };
             let _ = set_ready.set_readiness(Ready::readable());
         }
+
+        if body_size.is_none() {
+            let _ = data_out_tx.send(b"0\r\n\r\n".to_vec());
+        }
+
+        let _ = set_ready.set_readiness(Ready::readable());
     });
 }
 
@@ -571,9 +589,13 @@ fn write_status_and_headers(mut out: &mut Vec<u8>, status_code: u16,
         out.extend_from_slice(b"Date: TODO\r\n");      // TODO:
     }
 
-    out.extend_from_slice(b"Content-Length: ");
-    itoa(&mut out, body_size.unwrap()).unwrap();      // TODO: don't unwrap body_size
-    out.extend_from_slice(b"\r\n");
+    if let Some(body_size) = body_size {
+        out.extend_from_slice(b"Content-Length: ");
+        itoa(&mut out, body_size).unwrap();
+        out.extend_from_slice(b"\r\n");
+    } else {
+        out.extend_from_slice(b"Transfer-Encoding: chunked\r\n");
+    }
     out.extend_from_slice(b"\r\n");
 }
 

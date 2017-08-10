@@ -144,6 +144,7 @@ impl RequestBodyAnalyzer {
                             data[out_body_data + n] = data[out_body_data + out_unused_trailing + n];
                         }
                     }
+                    // FIXME: wrong because ignores trailing \r\n at end of chunks
                     out_body_data += copy_len;
                     *remaining_chunk_size.as_mut().unwrap() -= copy_len;
                     if *remaining_chunk_size == Some(0) {

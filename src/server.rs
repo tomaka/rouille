@@ -388,7 +388,7 @@ fn handle_read<F>(share: &Arc<ThreadsShare<F>>, socket: Socket)
 
 fn handle_write<F>(share: &ThreadsShare<F>, socket: Socket) {
     // Write events can't happen for listeners.
-    let (mut stream, read_closed, write_flush_suggested, handler, mut update) = match socket {
+    let (mut stream, read_closed, mut write_flush_suggested, handler, mut update) = match socket {
         Socket::Listener { .. } => unreachable!(),
         Socket::Stream { stream, read_closed, write_flush_suggested, handler, update } =>
             (stream, read_closed, write_flush_suggested, handler, update),
@@ -414,6 +414,11 @@ fn handle_write<F>(share: &ThreadsShare<F>, socket: Socket) {
             },
         };
     };
+
+    if write_flush_suggested {
+        let _ = stream.flush();
+        write_flush_suggested = false;
+    }
 
     // Re-register the stream for the next event.
     let mut ready = Ready::empty();
