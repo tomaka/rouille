@@ -137,10 +137,38 @@ impl SocketHandler for Http1Handler {
                                                               .position(|w| w == b"\r\n");
                     if let Some(rn) = rn {
                         // Found a request line!
-                        let (method, path, version) = {
-                            let (method, path, version) = parse_request_line(&update.pending_read_buffer[..rn]).unwrap();       // TODO: handle error
-                            let method = ArrayString::from(method).unwrap();        // TODO: handle error
-                            (method, path.to_owned(), version)
+                        let method;
+                        let path;
+                        let version;
+                        {
+                            let (method_raw, path_raw, version_raw) = match parse_request_line(&update.pending_read_buffer[..rn]) {
+                                Ok(v) => v,
+                                Err(_) => {
+                                    write_status_and_headers(&mut update.pending_write_buffer, 400, &[], Some(0));
+                                    self.state = Http1HandlerState::Closed;
+                                    break UpdateResult {
+                                        registration: None,
+                                        close_read: true,
+                                        write_flush_suggested: true,
+                                    };
+                                },
+                            };
+
+                            method = match ArrayString::from(method_raw) {
+                                Ok(m) => m,
+                                Err(_) => {
+                                    write_status_and_headers(&mut update.pending_write_buffer, 501, &[], Some(0));
+                                    self.state = Http1HandlerState::Closed;
+                                    break UpdateResult {
+                                        registration: None,
+                                        close_read: true,
+                                        write_flush_suggested: true,
+                                    };
+                                },
+                            };
+
+                            path = path_raw.to_owned();
+                            version = version_raw;
                         };
 
                         // Remove the request line from the head of the buffer.
