@@ -25,7 +25,6 @@ enum RequestBodyAnalyzerInner {
         // Remaining size of the chunk being read. `None` if we are not in a chunk.
         remaining_chunk_size: Option<usize>,
     },
-    EndOfStream,
 }
 
 impl RequestBodyAnalyzer {
@@ -150,14 +149,6 @@ impl RequestBodyAnalyzer {
                     if *remaining_chunk_size == Some(0) {
                         *remaining_chunk_size = None;
                     }
-                }
-            },
-
-            RequestBodyAnalyzerInner::EndOfStream => {
-                FeedOutcome {
-                    body_data: data.len(),
-                    unused_trailing: 0,
-                    finished: false,
                 }
             },
         }
