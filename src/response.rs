@@ -13,6 +13,7 @@ use std::io;
 use std::io::Cursor;
 use std::io::Read;
 use std::fs::File;
+use std::fmt;
 use rustc_serialize;
 use url::percent_encoding;
 use Request;
@@ -59,6 +60,15 @@ pub struct Response {
     /// cannot be customized. If this value is set, the response will automatically contain
     /// `Connection: Upgrade`.
     pub upgrade: Option<Box<Upgrade + Send>>,
+}
+
+impl fmt::Debug for Response {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Response")
+            .field("status_code", &self.status_code)
+            .field("headers", &self.headers)
+            .finish()
+    }
 }
 
 impl Response {
@@ -641,7 +651,7 @@ impl Response {
 /// An opaque type that represents the body of a response.
 ///
 /// You can't access the inside of this struct, but you can build one by using one of the provided
-/// constructors. 
+/// constructors.
 ///
 /// # Example
 ///
