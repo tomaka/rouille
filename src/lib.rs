@@ -86,6 +86,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
 use std::ascii::AsciiExt;
+use std::fmt;
 
 pub mod cgi;
 pub mod content_encoding;
@@ -141,7 +142,7 @@ macro_rules! assert_or_400 {
     ($cond:expr) => (
         if !$cond {
             return $crate::Response::empty_400();
-        } 
+        }
     );
 }
 
@@ -374,7 +375,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
 /// The purpose of this trait is to be used with the `Connection: Upgrade` header, hence its name.
 pub trait Upgrade {
     /// Initializes the object with the given socket.
-    fn build(&mut self, socket: Box<ReadWrite + Send>); 
+    fn build(&mut self, socket: Box<ReadWrite + Send>);
 }
 
 /// Represents a request that your handler must answer to.
@@ -388,6 +389,18 @@ pub struct Request {
     https: bool,
     data: Arc<Mutex<Option<Box<Read>>>>,
     remote_addr: SocketAddr,
+}
+
+impl fmt::Debug for Request {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Request")
+            .field("method", &self.method)
+            .field("url", &self.url)
+            .field("headers", &self.headers)
+            .field("https", &self.https)
+            .field("remote_addr", &self.remote_addr)
+            .finish()
+    }
 }
 
 impl Request {
@@ -476,7 +489,7 @@ impl Request {
         if !self.url().starts_with(prefix) {
             return None;
         }
-    
+
         // TODO: url-encoded characters in the prefix are not implemented
         assert!(self.url.starts_with(prefix));
         Some(Request {
