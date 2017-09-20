@@ -130,30 +130,33 @@ impl<R> BoundaryReader<R> where R: Read {
                String::from_utf8_lossy(self.source.get_buf()));
 
         let consume_amt = {
-            let buf = self.source.get_buf();
-            let mut skip_size = 0;
-            while buf.len() >= skip_size + 2 && buf[skip_size..(skip_size + 2)] == *b"\r\n" {
-                skip_size += 2;
+            let min_len = self.boundary.len() + 4;
+
+            let buf = fill_buf_min(&mut self.source, min_len)?;
+
+            if buf.len() < min_len {
+                return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
+                                          "not enough bytes to verify boundary"));
             }
-            self.boundary.len() + skip_size
+
+            let mut consume_amt = self.boundary.len();
+
+            if buf[..2] == *b"\r\n" { consume_amt += 2 }
+
+            let last_two = &buf[consume_amt .. consume_amt + 2];
+
+            match last_two {
+                b"\r\n" => consume_amt += 2,
+                b"--" => { consume_amt += 2; self.at_end = true },
+                _ => debug!("Unexpected bytes following boundary: {:?}",
+                            String::from_utf8_lossy(&last_two)),
+            }
+
+            consume_amt
         };
 
         self.source.consume(consume_amt);
         self.boundary_read = false;
-
-        let mut bytes_after = [0, 0];
-
-        let read = self.source.read(&mut bytes_after)?;
-
-        if read == 1 {
-            let _ = self.source.read(&mut bytes_after[1..])?;
-        }
-
-        if bytes_after == *b"--" {
-            self.at_end = true;
-        } else if bytes_after != *b"\r\n" {
-            debug!("Unexpected bytes following boundary: {:?}", String::from_utf8_lossy(&bytes_after));
-        }
 
         trace!("Consumed boundary (at_end: {:?}), remaining buf: {:?}", self.at_end,
                String::from_utf8_lossy(self.source.get_buf()));
@@ -329,6 +332,32 @@ mod test {
         reader.consume_boundary().unwrap();
 
         debug!("Read 4");
+        let _ = reader.read_to_string(buf).unwrap();
+        assert_eq!(buf, "");
+    }
+
+    #[test]
+    fn test_leading_crlf() {
+        let mut body: &[u8] = b"\r\n\r\n--boundary\r\n\
+                         asdf1234\
+                         \r\n\r\n--boundary--";
+
+        let ref mut buf = String::new();
+        let mut reader = BoundaryReader::from_reader(&mut body, BOUNDARY);
+
+
+        debug!("Consume 1");
+        reader.consume_boundary().unwrap();
+
+        debug!("Read 1");
+        let _ = reader.read_to_string(buf).unwrap();
+        assert_eq!(buf, "asdf1234\r\n");
+        buf.clear();
+
+        debug!("Consume 2");
+        reader.consume_boundary().unwrap();
+
+        debug!("Read 2 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
         assert_eq!(buf, "");
     }

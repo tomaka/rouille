@@ -32,7 +32,7 @@ pub struct StrHeader<'a> {
     val: &'a str,
 }
 
-const MAX_ATTEMPTS: usize = 5;
+const MAX_ATTEMPTS: usize = 30;
 
 fn with_headers<R, F, Ret>(r: &mut R, closure: F) -> Result<Ret, ParseHeaderError>
 where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
