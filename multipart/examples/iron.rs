@@ -1,6 +1,8 @@
 extern crate multipart;
 extern crate iron;
 
+extern crate env_logger;
+
 use std::fs::File;
 use std::io::Read;
 use multipart::server::{Multipart, Entries, SaveResult, SavedFile};
@@ -8,6 +10,8 @@ use iron::prelude::*;
 use iron::status;
 
 fn main() {
+    env_logger::init().unwrap();
+
     Iron::new(process_request).http("localhost:80").expect("Could not bind localhost:80");
 }
 
@@ -23,9 +27,15 @@ fn process_request(request: &mut Request) -> IronResult<Response> {
                 SaveResult::Full(entries) => process_entries(entries),
                 SaveResult::Partial(entries, reason) => {
                     process_entries(entries.keep_partial())?;
-                    Err(IronError::new(reason.unwrap_err(), status::InternalServerError))
+                    Ok(Response::with((
+                        status::BadRequest,
+                        format!("error reading request: {}", reason.unwrap_err())
+                    )))
                 }
-                SaveResult::Error(error) => Err(IronError::new(error, status::InternalServerError)),
+                SaveResult::Error(error) => Ok(Response::with((
+                    status::BadRequest,
+                    format!("error reading request: {}", error)
+                ))),
             }
         }
         Err(_) => {

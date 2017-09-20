@@ -7,6 +7,8 @@ use hyper::net::Streaming;
 
 use multipart::client::Multipart;
 
+use std::io::Read;
+
 fn main() {
     let url = "http://localhost:80".parse()
         .expect("Failed to parse URL");
@@ -20,7 +22,13 @@ fn main() {
     write_body(&mut multipart)
         .expect("Failed to write multipart body");
 
-    let _response = multipart.send().expect("Failed to send multipart request");
+    let mut response = multipart.send().expect("Failed to send multipart request");
+
+    if !response.status.is_success() {
+        let mut res = String::new();
+        response.read_to_string(&mut res).expect("failed to read response");
+        println!("response reported unsuccessful: {:?}\n {}", response, res);
+    }
 
     // Optional: read out response
 }
