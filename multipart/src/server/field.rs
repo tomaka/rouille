@@ -20,6 +20,8 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::{str, fmt, error};
 
+use std::ascii::AsciiExt;
+
 const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader {
     name: "",
     val: "",
@@ -516,7 +518,9 @@ fn io_str_utf8(buf: &[u8]) -> io::Result<&str> {
 }
 
 fn find_header<'a, 'b>(headers: &'a [StrHeader<'b>], name: &str) -> Option<&'a StrHeader<'b>> {
-    headers.iter().find(|header| header.name == name)
+    /// Field names are case insensitive and consist of ASCII characters
+    /// only (see https://tools.ietf.org/html/rfc822#section-3.2).
+    headers.iter().find(|header| header.name.eq_ignore_ascii_case(name))
 }
 
 /// Common trait for `Multipart` and `&mut Multipart`
