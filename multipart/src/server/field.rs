@@ -743,3 +743,16 @@ impl From<httparse::Error> for ParseHeaderError {
         ParseHeaderError::Invalid(format!("{}", err))
     }
 }
+
+#[test]
+fn test_find_header() {
+    let headers = [
+        StrHeader { name: "Content-Type", val: "text/plain" },
+        StrHeader { name: "Content-disposition", val: "form-data" },
+        StrHeader { name: "content-transfer-encoding", val: "binary" }
+    ];
+
+    assert_eq!(find_header(&headers, "Content-Type").unwrap().val, "text/plain");
+    assert_eq!(find_header(&headers, "Content-Disposition").unwrap().val, "form-data");
+    assert_eq!(find_header(&headers, "Content-Transfer-Encoding").unwrap().val, "binary");
+}
