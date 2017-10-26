@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate rouille;
+#[cfg(feature = "rustc-serialize")]
 extern crate rustc_serialize;
 
 use std::io;

@@ -14,7 +14,12 @@ use std::io::Cursor;
 use std::io::Read;
 use std::fs::File;
 use std::fmt;
+#[cfg(feature = "rustc-serialize")]
 use rustc_serialize;
+#[cfg(feature = "serdejson")]
+use serde;
+#[cfg(feature = "serdejson")]
+use serde_json;
 use url::percent_encoding;
 use Request;
 use Upgrade;
@@ -342,7 +347,7 @@ impl Response {
     ///
     /// ```
     /// extern crate rustc_serialize;
-    /// # #[macro_use] extern crate rouille;
+    /// #[macro_use] extern crate rouille;
     /// use rouille::Response;
     /// # fn main() {
     ///
@@ -357,8 +362,43 @@ impl Response {
     /// # }
     /// ```
     #[inline]
+    #[cfg(feature = "rustc-serialize")]
     pub fn json<T>(content: &T) -> Response where T: rustc_serialize::Encodable {
         let data = rustc_serialize::json::encode(content).unwrap();
+
+        Response {
+            status_code: 200,
+            headers: vec![("Content-Type".into(), "application/json".into())],
+            data: ResponseBody::from_data(data),
+            upgrade: None,
+        }
+    }
+
+    /// Builds a `Response` that outputs JSON.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// extern crate serde;
+    /// #[macro_use] extern crate serde_derive;
+    /// #[macro_use] extern crate rouille;
+    /// use rouille::Response;
+    /// # fn main() {
+    ///
+    /// #[derive(Serialize)]
+    /// struct MyStruct {
+    ///     field1: String,
+    ///     field2: i32,
+    /// }
+    ///
+    /// let response = Response::json(&MyStruct { field1: "hello".to_owned(), field2: 5 });
+    /// // The Response will contain something like `{ field1: "hello", field2: 5 }`
+    /// # }
+    /// ```
+    #[inline]
+    #[cfg(feature = "serde")]
+    pub fn json<T>(content: &T) -> Response where T: serde::Serialize {
+        let data = serde_json::to_string(content).unwrap();
 
         Response {
             status_code: 200,

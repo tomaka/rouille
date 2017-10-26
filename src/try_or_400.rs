@@ -19,7 +19,6 @@ use std::error::Error;
 ///
 /// ```
 /// # #[macro_use] extern crate rouille;
-/// # extern crate rustc_serialize;
 /// # fn main() {
 /// use rouille::Request;
 /// use rouille::Response;
@@ -48,7 +47,8 @@ macro_rules! try_or_400 {
     );
 }
 
-#[derive(RustcEncodable)]
+#[cfg_attr(feature = "rustc-serialize", derive(RustcEncodable))]
+#[cfg_attr(feature = "serdejson", derive(Serialize))]
 pub struct ErrJson<'a> {
     description: &'a str,
     cause: Option<Box<ErrJson<'a>>>,

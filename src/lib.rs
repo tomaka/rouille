@@ -61,7 +61,14 @@ extern crate filetime;
 extern crate flate2;
 extern crate multipart;
 extern crate rand;
+#[cfg(feature = "rustc-serialize")]
 extern crate rustc_serialize;
+#[cfg(feature = "serdejson")]
+extern crate serde;
+#[cfg(feature = "serdejson")]
+#[macro_use] extern crate serde_derive;
+#[cfg(feature = "serdejson")]
+extern crate serde_json;
 extern crate sha1;
 extern crate time;
 extern crate tiny_http;
