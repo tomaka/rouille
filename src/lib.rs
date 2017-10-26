@@ -52,6 +52,7 @@
 
 #![deny(unsafe_code)]
 
+extern crate base64;
 #[cfg(feature = "brotli2")]
 extern crate brotli2;
 extern crate chrono;
