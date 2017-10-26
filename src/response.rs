@@ -288,7 +288,7 @@ impl Response {
     ///
     /// ```
     /// use rouille::Response;
-    /// let response = Response::text("<p>hello <strong>world</strong></p>");
+    /// let response = Response::html("<p>hello <strong>world</strong></p>");
     /// ```
     #[inline]
     pub fn html<D>(content: D) -> Response where D: Into<String> {
