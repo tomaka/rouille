@@ -13,6 +13,7 @@ use std::io;
 use std::io::Cursor;
 use std::io::Read;
 use std::fs::File;
+use std::fmt;
 use rustc_serialize;
 use url::percent_encoding;
 use Request;
@@ -59,6 +60,15 @@ pub struct Response {
     /// cannot be customized. If this value is set, the response will automatically contain
     /// `Connection: Upgrade`.
     pub upgrade: Option<Box<Upgrade + Send>>,
+}
+
+impl fmt::Debug for Response {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Response")
+            .field("status_code", &self.status_code)
+            .field("headers", &self.headers)
+            .finish()
+    }
 }
 
 impl Response {
@@ -278,7 +288,7 @@ impl Response {
     ///
     /// ```
     /// use rouille::Response;
-    /// let response = Response::text("<p>hello <strong>world</strong></p>");
+    /// let response = Response::html("<p>hello <strong>world</strong></p>");
     /// ```
     #[inline]
     pub fn html<D>(content: D) -> Response where D: Into<String> {
@@ -522,37 +532,50 @@ impl Response {
     ///     Response::text("hello world").with_etag(request, "my-etag-1234")
     /// }
     /// ```
+    #[inline]
     pub fn with_etag<E>(mut self, request: &Request, etag: E) -> Response
         where E: Into<Cow<'static, str>>
     {
+        self.with_etag_keep(etag).simplify_if_etag_match(request)
+    }
+
+    /// Turns the response into an empty 304 response if the `ETag` that is stored in it matches a
+    /// `If-None-Match` header of the request.
+    pub fn simplify_if_etag_match(mut self, request: &Request) -> Response {
         if self.status_code < 200 || self.status_code >= 300 {
             return self;
         }
 
-        let etag = etag.into();
+        let mut not_modified = false;
+        for &(ref key, ref etag) in self.headers.iter() {
+            if !key.eq_ignore_ascii_case("ETag") {
+                continue;
+            }
 
-        let not_modified = if let Some(header) = request.header("If-None-Match") {
-            if header == etag {
-                true
+            not_modified = if let Some(header) = request.header("If-None-Match") {
+                if header == etag {
+                    true
+                } else {
+                    false
+                }
             } else {
                 false
-            }
-        } else {
-            false
-        };
+            };
+        }
 
         if not_modified {
             self.data = ResponseBody::empty();
             self.status_code = 304;
         }
 
-        self.with_etag_keep(etag)
+        self
     }
 
     /// Adds a `ETag` header to the response, or replaces an existing header if there is one.
     ///
     /// > **Note**: Contrary to `with_etag`, this function doesn't try to turn the response into
     /// > a 304 response. If you're unsure of what to do, prefer `with_etag`.
+    #[inline]
     pub fn with_etag_keep<E>(self, etag: E) -> Response
         where E: Into<Cow<'static, str>>
     {
@@ -641,7 +664,7 @@ impl Response {
 /// An opaque type that represents the body of a response.
 ///
 /// You can't access the inside of this struct, but you can build one by using one of the provided
-/// constructors. 
+/// constructors.
 ///
 /// # Example
 ///

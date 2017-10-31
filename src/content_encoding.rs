@@ -153,7 +153,7 @@ fn gzip(e: &str, response: &mut Option<Response>) -> bool {
         return false;
     }
 
-    let mut response = response.as_mut().unwrap();
+    let response = response.as_mut().unwrap();
     response.headers.push(("Content-Encoding".into(), "gzip".into()));
     let previous_body = mem::replace(&mut response.data, ResponseBody::empty());
     let (raw_data, _) = previous_body.into_reader_and_size();
@@ -177,7 +177,7 @@ fn brotli(e: &str, response: &mut Option<Response>) -> bool {
         return false;
     }
 
-    let mut response = response.as_mut().unwrap();
+    let response = response.as_mut().unwrap();
     response.headers.push(("Content-Encoding".into(), "br".into()));
     let previous_body = mem::replace(&mut response.data, ResponseBody::empty());
     let (raw_data, _) = previous_body.into_reader_and_size();
@@ -218,7 +218,7 @@ mod tests {
             let h = vec![("Accept-Encoding".to_owned(), "foo".to_owned())];
             Request::fake_http("GET", "/", h, vec![])
         };
-        
+
         let mut list = content_encoding::accepted_content_encodings(&request);
         assert_eq!(list.next().unwrap(), "foo");
         assert_eq!(list.next(), None);
@@ -230,7 +230,7 @@ mod tests {
             let h = vec![("Accept-Encoding".to_owned(), "foo, bar".to_owned())];
             Request::fake_http("GET", "/", h, vec![])
         };
-        
+
         let mut list = content_encoding::accepted_content_encodings(&request);
         assert_eq!(list.next().unwrap(), "foo");
         assert_eq!(list.next().unwrap(), "bar");

@@ -69,6 +69,7 @@ pub use self::websocket::Message;
 pub use self::websocket::SendError;
 pub use self::websocket::Websocket;
 
+use base64;
 use std::ascii::AsciiExt;
 use std::borrow::Cow;
 use std::error;
@@ -76,10 +77,6 @@ use std::fmt;
 use std::sync::mpsc;
 use std::vec::IntoIter as VecIntoIter;
 use sha1::Sha1;
-use rustc_serialize::base64::Config;
-use rustc_serialize::base64::Standard;
-use rustc_serialize::base64::Newline;
-use rustc_serialize::base64::ToBase64;
 
 use Request;
 use Response;
@@ -242,6 +239,5 @@ fn convert_key(input: &str) -> String {
     sha1.update(input.as_bytes());
     sha1.update(b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
-    sha1.digest().bytes().to_base64(Config { char_set: Standard, pad: true,
-                                             line_length: None, newline: Newline::LF })
+    base64::encode_config(&sha1.digest().bytes(), base64::STANDARD)
 }

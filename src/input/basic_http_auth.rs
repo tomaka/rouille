@@ -17,7 +17,7 @@
 //! - In order to read a plain text body, see
 //!   [the `plain_text_body` function](fn.plain_text_body.html).
 
-use rustc_serialize::base64::FromBase64;
+use base64;
 use Request;
 
 /// Credentials returned by `basic_http_auth`.
@@ -71,7 +71,7 @@ pub fn basic_http_auth(request: &Request) -> Option<HttpAuthCredentials> {
     }
 
     let authvalue = match split.next() { None => return None, Some(v) => v };
-    let authvalue = match authvalue.from_base64() { Ok(v) => v, Err(_) => return None };
+    let authvalue = match base64::decode(authvalue) { Ok(v) => v, Err(_) => return None };
 
     let mut split = authvalue.splitn(2, |&c| c == b':');
     let login = match split.next() { Some(l) => l, None => return None };
