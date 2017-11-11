@@ -18,7 +18,7 @@ gzip = ["flate2"]
 [dependencies]
 base64 = "0.7.0"
 brotli2 = { version = "0.2.1", optional = true }
-chrono = "0.2.0"
+chrono = "0.4.0"
 filetime = "0.1.10"
 flate2 = { version = "0.2.14", optional = true }
 multipart = { version = "0.5.1", default-features = false, features = ["server"] }
@@ -32,3 +32,4 @@ url = "1.2"
 
 [dev-dependencies]
 postgres = { version = "0.13", default-features = false }
+log = "0.3"

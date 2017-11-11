@@ -17,10 +17,14 @@ use chrono;
 use Request;
 use Response;
 
-/// Adds a log entry to the given writer at each request.
+/// Adds a log entry to the given writer for each request.
 ///
-/// Each request writes a line to the given parameter. The line contains various info like the URL
-/// of the request, the time taken, and the status code of the response.
+/// Writes a line to the given "writer" after processing each request.
+/// Log line info has the format:
+/// `"{%Y-%m-%d %H:%M%S%.6f} UTC - {METHOD} {URL} - {ELAPSED_TIME} - {RESP_SATUS}"`
+///
+/// If you would like to customize the log output or functionality (such as integrating
+/// with the [`log`](https://docs.rs/log) crate, see [`rouille::log_custom`](fn.log_custom.html))
 ///
 /// # Example
 ///
@@ -39,7 +43,7 @@ pub fn log<W, F>(rq: &Request, mut output: W, f: F) -> Response
           F: FnOnce() -> Response
 {
     let start_instant = Instant::now();
-    let rq_line = format!("{} UTC - {} {}", chrono::UTC::now().format("%Y-%m-%d %H:%M:%S%.6f"),
+    let rq_line = format!("{} UTC - {} {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S%.6f"),
                                             rq.method(), rq.raw_url());
 
     // Calling the handler and catching potential panics.
@@ -62,6 +66,64 @@ pub fn log<W, F>(rq: &Request, mut output: W, f: F) -> Response
         }
     }
 }
+
+
+/// Calls custom logging functions after processing a request.
+///
+/// This is nearly identical to the [`rouille::log`](fn.log.html) function except it
+/// takes two logging functions that will be called with access to the request/response
+/// structs and the total execution duration of the handler.
+///
+/// # Example
+///
+/// ```
+/// #[macro_use] extern crate log;
+/// extern crate chrono;
+/// # extern crate rouille;
+/// use rouille::{Request, Response};
+///
+///
+/// fn handle(request: &Request) -> Response {
+///     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S%.6f");
+///     let log_ok = |req: &Request, resp: &Response, _elap: std::time::Duration| {
+///         info!("{} {} {}", now, req.method(), req.raw_url());
+///     };
+///     let log_err = |req: &Request, _elap: std::time::Duration| {
+///         error!("{} Handler panicked: {} {}", now, req.method(), req.raw_url());
+///     };
+///     rouille::log_custom(request, log_ok, log_err, || {
+///         Response::text("hello world")
+///     })
+/// }
+/// #
+/// # fn main() { }
+/// ```
+pub fn log_custom<L, E, F>(req: &Request, log_ok_f: L, log_err_f: E, handler: F) -> Response
+    where L: Fn(&Request, &Response, Duration),
+          E: Fn(&Request, Duration),
+          F: FnOnce() -> Response
+{
+    let start_instant = Instant::now();
+
+    // Call the handler and catch panics.
+    // Note that we always resume unwinding afterwards.
+    // We can ignore the small panic-safety mechanism of `catch_unwind`.
+    let response = panic::catch_unwind(panic::AssertUnwindSafe(handler));
+    let elapsed = start_instant.elapsed();
+
+    match response {
+        Ok(response) => {
+            log_ok_f(req, &response, elapsed);
+            response
+        },
+        Err(payload) => {
+            log_err_f(req, elapsed);
+            // The panic handler will print the payload contents
+            panic::resume_unwind(payload);
+        }
+    }
+}
+
 
 fn format_time(duration: Duration) -> String {
     let secs_part = match duration.as_secs().checked_mul(1_000_000_000) {
