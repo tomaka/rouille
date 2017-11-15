@@ -34,8 +34,8 @@
 //! The `Request` object itself provides some getters, but most advanced functionnalities are
 //! provided by other modules of this crate.
 //!
-//! - In order to dispatch between various code depending on the URL, you can use the `router!`
-//!   macro.
+//! - In order to dispatch between various code depending on the URL, you can use the
+//!   [`router!`](macro.router.html) macro.
 //! - In order to analyze the body of the request, like handling JSON input, form input, etc. you
 //!   can take a look at [the `input` module](input/index.html).
 //!

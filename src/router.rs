@@ -35,7 +35,7 @@
 ///
 /// # Details
 ///
-/// The macro will take each route one by one and execute the first one that matches, similar to a
+/// The macro will take each route one by one and execute the first one that matches, similar to the
 /// `match` language construct. The whole `router!` expression then returns what the body
 /// returns, therefore all the bodies must return the same type of data.
 ///
@@ -49,7 +49,6 @@
 ///
 /// If you use parameters inside `{}`, then a variable with the same name will be available in the
 /// code in the body.
-///
 /// Each parameter gets parsed through the `FromStr` trait. If the parsing fails, the route is
 /// ignored. If you get an error because the type of the parameter couldn't be inferred, you can
 /// also specify the type inside the brackets:
@@ -60,17 +59,193 @@
 /// },
 /// ```
 ///
-/// Some other things to note:
+///
+/// # Alternative syntax (**string-style**)
+///
+/// You can also define url routes using strings. This allows using characters that are not valid rust
+/// `ident`s (e.g. periods and numbers).
+///
+/// ```ignore
+/// (GET) ["/hello/2"] => { ... },
+/// ```
+///
+/// You can use parameters by putting them inside `{}`, and adding an `identity: type` pair. Note
+/// that `identity` names **must** match the parameter names used in the URL string and an
+/// accompanying `type` is required. The declared identities (variables) will be parsed through the
+/// `FromStr` trait and made available in the code of the route's body. If the parsing fails, the
+/// route is ignored.
+///
+/// ```ignore
+/// (GET) ["/add/{a}/plus/{b}", a: u32, b: u32] => {
+///     let c = a + b;
+///     ...
+/// },
+/// ```
+///
+/// # Some other things to note
 ///
 /// - The right of the `=>` must be a block (must be surrounded by `{` and `}`).
-/// - The pattern of the URL and the closure must be inside parentheses. This is to bypass
-///   limitations of Rust's macros system.
 /// - The default handler (with `_`) must be present or will get a compilation error.
+/// - The pattern of the URL must be inside parentheses for ident-style syntax
+///   and brackets for string-style syntax. This is to bypass limitations of Rust's macros system.
+/// - String-style and token-style definitions are mutually exclusive. Either all routes are defined with
+///   tokens or all routes are defined with strings.
+/// - When using URL parameters with **string-style** syntax, the parameter names in the URL and `identity: type`
+///   pairs must be the same, e.g. `... ["/users/{name}", name: String] ...` .
+///   This can't be checked at compile time so bad route definitions will cause a runtime `panic`.
 ///
-// FIXME: turn `: $pt:ident` into `ty`
-// TODO: don't panic if parsing fails
 #[macro_export]
 macro_rules! router {
+    // -----------------
+    // --- New style ---
+    // -----------------
+    ($request:expr,
+     $(($method:ident) [$url_pattern:expr $(, $param:ident: $param_type:ty)*] => $handle:expr,)*
+     _ => $default:expr) => {
+        {
+            let request = &$request;
+
+            // ignoring the GET parameters (everything after `?`)
+            let request_url = request.url();
+            let request_url = {
+                let pos = request_url.find('?').unwrap_or(request_url.len());
+                &request_url[..pos]
+            };
+
+            let mut ret = None;
+            $({
+                if ret.is_none() && request.method() == stringify!($method) {
+                    ret = router!(__param_dispatch request_url, $url_pattern => $handle ; $($param: $param_type),*);
+                }
+            })+
+
+            if let Some(ret) = ret {
+                ret
+            } else {
+                $default
+            }
+        }
+    };
+
+    // No url parameters, just check the url and evaluate the `$handle`
+    (__param_dispatch $request_url:ident, $url_pattern:expr => $handle:expr ; ) => {
+        router!(__check_url_match $request_url, $url_pattern => $handle)
+    };
+
+    // Url parameters found, check and parse the url against the provided pattern
+    (__param_dispatch $request_url:ident, $url_pattern:expr => $handle:expr ; $($param:ident: $param_type:ty),*) => {
+        router!(__check_parse_pattern $request_url, $url_pattern => $handle ; $($param: $param_type),*)
+    };
+
+    (__check_url_match $request_url:ident, $url_pattern:expr => $handle:expr) => {
+        if $request_url == $url_pattern {
+            Some($handle)
+        } else {
+            None
+        }
+    };
+
+    // Compare each url segment while attempting to parse any url parameters.
+    // If parsing fails, return `None` so this route gets skipped.
+    // If parsing is successful, recursively bind each url parameter to the given identity
+    // before evaluating the `$handle`
+    // Note: Url parameters need to be held in the `RouilleUrlParams` struct since
+    //       we need to be able to "evaluate to None" (if url segments don't match or parsing fails)
+    //       and we can't actually "return None" since we'd be returning from whatever scope the macro is being used in.
+    (__check_parse_pattern $request_url_str:ident, $url_pattern:expr => $handle:expr ; $($param:ident: $param_type:ty),*) => {
+        {
+            let request_url = $request_url_str.split("/").collect::<Vec<_>>();
+            let url_pattern = $url_pattern.split("/").collect::<Vec<_>>();
+            if request_url.len() != url_pattern.len() {
+                None
+            } else {
+                struct RouilleUrlParams {
+                    $( $param: Option<$param_type> ),*
+                }
+                impl RouilleUrlParams {
+                    fn new() -> Self {
+                        Self {
+                            $( $param: None ),*
+                        }
+                    }
+                }
+                let url_params = (|| {
+                    let mut url_params = RouilleUrlParams::new();
+                    for (actual, desired) in request_url.iter().zip(url_pattern.iter()) {
+                        if desired.starts_with("{") && desired.ends_with("}") {
+                            let key = &desired[1..desired.len()-1];
+                            router!(__insert_param $request_url_str, url_params, key, actual ; $($param: $param_type)*)
+                        } else if actual != desired {
+                            return None
+                        }
+                    }
+                    Some(url_params)
+                })();
+                if let Some(url_params) = url_params {
+                    router!(__build_resp $request_url_str, url_params, $handle ; $($param: $param_type)*)
+                } else {
+                    None
+                }
+            }
+        }
+    };
+
+    // We walked through all the given url parameter identities and couldn't find one that
+    // matches the parameter name defined in the url-string
+    //   e.g. `(GET) ("/name/{title}", name: String)
+    (__insert_param $request_url:ident, $url_params:ident, $key:expr, $actual:expr ; ) => {
+        panic!("Unable to match url parameter name, `{}`, to an `identity: type` pair in url: {:?}", $key, $request_url);
+    };
+
+    // Walk through all the given url parameter identities. If they match the current
+    // `$key` (a parameter name in the string-url), then set them in the `$url_params` struct
+    (__insert_param $request_url:ident, $url_params:ident, $key:expr, $actual:expr ; $param:tt: $param_type:tt $($params:tt: $param_types:tt)*) => {
+        if $key == stringify!($param) {
+            router!(__bind_url_param $url_params, $actual, $param, $param_type)
+        } else {
+            router!(__insert_param $request_url, $url_params, $key, $actual ; $($params: $param_types)*);
+        }
+    };
+
+    (__bind_url_param $url_params:ident, $actual:expr, $param:ident, $param_type:ty) => {
+        {
+            match $actual.parse::<$param_type>() {
+                Ok(value) => $url_params.$param = Some(value),
+                // it's safe to `return` here since we're in a closure
+                Err(_) => return None,
+            }
+        }
+    };
+
+    // No more url parameters to bind
+    (__build_resp $request_url:ident, $url_params:expr, $handle:expr ; ) => {
+        { Some($handle) }
+    };
+
+    // There's still some params to bind
+    (__build_resp $request_url:ident, $url_params:expr, $handle:expr ; $param:tt: $param_type:tt $($params:tt: $param_types:tt)*) => {
+        router!(__bind_param $request_url, $url_params, $handle, $param: $param_type ; $($params: $param_types)*)
+    };
+
+    // Recursively pull out and bind a url param
+    (__bind_param $request_url:ident, $url_params:expr, $handle:expr, $param:ident: $param_type:ty ; $($params:tt: $param_types:tt)*) => {
+        {
+            let $param = match $url_params.$param {
+                Some(p) => p,
+                None => {
+                    let param_name = stringify!($param);
+                    panic!("Url parameter identity, `{}`, does not have a matching `{{{}}}` segment in url: {:?}",
+                           param_name, param_name, $request_url);
+                }
+            };
+            router!(__build_resp $request_url, $url_params, $handle ; $($params: $param_types)*)
+        }
+    };
+
+
+    // -----------------
+    // --- Old style ---
+    // -----------------
     ($request:expr, $(($method:ident) ($($pat:tt)+) => $value:block,)* _ => $def:expr) => {
         {
             let request = &$request;
@@ -175,12 +350,14 @@ macro_rules! router {
     );
 }
 
+
 #[cfg(test)]
 mod tests {
     use Request;
 
+    // -- old-style tests --
     #[test]
-    fn basic() {
+    fn old_style_basic() {
         let request = Request::fake_http("GET", "/", vec![], vec![]);
 
         assert_eq!(1, router!(request,
@@ -192,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    fn dash() {
+    fn old_style_dash() {
         let request = Request::fake_http("GET", "/a-b", vec![], vec![]);
 
         assert_eq!(1, router!(request,
@@ -204,7 +381,7 @@ mod tests {
     }
 
     #[test]
-    fn params() {
+    fn old_style_params() {
         let request = Request::fake_http("GET", "/hello/5", vec![], vec![]);
 
         assert_eq!(1, router!(request,
@@ -215,14 +392,143 @@ mod tests {
         ));
     }
 
+    // -- new-style tests --
+    #[test]
+    fn multiple_params() {
+        let request = Request::fake_http("GET", "/math/3.2/plus/4", vec![], vec![]);
+        let resp = router!(request,
+            (GET) ["/hello"] => { 1. },
+            (GET) ["/math/{a}/plus/{b}", a: u32 , b: u32] => { 7. },
+            (GET) ["/math/{a}/plus/{b}", a: f32 , b: u32] => { a + (b as f32) },
+            _ => 0.
+        );
+        assert_eq!(7.2, resp);
+    }
+
+
+    #[test]
+    fn basic() {
+        let request = Request::fake_http("GET", "/", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) ["/hello"] => { 0 },
+            (GET) ["/{_val}", _val: u32] => { 0 },
+            (GET) ["/"] => { 1 },
+            _ => 0
+        ));
+    }
+
+    #[test]
+    fn dash() {
+        let request = Request::fake_http("GET", "/a-b", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) ["/a/b"] => { 0 },
+            (GET) ["/a_b"] => { 0 },
+            (GET) ["/a-b"] => { 1 },
+            _ => 0
+        ));
+    }
+
+    #[test]
+    fn numbers() {
+        let request = Request::fake_http("GET", "/5", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) ["/a"] => { 0 },
+            (GET) ["/3"] => { 0 },
+            (GET) ["/5"] => { 1 },
+            _ => 0
+        ));
+    }
+
+    #[test]
+    fn files() {
+        let request = Request::fake_http("GET", "/robots.txt", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) ["/a"] => { 0 },
+            (GET) ["/3/2/1"] => { 0 },
+            (GET) ["/robots.txt"] => { 1 },
+            _ => 0
+        ));
+    }
+
+    #[test]
+    fn skip_failed_parse_float() {
+        let request = Request::fake_http("GET", "/hello/5.1", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) ["/hello/"] => { 0 },
+            (GET) ["/hello/{_id}", _id: u32] => { 0 },
+            (GET) ["/hello/{id}", id: f32] => { if id == 5.1 { 1 } else { 0 } },
+            _ => 0
+        ));
+    }
+
+    #[test]
+    fn skip_failed_parse_string() {
+        let request = Request::fake_http("GET", "/word/wow", vec![], vec![]);
+        let resp = router!(request,
+            (GET) ["/hello"] => { "hello".to_string() },
+            (GET) ["/word/{int}", int: u32] => { int.to_string() },
+            (GET) ["/word/{word}", word: String] => { word },
+            _ => "default".to_string()
+        );
+        assert_eq!("wow", resp);
+    }
+
+    #[test]
+    fn url_parameter_ownership() {
+        let request = Request::fake_http("GET", "/word/one/two/three/four", vec![], vec![]);
+        let resp = router!(request,
+            (GET) ["/hello"] => { "hello".to_string() },
+            (GET) ["/word/{int}", int: u32] => { int.to_string() },
+            (GET) ["/word/{a}/{b}/{c}/{d}", a: String, b: String, c: String, d: String] => {
+                fn expects_strings(a: String, b: String, c: String, d: String) -> String {
+                    format!("{}{}{}{}", a, b, c, d)
+                }
+                expects_strings(a, b, c, d)
+            },
+            _ => "default".to_string()
+        );
+        assert_eq!("onetwothreefour", resp);
+    }
+
+    #[test]
+    #[should_panic(expected="Url parameter identity, `id`, does not have a matching `{id}` segment in url: \"/hello/james\"")]
+    fn identity_not_present_in_url_string() {
+        let request = Request::fake_http("GET", "/hello/james", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) ["/hello/"] => { 0 },
+            (GET) ["/hello/{name}", name: String, id: u32] => { 1 }, // this should fail
+            _ => 0
+        ));
+    }
+
+    #[test]
+    #[should_panic(expected="Unable to match url parameter name, `name`, to an `identity: type` pair in url: \"/hello/1/james\"")]
+    fn parameter_with_no_matching_identity() {
+        let request = Request::fake_http("GET", "/hello/1/james", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) ["/hello/"] => { 0 },
+            (GET) ["/hello/{id}/{name}"] => { 0 },           // exact match should be ignored
+            (GET) ["/hello/{id}/{name}", id: u32] => { id }, // this one should fail
+            _ => 0
+        ));
+    }
+
     #[test]
     #[ignore]       // TODO: not implemented
     fn param_slash() {
         let request = Request::fake_http("GET", "/hello%2F5", vec![], vec![]);
 
         router!(request,
-            (GET) (/{a:String}) => { assert_eq!(a, "hello/5") },
+            (GET) ["/", a: String] => { assert_eq!(a, "hello/5") },
             _ => panic!()
         );
     }
 }
+
