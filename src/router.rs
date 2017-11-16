@@ -101,7 +101,7 @@ macro_rules! router {
     // -----------------
     ($request:expr,
      $(($method:ident) [$url_pattern:expr $(, $param:ident: $param_type:ty)*] => $handle:expr,)*
-     _ => $default:expr) => {
+     _ => $default:expr $(,)*) => {
         {
             let request = &$request;
 
@@ -246,7 +246,7 @@ macro_rules! router {
     // -----------------
     // --- Old style ---
     // -----------------
-    ($request:expr, $(($method:ident) ($($pat:tt)+) => $value:block,)* _ => $def:expr) => {
+    ($request:expr, $(($method:ident) ($($pat:tt)+) => $value:block,)* _ => $def:expr $(,)*) => {
         {
             let request = &$request;
 
@@ -392,6 +392,30 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn old_style_trailing_comma() {
+        let request = Request::fake_http("GET", "/hello/5", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) (/hello/) => { 0 },
+            (GET) (/hello/{id:u32}) => { if id == 5 { 1 } else { 0 } },
+            (GET) (/hello/{_id:String}) => { 0 },
+            _ => 0,
+        ));
+    }
+
+    #[test]
+    fn old_style_trailing_commas() {
+        let request = Request::fake_http("GET", "/hello/5", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) (/hello/) => { 0 },
+            (GET) (/hello/{id:u32}) => { if id == 5 { 1 } else { 0 } },
+            (GET) (/hello/{_id:String}) => { 0 },
+            _ => 0,,,,
+        ));
+    }
+
     // -- new-style tests --
     #[test]
     fn multiple_params() {
@@ -439,6 +463,30 @@ mod tests {
             (GET) ["/3"] => { 0 },
             (GET) ["/5"] => { 1 },
             _ => 0
+        ));
+    }
+
+    #[test]
+    fn trailing_comma() {
+        let request = Request::fake_http("GET", "/5", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) ["/a"] => { 0 },
+            (GET) ["/3"] => { 0 },
+            (GET) ["/5"] => { 1 },
+            _ => 0,
+        ));
+    }
+
+    #[test]
+    fn trailing_commas() {
+        let request = Request::fake_http("GET", "/5", vec![], vec![]);
+
+        assert_eq!(1, router!(request,
+            (GET) ["/a"] => { 0 },
+            (GET) ["/3"] => { 0 },
+            (GET) ["/5"] => { 1 },
+            _ => 0,,,,
         ));
     }
 
