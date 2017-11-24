@@ -12,8 +12,8 @@
 //! This module provides functions and sub-modules that allow you to easily analyze or parse the
 //! request's headers and body.
 //! 
-//! - In order to parse JSON, see [the `json` module](json/input.html).
-//! - In order to parse input from HTML forms, see [the `post` module](post/input.html).
+//! - In order to parse JSON, see [the `json` module](json/index.html).
+//! - In order to parse input from HTML forms, see [the `post` module](post/index.html).
 //! - In order to read a plain text body, see
 //!   [the `plain_text_body` function](fn.plain_text_body.html).
 
