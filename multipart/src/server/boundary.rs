@@ -362,6 +362,40 @@ mod test {
         assert_eq!(buf, "");
     }
 
+    #[test]
+    fn test_trailing_crlf() {
+        let mut body: &[u8] = b"--boundary\r\n\
+                         asdf1234\
+                         \r\n\r\n--boundary\r\n\
+                         hjkl5678\r\n--boundary--";
+
+        let ref mut buf = String::new();
+        let mut reader = BoundaryReader::from_reader(&mut body, BOUNDARY);
+
+        debug!("Consume 1");
+        reader.consume_boundary().unwrap();
+
+        debug!("Read 1");
+        let _ = reader.read_to_string(buf).unwrap();
+        assert_eq!(buf, "asdf1234\r\n");
+        buf.clear();
+
+        debug!("Consume 2");
+        reader.consume_boundary().unwrap();
+
+        debug!("Read 2");
+        let _ = reader.read_to_string(buf).unwrap();
+        assert_eq!(buf, "hjkl5678");
+        buf.clear();
+
+        debug!("Consume 3");
+        reader.consume_boundary().unwrap();
+
+        debug!("Read 3 (empty)");
+        let _ = reader.read_to_string(buf).unwrap();
+        assert_eq!(buf, "");
+    }
+
     #[cfg(feature = "bench")]
     mod bench {
         extern crate test;
