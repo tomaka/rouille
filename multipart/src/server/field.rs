@@ -172,12 +172,29 @@ fn parse_cont_type(headers: &[StrHeader]) -> Result<Option<Mime>, ParseHeaderErr
     Ok(Some(read_content_type(header.val.trim())))
 }
 
-/// A field in a multipart request. May be either text or a binary stream (file).
+/// A field in a multipart request with its associated headers and data.
+///
+/// ### Warning: Values are Client-Provided
+/// Everything in this struct are values from the client and should be considered **untrustworthy**.
+/// This crate makes no effort to validate or sanitize any client inputs.
 #[derive(Debug)]
 pub struct MultipartField<M: ReadEntry> {
-    /// The field's name from the form
+    /// The field's name from the form.
     pub name: String,
-    /// The data of the field. Can be text or binary.
+
+    /// The filename of this entry, if supplied. This is not guaranteed to match the original file
+    /// or even to be a valid filename for the current platform.
+    pub filename: Option<String>,
+
+    /// The MIME type (`Content-Type` value) of this file, if supplied by the client.
+    ///
+    /// If this is not supplied, the content-type of the field should default to `text/plain` as
+    /// per [IETF RFC 7578, section 4.4](https://tools.ietf.org/html/rfc7578#section-4.4), but this
+    /// should not be implicitly trusted. This crate makes no attempt to identify or validate
+    /// the content-type of the actual field data.
+    pub content_type: Option<Mime>,
+
+    /// The field's data.
     pub data: MultipartData<M>,
 }
 
@@ -212,185 +229,25 @@ impl<M: ReadEntry> MultipartField<M> {
 }
 
 /// The data of a field in a `multipart/form-data` request.
-#[derive(Debug)]
-pub enum MultipartData<M> {
-    /// The field's payload is a text string.
-    Text(MultipartText<M>),
-    /// The field's payload is a binary stream (file).
-    File(MultipartFile<M>),
-}
-
-impl<M: ReadEntry> MultipartData<M> {
-    /// Borrow this payload as a text field, if possible.
-    pub fn as_text(&self) -> Option<&str> {
-        match *self {
-            MultipartData::Text(ref text) => Some(&text.text),
-            _ => None,
-        }
-    }
-
-    /// Borrow this payload as a file field, if possible.
-    /// Mutably borrows so the contents can be read.
-    pub fn as_file(&mut self) -> Option<&mut MultipartFile<M>> {
-        match *self {
-            MultipartData::File(ref mut file) => Some(file),
-            _ => None,
-        }
-    }
-
-    /// Return the inner `Multipart`.
-    pub fn into_inner(self) -> M {
-        use self::MultipartData::*;
-
-        match self {
-            Text(text) => text.into_inner(),
-            File(file) => file.into_inner(),
-        }
-    }
-
-    fn take_inner(&mut self) -> M {
-        use self::MultipartData::*;
-
-        match *self {
-            Text(ref mut text) => text.take_inner(),
-            File(ref mut file) => file.take_inner(),
-        }
-    }
-
-    fn give_inner(&mut self, inner: M) {
-        use self::MultipartData::*;
-
-        let inner = Some(inner);
-
-        match *self {
-            Text(ref mut text) => text.inner = inner,
-            File(ref mut file) => file.inner = inner,
-        }
-    }
-}
-
-/// A representation of a text field in a `multipart/form-data` body.
-#[derive(Debug)]
-pub struct MultipartText<M> {
-    /// The text of this field.
-    pub text: String,
-    /// The `Multipart` this field was read from.
-    inner: Option<M>,
-}
-
-impl<M> Deref for MultipartText<M> {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.text
-    }
-}
-
-impl<M> Into<String> for MultipartText<M> {
-    fn into(self) -> String {
-        self.text
-    }
-}
-
-impl<M> MultipartText<M> {
-    #[doc(hidden)]
-    pub fn take_inner(&mut self) -> M {
-        self.inner.take().expect("MultipartText::inner already taken!")
-    }
-
-    fn into_inner(self) -> M {
-        self.inner.expect("MultipartText::inner taken!")
-    }
-}
-
-/// A representation of a file in HTTP `multipart/form-data`.
-///
-/// Note that the file is not yet saved to the local filesystem;
-/// instead, this struct exposes `Read` and `BufRead` impls which point
-/// to the beginning of the file's contents in the HTTP stream.
 ///
 /// You can read it to EOF, or use one of the `save()` method
-/// to save it to disk.
+/// to save it to disk/memory.
 #[derive(Debug)]
-pub struct MultipartFile<M> {
-    /// The filename of this entry, if supplied.
-    ///
-    /// ### Warning: Client Provided / Untrustworthy
-    /// You should treat this value as **untrustworthy** because it is an arbitrary string
-    /// provided by the client.
-    ///
-    /// It is a serious security risk to create files or directories with paths based on user input.
-    /// A malicious user could craft a path which can be used to overwrite important files, such as
-    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
-    /// if they are writable by the server process.
-    ///
-    /// This can be mitigated somewhat by setting filesystem permissions as
-    /// conservatively as possible and running the server under its own user with restricted
-    /// permissions, but you should still not use user input directly as filesystem paths.
-    /// If it is truly necessary, you should sanitize filenames such that they cannot be
-    /// misinterpreted by the OS. Such functionality is outside the scope of this crate.
-    pub filename: Option<String>,
-
-    /// The MIME type (`Content-Type` value) of this file, if supplied by the client,
-    /// or `"applicaton/octet-stream"` otherwise.
-    ///
-    /// ### Note: Client Provided
-    /// Consider this value to be potentially untrustworthy, as it is provided by the client.
-    /// It may be inaccurate or entirely wrong, depending on how the client determined it.
-    ///
-    /// Some variants wrap arbitrary strings which could be abused by a malicious user if your
-    /// application performs any non-idempotent operations based on their value, such as
-    /// starting another program or querying/updating a database (web-search "SQL injection").
-    pub content_type: Mime,
-
-    /// The `Multipart` this field was read from.
+pub struct MultipartData<M> {
     inner: Option<M>,
 }
 
-impl<M> MultipartFile<M> {
-    /// Get the filename of this entry, if supplied.
-    ///
-    /// ### Warning: Client Provided / Untrustworthy
-    /// You should treat this value as **untrustworthy** because it is an arbitrary string
-    /// provided by the client.
-    ///
-    /// It is a serious security risk to create files or directories with paths based on user input.
-    /// A malicious user could craft a path which can be used to overwrite important files, such as
-    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
-    /// if they are writable by the server process.
-    ///
-    /// This can be mitigated somewhat by setting filesystem permissions as
-    /// conservatively as possible and running the server under its own user with restricted
-    /// permissions, but you should still not use user input directly as filesystem paths.
-    /// If it is truly necessary, you should sanitize filenames such that they cannot be
-    /// misinterpreted by the OS. Such functionality is outside the scope of this crate.
-    #[deprecated(since = "0.10.0", note = "`filename` field is now public")]
-    pub fn filename(&self) -> Option<&str> {
-        self.filename.as_ref().map(String::as_ref)
+impl<M> MultipartData<M> where M: ReadEntry {
+    /// Get a builder type which can save the file with or without a size limit.
+    pub fn save(&mut self) -> SaveBuilder<&mut Self> {
+        SaveBuilder::new(self)
     }
-
-    /// Get the MIME type (`Content-Type` value) of this file, if supplied by the client,
-    /// or `"applicaton/octet-stream"` otherwise.
-    ///
-    /// ### Note: Client Provided
-    /// Consider this value to be potentially untrustworthy, as it is provided by the client.
-    /// It may be inaccurate or entirely wrong, depending on how the client determined it.
-    ///
-    /// Some variants wrap arbitrary strings which could be abused by a malicious user if your
-    /// application performs any non-idempotent operations based on their value, such as
-    /// starting another program or querying/updating a database (web-search "SQL injection").
-    #[deprecated(since = "0.10.0", note = "`content_type` field is now public")]
-    pub fn content_type(&self) -> &Mime {
-        &self.content_type
-    }
-
 
     fn inner_mut(&mut self) -> &mut M {
         self.inner.as_mut().expect("MultipartFile::inner taken!")
     }
 
-    #[doc(hidden)]
-    pub fn take_inner(&mut self) -> M {
+    fn take_inner(&mut self) -> M {
         self.inner.take().expect("MultipartFile::inner already taken!")
     }
 
@@ -399,91 +256,13 @@ impl<M> MultipartFile<M> {
     }
 }
 
-impl<M> MultipartFile<M> where M: ReadEntry {
-    /// Get a builder type which can save the file with or without a size limit.
-    pub fn save(&mut self) -> SaveBuilder<&mut Self> {
-        SaveBuilder::new(self)
-    }
-
-    /// Save this file to the given output stream.
-    ///
-    /// If successful, returns the number of bytes written.
-    ///
-    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated(since = "0.10.0", note = "use `.save().write_to()` instead")]
-    pub fn save_to<W: Write>(&mut self, out: W) -> io::Result<u64> {
-        self.save().write_to(out).into_result_strict()
-    }
-
-    /// Save this file to the given output stream, **truncated** to `limit`
-    /// (no more than `limit` bytes will be written out).
-    ///
-    /// If successful, returns the number of bytes written.
-    ///
-    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated(since = "0.10.0", note = "use `.save().size_limit(limit).write_to(out)` instead")]
-    pub fn save_to_limited<W: Write>(&mut self, out: W, limit: u64) -> io::Result<u64> {
-        self.save().size_limit(limit).write_to(out).into_result_strict()
-    }
-
-    /// Save this file to `path`.
-    ///
-    /// Returns the saved file info on success, or any errors otherwise.
-    ///
-    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated(since = "0.10.0", note = "use `.save().with_path(path)` instead")]
-    pub fn save_as<P: Into<PathBuf>>(&mut self, path: P) -> io::Result<SavedFile> {
-        self.save().with_path(path).into_result_strict()
-    }
-
-    /// Save this file in the directory pointed at by `dir`,
-    /// using a random alphanumeric string as the filename.
-    ///
-    /// Any missing directories in the `dir` path will be created.
-    ///
-    /// Returns the saved file's info on success, or any errors otherwise.
-    ///
-    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated(since = "0.10.0", note = "use `.save().with_dir(dir)` instead")]
-    pub fn save_in<P: AsRef<Path>>(&mut self, dir: P) -> io::Result<SavedFile> {
-        self.save().with_dir(dir.as_ref()).into_result_strict()
-    }
-
-    /// Save this file to `path`, **truncated** to `limit` (no more than `limit` bytes will be written out).
-    ///
-    /// Any missing directories in the `dir` path will be created.
-    ///
-    /// Returns the saved file's info on success, or any errors otherwise.
-    ///
-    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated(since = "0.10.0", note = "use `.save().size_limit(limit).with_path(path)` instead")]
-    pub fn save_as_limited<P: Into<PathBuf>>(&mut self, path: P, limit: u64) -> io::Result<SavedFile> {
-        self.save().size_limit(limit).with_path(path).into_result_strict()
-    }
-
-    /// Save this file in the directory pointed at by `dir`,
-    /// using a random alphanumeric string as the filename.
-    ///
-    /// **Truncates** file to `limit` (no more than `limit` bytes will be written out).
-    ///
-    /// Any missing directories in the `dir` path will be created.
-    ///
-    /// Returns the saved file's info on success, or any errors otherwise.
-    ///
-    /// Retries when `io::Error::kind() == io::ErrorKind::Interrupted`.
-    #[deprecated(since = "0.10.0", note = "use `.save().size_limit(limit).with_dir(dir)` instead")]
-    pub fn save_in_limited<P: AsRef<Path>>(&mut self, dir: P, limit: u64) -> io::Result<SavedFile> {
-        self.save().size_limit(limit).with_dir(dir).into_result_strict()
-    }
-}
-
-impl<M: ReadEntry> Read for MultipartFile<M> {
+impl<M: ReadEntry> Read for MultipartData<M> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
         self.inner_mut().source().read(buf)
     }
 }
 
-impl<M: ReadEntry> BufRead for MultipartFile<M> {
+impl<M: ReadEntry> BufRead for MultipartData<M> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.inner_mut().source().fill_buf()
     }
