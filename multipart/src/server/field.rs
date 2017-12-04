@@ -55,7 +55,6 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
             return Err(ParseHeaderError::Other("Could not read field headers".to_string()));
         }
 
-        // FIXME: https://github.com/seanmonstar/httparse/issues/34
         match httparse::parse_headers(buf, &mut raw_headers) {
             Ok(Status::Complete((consume_, raw_headers))) =>  {
                 consume = consume_;
@@ -87,11 +86,25 @@ fn copy_headers<'h, 'b: 'h>(raw: &[Header<'b>], headers: &'h mut [StrHeader<'b>]
 }
 
 /// The headers that (may) appear before a `multipart/form-data` field.
+///
+/// ### Warning: Values are Client-Provided
+/// Everything in this struct are values from the client and should be considered **untrustworthy**.
+/// This crate makes no effort to validate or sanitize any client inputs.
 pub struct FieldHeaders {
-    /// The `Content-Disposition` header, required.
-    cont_disp: ContentDisp,
-    /// The `Content-Type` header, optional.
-    cont_type: Option<Mime>,
+    /// The field's name from the form.
+    pub name: Arc<str>,
+
+    /// The filename of this entry, if supplied. This is not guaranteed to match the original file
+    /// or even to be a valid filename for the current platform.
+    pub filename: Option<String>,
+
+    /// The MIME type (`Content-Type` value) of this file, if supplied by the client.
+    ///
+    /// If this is not supplied, the content-type of the field should default to `text/plain` as
+    /// per [IETF RFC 7578, section 4.4](https://tools.ietf.org/html/rfc7578#section-4.4), but this
+    /// should not be implicitly trusted. This crate makes no attempt to identify or validate
+    /// the content-type of the actual field data.
+    pub content_type: Option<Mime>,
 }
 
 impl FieldHeaders {
@@ -103,8 +116,9 @@ impl FieldHeaders {
     fn parse(headers: &[StrHeader]) -> Result<FieldHeaders, ParseHeaderError> {
         let cont_disp = ContentDisp::parse(headers)?.ok_or(ParseHeaderError::MissingContentDisposition)?;
         Ok(FieldHeaders {
-            cont_disp: cont_disp,
-            cont_type: parse_cont_type(headers)?,
+            name: cont_disp.name,
+            filename: cont_disp.filename,
+            content_type: parse_content_type(headers)?,
         })
     }
 }
@@ -159,7 +173,7 @@ impl ContentDisp {
     }
 }
 
-fn parse_cont_type(headers: &[StrHeader]) -> Result<Option<Mime>, ParseHeaderError> {
+fn parse_content_type(headers: &[StrHeader]) -> Result<Option<Mime>, ParseHeaderError> {
     const CONTENT_TYPE: &'static str = "Content-Type";
     let header = if let Some(header) = find_header(headers, CONTENT_TYPE) {
         header
@@ -179,26 +193,33 @@ fn parse_cont_type(headers: &[StrHeader]) -> Result<Option<Mime>, ParseHeaderErr
 /// This crate makes no effort to validate or sanitize any client inputs.
 #[derive(Debug)]
 pub struct MultipartField<M: ReadEntry> {
-    /// The field's name from the form.
-    pub name: String,
-
-    /// The filename of this entry, if supplied. This is not guaranteed to match the original file
-    /// or even to be a valid filename for the current platform.
-    pub filename: Option<String>,
-
-    /// The MIME type (`Content-Type` value) of this file, if supplied by the client.
+    /// The headers for this field, including the name, filename, and content-type, if provided.
     ///
-    /// If this is not supplied, the content-type of the field should default to `text/plain` as
-    /// per [IETF RFC 7578, section 4.4](https://tools.ietf.org/html/rfc7578#section-4.4), but this
-    /// should not be implicitly trusted. This crate makes no attempt to identify or validate
-    /// the content-type of the actual field data.
-    pub content_type: Option<Mime>,
+    /// ### Warning: Values are Client-Provided
+    /// Everything in this struct are values from the client and should be considered **untrustworthy**.
+    /// This crate makes no effort to validate or sanitize any client inputs.
+    pub headers: FieldHeaders,
 
     /// The field's data.
     pub data: MultipartData<M>,
 }
 
 impl<M: ReadEntry> MultipartField<M> {
+    /// Returns `true` if this field has no content-type or the content-type is `text/plain`.
+    ///
+    /// This typically means it can be read to a string, but it could still be using an unsupported
+    /// character encoding, so decoding to `String` needs to ensure that the data is valid UTF-8.
+    ///
+    /// Note also that the field contents may be too large to reasonably fit in memory.
+    /// The `.save()` adapter can be used to enforce a size limit.
+    ///
+    /// Detecting character encodings by any means is (currently) beyond the scope of this crate.
+    pub fn is_text(&self) -> bool {
+        self.headers.content_type.as_ref()
+            .map(|ct| ct.type_() == mime::TEXT && ct.subtype() == mime::PLAIN)
+            .unwrap_or(true)
+    }
+
     /// Read the next entry in the request.
     pub fn next_entry(self) -> ReadEntryResult<M> {
         self.data.into_inner().read_entry()
@@ -230,8 +251,7 @@ impl<M: ReadEntry> MultipartField<M> {
 
 /// The data of a field in a `multipart/form-data` request.
 ///
-/// You can read it to EOF, or use one of the `save()` method
-/// to save it to disk/memory.
+/// You can read it to EOF, or use the `save()` adaptor to save it to disk/memory.
 #[derive(Debug)]
 pub struct MultipartData<M> {
     inner: Option<M>,
@@ -253,6 +273,10 @@ impl<M> MultipartData<M> where M: ReadEntry {
 
     fn into_inner(self) -> M {
         self.inner.expect("MultipartFile::inner taken!")
+    }
+
+    fn give_inner(&mut self, inner: M) {
+        self.inner = Some(inner);
     }
 }
 
@@ -297,8 +321,8 @@ fn io_str_utf8(buf: &[u8]) -> io::Result<&str> {
 }
 
 fn find_header<'a, 'b>(headers: &'a [StrHeader<'b>], name: &str) -> Option<&'a StrHeader<'b>> {
-    /// Field names are case insensitive and consist of ASCII characters
-    /// only (see https://tools.ietf.org/html/rfc822#section-3.2).
+    // Field names are case insensitive and consist of ASCII characters
+    // only (see https://tools.ietf.org/html/rfc822#section-3.2).
     headers.iter().find(|header| header.name.eq_ignore_ascii_case(name))
 }
 
@@ -312,44 +336,27 @@ pub trait ReadEntry: PrivReadEntry + Sized {
             return End(self);
         }
 
-        let field_headers = try_read_entry!(self; self.read_headers());
+        let field_headers: FieldHeaders = try_read_entry!(self; self.read_headers());
 
-        let data = match field_headers.cont_type {
-            Some(cont_type) => {
-                match cont_type.0 {
-                    TopLevel::Multipart => {
-                        let msg = format!("Error on field {:?}: nested multipart fields are \
+        match field_headers.cont_type {
+            Some(ref cont_type) if cont_type.type_() == mime::MULTIPART => {
+                let msg = format!("Error on field {:?}: nested multipart fields are \
                                            not supported. However, reports of clients sending \
                                            requests like this are welcome at \
                                            https://github.com/abonander/multipart/issues/56",
-                                          field_headers.cont_disp.field_name);
+                                  field_headers.cont_disp.field_name);
 
-                        return ReadEntryResult::invalid_data(self, msg);
-                    },
-                    _ => {
-                        MultipartData::File(
-                            MultipartFile {
-                                filename: field_headers.cont_disp.filename,
-                                content_type: cont_type,
-                                inner: Some(self)
-                            }
-                        )
-                    }
-                }
+                return ReadEntryResult::invalid_data(self, msg);
             },
-            None => {
-                let text = try_read_entry!(self; self.read_to_string());
-                MultipartData::Text(MultipartText {
-                    text: text,
-                    inner: Some(self),
-                })
-            },
-        };
+            _ => (),
+        }
 
         Entry(
             MultipartField {
-                name: field_headers.cont_disp.field_name,
-                data: data,
+                headers: field_headers,
+                data: MultipartData {
+                    inner: Some(self),
+                },
             }
         )
     }

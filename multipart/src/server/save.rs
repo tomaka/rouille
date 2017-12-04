@@ -20,6 +20,8 @@ use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::{env, fs, io, mem};
 
+use server::field::FieldHeaders;
+
 const RANDOM_FILENAME_LEN: usize = 12;
 
 fn rand_filename() -> String {
@@ -187,7 +189,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
                         Some(limit) if count >= limit => return Partial (
                             PartialEntries {
                                 entries: entries,
-                                partial_file: Some(PartialFileField {
+                                partial_file: Some(PartialSavedField {
                                     field_name: field.name,
                                     source: file,
                                     dest: None,
@@ -208,7 +210,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
                         Partial(partial, reason) => return Partial(
                             PartialEntries {
                                 entries: entries,
-                                partial_file: Some(PartialFileField {
+                                partial_file: Some(PartialSavedField {
                                     field_name: field.name,
                                     source: file,
                                     dest: Some(partial)
@@ -219,7 +221,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
                         Error(e) => return Partial(
                             PartialEntries {
                                 entries: entries,
-                                partial_file: Some(PartialFileField {
+                                partial_file: Some(PartialSavedField {
                                     field_name: field.name,
                                     source: file,
                                     dest: None,
@@ -241,7 +243,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
 }
 
 /// Save API for individual files.
-impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: BufRead {
+impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: BufRead {
 
     /// Save to a file with a random alphanumeric name in the OS temporary directory.
     ///
@@ -257,17 +259,7 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: Bu
     ///
     /// See `with_path()` for more details.
     ///
-    /// ### Warning: Do **not* trust user input!
-    /// It is a serious security risk to create files or directories with paths based on user input.
-    /// A malicious user could craft a path which can be used to overwrite important files, such as
-    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
-    /// if they are writable by the server process.
-    ///
-    /// This can be mitigated somewhat by setting filesystem permissions as
-    /// conservatively as possible and running the server under its own user with restricted
-    /// permissions, but you should still not use user input directly as filesystem paths.
-    /// If it is truly necessary, you should sanitize filenames such that they cannot be
-    /// misinterpreted by the OS.
+
     pub fn with_filename(&mut self, filename: &str) -> FileSaveResult {
         let mut tempdir = env::temp_dir();
         tempdir.set_file_name(filename);
@@ -278,18 +270,6 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: Bu
     /// Save to a file with a random alphanumeric name in the given directory.
     ///
     /// See `with_path()` for more details.
-    ///
-    /// ### Warning: Do **not* trust user input!
-    /// It is a serious security risk to create files or directories with paths based on user input.
-    /// A malicious user could craft a path which can be used to overwrite important files, such as
-    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
-    /// if they are writable by the server process.
-    ///
-    /// This can be mitigated somewhat by setting filesystem permissions as
-    /// conservatively as possible and running the server under its own user with restricted
-    /// permissions, but you should still not use user input directly as filesystem paths.
-    /// If it is truly necessary, you should sanitize filenames such that they cannot be
-    /// misinterpreted by the OS.
     pub fn with_dir<P: AsRef<Path>>(&mut self, dir: P) -> FileSaveResult {
         let path = dir.as_ref().join(rand_filename());
         self.with_path(path)
@@ -347,37 +327,10 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartFile<M>> where MultipartFile<M>: Bu
 /// A file saved to the local filesystem from a multipart request.
 #[derive(Debug)]
 pub struct SavedFile {
+    /// The headers of the field that was saved.
+    pub headers: FieldHeaders,
     /// The complete path this file was saved at.
     pub path: PathBuf,
-
-    /// ### Warning: Client Provided / Untrustworthy
-    /// You should treat this value as **untrustworthy** because it is an arbitrary string
-    /// provided by the client.
-    ///
-    /// It is a serious security risk to create files or directories with paths based on user input.
-    /// A malicious user could craft a path which can be used to overwrite important files, such as
-    /// web templates, static assets, Javascript files, database files, configuration files, etc.,
-    /// if they are writable by the server process.
-    ///
-    /// This can be mitigated somewhat by setting filesystem permissions as
-    /// conservatively as possible and running the server under its own user with restricted
-    /// permissions, but you should still not use user input directly as filesystem paths.
-    /// If it is truly necessary, you should sanitize filenames such that they cannot be
-    /// misinterpreted by the OS. Such functionality is outside the scope of this crate.
-    pub filename: Option<String>,
-
-    /// The MIME type (`Content-Type` value) of this file, if supplied by the client,
-    /// or `"applicaton/octet-stream"` otherwise.
-    ///
-    /// ### Note: Client Provided
-    /// Consider this value to be potentially untrustworthy, as it is provided by the client.
-    /// It may be inaccurate or entirely wrong, depending on how the client determined it.
-    ///
-    /// Some variants wrap arbitrary strings which could be abused by a malicious user if your
-    /// application performs any non-idempotent operations based on their value, such as
-    /// starting another program or querying/updating a database (web-search "SQL injection").
-    pub content_type: Mime,
-
     /// The number of bytes written to the disk.
     pub size: u64,
 }
@@ -388,67 +341,12 @@ impl SavedFile {
     }
 }
 
-/// Wrapper for the fields of an `Entries`. Stores text fields in a `Vec<(String, String)>` to
-/// enable accessing fields with duplicated names.
-
-#[derive(Debug, Default)]
-pub struct FieldsWrapper(Vec<(String, String)>);
-
-impl FieldsWrapper {
-
-    /// Converts the contents into a multivalued hashmap
-    pub fn into_multivalued_map(self) -> HashMap<String, Vec<String>> {
-        let mut out = HashMap::new();
-        for (key, val) in self.0.into_iter() {
-            out.entry(key).or_insert_with(Vec::new).push(val);
-        }
-        out
-    }
-
-    /// Converts the contents into a single-valued hashmap
-    pub fn into_map(self) -> HashMap<String, String> {
-        self.0.into_iter().collect()
-    }
-}
-
-impl IntoIterator for FieldsWrapper {
-    type Item = (String, String);
-    type IntoIter = ::std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl ::std::ops::Deref for FieldsWrapper {
-    type Target = Vec<(String, String)>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl ::std::ops::DerefMut for FieldsWrapper {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-// this allows use of both `from(FieldsWrapper)` and `FieldsWrapper.into()`
-impl From<FieldsWrapper> for Vec<(String, String)> {
-    fn from(fields: FieldsWrapper) -> Self {
-        fields.0
-    }
-}
-
 /// A result of `Multipart::save_all()`.
 #[derive(Debug)]
 pub struct Entries {
     /// The text fields of the multipart request, mapped by field name -> value.
-    pub fields: FieldsWrapper,
-    /// A map of file field names to their contents saved on the filesystem.
-    pub files: HashMap<String, Vec<SavedFile>>,
-    /// The directory the files in this request were saved under; may be temporary or permanent.
+    pub fields: HashMap<String, >,
+
     pub save_dir: SaveDir,
 }
 
@@ -480,7 +378,7 @@ pub enum SaveDir {
     /// This directory is permanent and will be left on the filesystem when this wrapper is dropped.
     ///
     /// **N.B.** If this directory is in the OS temporary directory then it may still be
-    /// deleted at any time, usually on reboot or when free space is low.
+    /// deleted at any time.
     Perm(PathBuf),
 }
 
@@ -592,16 +490,12 @@ impl PartialReason {
     }
 }
 
-/// The file field that was being read when the save operation quit.
+/// The field that was being read when the save operation quit.
 ///
 /// May be partially saved to the filesystem if `dest` is `Some`.
 #[derive(Debug)]
-pub struct PartialFileField<M> {
-    /// The field name for the partial file.
-    pub field_name: String,
-    /// The partial file's source in the multipart stream (may be partially read if `dest`
-    /// is `Some`).
-    pub source: MultipartFile<M>,
+pub struct PartialSavedField<M> {
+    pub source: MultipartField<M>,
     /// The partial file's entry on the filesystem, if the operation got that far.
     pub dest: Option<SavedFile>,
 }
@@ -615,9 +509,9 @@ pub struct PartialFileField<M> {
 pub struct PartialEntries<M> {
     /// The entries that were saved successfully.
     pub entries: Entries,
-    /// The file that was in the process of being read. `None` if the error
-    /// occurred between file entries.
-    pub partial_file: Option<PartialFileField<M>>,
+    /// The field that was in the process of being read. `None` if the error
+    /// occurred between entries.
+    pub partial_field: Option<PartialSavedField<M>>,
 }
 
 /// Discards `partial_file`

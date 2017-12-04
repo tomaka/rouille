@@ -1,7 +1,7 @@
 [package]
 name = "multipart"
 
-version = "0.13.4"
+version = "0.14.0"
 
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
@@ -17,8 +17,8 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 log = "0.3"
-mime = "0.2"
-mime_guess = "1.8"
+mime = "0.3"
+mime_guess = "2.0.0-alpha.3"
 rand = "0.3"
 safemem = { version = "0.2", optional = true }
 tempdir = ">=0.3.4"
@@ -27,6 +27,7 @@ clippy = { version = ">=0.0, <0.1", optional = true}
 #Server Dependencies
 buf_redux = { version = "0.6", optional = true }
 httparse = { version = "1.2", optional = true }
+smallvec = { version = "0.6", optional = true }
 twoway = { version = "0.1", optional = true }
 
 # Optional Integrations
@@ -40,7 +41,7 @@ env_logger = "0.3"
 [features]
 client = []
 default = ["all"]
-server = ["buf_redux", "httparse", "safemem", "twoway"]
+server = ["buf_redux", "httparse", "safemem", "smallvec", "twoway"]
 mock = []
 nightly = []
 bench = []
