@@ -18,6 +18,7 @@ extern crate twoway;
 use std::borrow::Borrow;
 use std::io::prelude::*;
 use std::path::Path;
+use std::sync::Arc;
 use std::io;
 
 use tempdir::TempDir;
@@ -26,13 +27,24 @@ use self::boundary::BoundaryReader;
 
 use self::field::PrivReadEntry;
 
-pub use self::field::{MultipartField, MultipartFile, MultipartData, ReadEntry, ReadEntryResult};
+pub use self::field::{MultipartField, MultipartData, ReadEntry, ReadEntryResult};
 
 use self::save::SaveBuilder;
 
-pub use self::save::{Entries, SaveResult, SavedFile};
+pub use self::save::{Entries, SaveResult, SavedField};
 
 use self::save::EntriesSaveResult;
+
+/// Replacement typedef for `Arc<str>` for older Rust releases.
+#[cfg(feature = "no_arc_str")]
+pub type ArcStr = Arc<String>;
+
+/// Typedef for `Arc<str>`.
+///
+/// Construction of `Arc<str>` was only stabilized in Rust 1.21, so to continue to support
+/// older versions, an alternate typedef of `Arc<String>` is available under the `no_arc_str` feature.
+#[cfg(not(feature = "no_arc_str"))]
+pub type ArcStr = Arc<str>;
 
 macro_rules! try_opt (
     ($expr:expr) => (

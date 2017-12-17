@@ -8,19 +8,18 @@
 
 use mime::Mime;
 
-use super::field::{MultipartData, MultipartFile, ReadEntry, ReadEntryResult};
-
-use self::SaveResult::*;
-
 pub use tempdir::TempDir;
 
 use std::collections::HashMap;
 use std::io::prelude::*;
-use std::fs::OpenOptions;
+use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
-use std::{env, fs, io, mem};
+use std::{env, io, mem};
 
-use server::field::FieldHeaders;
+use server::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry, ReadEntryResult};
+use server::ArcStr;
+
+use self::SaveResult::*;
 
 const RANDOM_FILENAME_LEN: usize = 12;
 
@@ -36,6 +35,19 @@ macro_rules! try_start (
         }
     )
 );
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TextPolicy {
+    /// Attempt to read a text field as text, falling back to binary on error
+    Try,
+    /// Attempt to read a text field as text, returning any errors
+    Force,
+    /// Don't try to read text
+    Ignore
+}
+
+// 8 MiB, reasonable?
+const DEFAULT_MEMORY_THRESHOLD: usize = 8 * 1024 * 1024;
 
 /// A builder for saving a file or files to the local filesystem.
 ///
@@ -75,6 +87,8 @@ pub struct SaveBuilder<S> {
     open_opts: OpenOptions,
     size_limit: Option<u64>,
     count_limit: Option<u32>,
+    memory_threshold: usize,
+    text_policy: TextPolicy,
 }
 
 impl<S> SaveBuilder<S> {
@@ -89,6 +103,8 @@ impl<S> SaveBuilder<S> {
             open_opts: open_opts,
             size_limit: None,
             count_limit: None,
+            memory_threshold: DEFAULT_MEMORY_THRESHOLD,
+            text_policy: TextPolicy::Try,
         }
     }
 
@@ -108,6 +124,43 @@ impl<S> SaveBuilder<S> {
         opts_fn(&mut self.open_opts);
         self.open_opts.write(true);
         self
+    }
+
+    /// Set the threshold at which to switch from copying a field into memory to copying
+    /// it to disk.
+    ///
+    /// If `0`, forces fields to save directly to the filesystem.
+    /// If `usize::MAX`, effectively forces fields to always save to memory.
+    ///
+    /// (RFC: usize::MAX` is technically reachable on 32-bit systems, should we test for capacity
+    /// overflow and switch to disk then? What about if/when `Vec::try_reserve()` becomes a thing?)
+    pub fn memory_threshold(self, memory_threshold: usize) -> Self {
+        Self { memory_threshold, ..self }
+    }
+
+    /// When encountering a field that is apparently text, try to read it to a string or fall
+    /// back to binary otherwise.
+    ///
+    /// Has no effect once `memory_threshold` has been reached.
+    pub fn try_text(self) -> Self {
+        Self { text_policy: TextPolicy::Try, ..self }
+    }
+
+    /// When encountering a field that is apparently text, read it to a string or return an error.
+    ///
+    /// (RFC: should this continue to validate UTF-8 when writing to the filesystem?)
+    pub fn force_text(self) -> Self {
+        Self { text_policy: TextPolicy::Force, ..self}
+    }
+
+    /// Don't try to read or validate any field data as UTF-8.
+    pub fn ignore_text(self) -> Self {
+        Self { text_policy: TextPolicy::Ignore, ..self }
+    }
+
+    fn fork<M_>(&self, savable: M_) -> Self<M_> {
+        // this actually forking works
+        Self { savable, .. *self }
     }
 }
 
@@ -283,14 +336,12 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
     pub fn with_path<P: Into<PathBuf>>(&mut self, path: P) -> FileSaveResult {
         let path = path.into();
 
-        let saved = SavedFile {
-            content_type: self.savable.content_type.clone(),
-            filename: self.savable.filename.clone(),
-            path: path,
-            size: 0,
+        let saved = SavedField {
+            headers: self.savable.headers.clone(),
+            data: Data
         };
 
-        let file = match create_dir_all(&saved.path).and_then(|_| self.open_opts.open(&saved.path)) {
+        let file = match create_dir_all(&path).and_then(|_| self.open_opts.open(&path)) {
             Ok(file) => file,
             Err(e) => return Partial(saved, e.into())
         };
@@ -324,37 +375,68 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
     }
 }
 
-/// A file saved to the local filesystem from a multipart request.
+/// A saved field (to memory or filesystem) from a multipart request.
 #[derive(Debug)]
-pub struct SavedFile {
+pub struct SavedField {
     /// The headers of the field that was saved.
     pub headers: FieldHeaders,
-    /// The complete path this file was saved at.
-    pub path: PathBuf,
-    /// The number of bytes written to the disk.
-    pub size: u64,
+    /// The data of the field which may reside in-memory or on the filesystem.
+    pub data: SavedData,
 }
 
-impl SavedFile {
-    fn with_size(self, size: u64) -> Self {
-        SavedFile { size: size, .. self }
+#[derive(Debug)]
+pub enum SavedData {
+    /// Data in the form of a Rust string.
+    Text(String),
+    Bytes(Vec<u8>),
+    /// A path to a file on the filesystem and its size as written by `multipart`.
+    File(PathBuf, u64),
+}
+
+impl SavedData {
+    pub fn readable(&self) -> io::Result<DataReader> {
+        use self::SavedData::*;
+
+        match *self {
+            Text(ref text) => Ok(DataReader::Bytes(text.as_ref())),
+            Bytes(ref bytes) => Ok(DataReader::Bytes(bytes)),
+            File(ref path, _) => File::open(path),
+        }
+    }
+
+    pub fn size(&self) -> u64 {
+        use self::SavedData::*;
+
+        match *self {
+            Text(ref text) => text.len() as u64,
+            Bytes(ref bytes) => bytes.len() as u64,
+            File(_, size) => size,
+        }
     }
 }
+
+pub enum DataReader<'a> {
+    Bytes(&'a [u8]),
+    File(File),
+}
+
+imp
 
 /// A result of `Multipart::save_all()`.
 #[derive(Debug)]
 pub struct Entries {
-    /// The text fields of the multipart request, mapped by field name -> value.
-    pub fields: HashMap<String, >,
+    /// The fields of the multipart request, mapped by field name -> value.
+    ///
+    /// Each vector is guaranteed not to be empty unless externally modified.
+    pub fields: HashMap<ArcStr, Vec<SavedField>>,
 
-    pub save_dir: SaveDir,
+    pub save_dir: Option<SaveDir>,
 }
 
 impl Entries {
     fn new(save_dir: SaveDir) -> Self {
         Entries {
-            fields: FieldsWrapper::default(),
-            files: HashMap::new(),
+            fields: HashMap::new(),
             save_dir: save_dir,
         }
     }
@@ -364,7 +446,7 @@ impl Entries {
         self.fields.is_empty() && self.files.is_empty()
     }
 
-    fn mut_files_for(&mut self, field: String) -> &mut Vec<SavedFile> {
+    fn mut_files_for(&mut self, field: String) -> &mut Vec<SavedField> {
         self.files.entry(field).or_insert_with(Vec::new)
     }
 }
@@ -497,7 +579,7 @@ impl PartialReason {
 pub struct PartialSavedField<M> {
     pub source: MultipartField<M>,
     /// The partial file's entry on the filesystem, if the operation got that far.
-    pub dest: Option<SavedFile>,
+    pub dest: Option<SavedField>,
 }
 
 /// The partial result type for `Multipart::save*()`.
@@ -552,12 +634,12 @@ pub enum SaveResult<Success, Partial> {
 /// Shorthand result for methods that return `Entries`
 pub type EntriesSaveResult<M> = SaveResult<Entries, PartialEntries<M>>;
 
-/// Shorthand result for methods that return `SavedFile`s.
+/// Shorthand result for methods that return `FieldData`s.
 ///
-/// The `MultipartFile` is not provided here because it is not necessary to return
+/// The `MultipartData` is not provided here because it is not necessary to return
 /// a borrow when the owned version is probably in the same scope. This hopefully
 /// saves some headache with the borrow-checker.
-pub type FileSaveResult = SaveResult<SavedFile, SavedFile>;
+pub type FieldSaveResult = SaveResult<SavedData, SavedData>;
 
 impl<M> EntriesSaveResult<M> {
     /// Take the `Entries` from `self`, if applicable, and discarding

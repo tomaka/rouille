@@ -3,7 +3,7 @@ extern crate multipart;
 
 use std::fs::File;
 use std::io::{self, Read};
-use multipart::server::{Multipart, Entries, SaveResult, SavedFile};
+use multipart::server::{Multipart, Entries, SaveResult, SavedField};
 use tiny_http::{Response, StatusCode, Request};
 fn main() {
     // Starting a server on `localhost:80`
@@ -67,7 +67,7 @@ fn process_entries<'a>(entries: Entries) -> io::Result<Response<&'a [u8]>> {
     Ok(build_response(200, "Multipart data is received!"))
 }
 
-fn print_file(saved_file: &SavedFile) -> io::Result<()> {
+fn print_file(saved_file: &SavedField) -> io::Result<()> {
     let mut file = File::open(&saved_file.path)?;
 
     let mut contents = String::new();

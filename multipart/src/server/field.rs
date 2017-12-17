@@ -6,14 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 //! `multipart` field header parsing.
-
-use super::httparse::{self, EMPTY_HEADER, Header, Status};
-
-use self::ReadEntryResult::*;
-
-use super::save::{SaveBuilder, SavedFile};
-
-use mime::{TopLevel, Mime};
+use mime::Mime;
 
 use std::io::{self, Read, BufRead, Write};
 use std::ops::Deref;
@@ -21,6 +14,15 @@ use std::path::{Path, PathBuf};
 use std::{str, fmt, error};
 
 use std::ascii::AsciiExt;
+
+use super::httparse::{self, EMPTY_HEADER, Header, Status};
+
+use self::ReadEntryResult::*;
+
+use super::save::{SaveBuilder, SavedField};
+
+use super::ArcStr;
+
 
 const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader {
     name: "",
@@ -90,9 +92,10 @@ fn copy_headers<'h, 'b: 'h>(raw: &[Header<'b>], headers: &'h mut [StrHeader<'b>]
 /// ### Warning: Values are Client-Provided
 /// Everything in this struct are values from the client and should be considered **untrustworthy**.
 /// This crate makes no effort to validate or sanitize any client inputs.
+#[derive(Clone, Debug)]
 pub struct FieldHeaders {
     /// The field's name from the form.
-    pub name: Arc<str>,
+    pub name: ArcStr,
 
     /// The filename of this entry, if supplied. This is not guaranteed to match the original file
     /// or even to be a valid filename for the current platform.
@@ -187,10 +190,6 @@ fn parse_content_type(headers: &[StrHeader]) -> Result<Option<Mime>, ParseHeader
 }
 
 /// A field in a multipart request with its associated headers and data.
-///
-/// ### Warning: Values are Client-Provided
-/// Everything in this struct are values from the client and should be considered **untrustworthy**.
-/// This crate makes no effort to validate or sanitize any client inputs.
 #[derive(Debug)]
 pub struct MultipartField<M: ReadEntry> {
     /// The headers for this field, including the name, filename, and content-type, if provided.
@@ -205,7 +204,7 @@ pub struct MultipartField<M: ReadEntry> {
 }
 
 impl<M: ReadEntry> MultipartField<M> {
-    /// Returns `true` if this field has no content-type or the content-type is `text/plain`.
+    /// Returns `true` if this field has no content-type or the content-type is `text/...`.
     ///
     /// This typically means it can be read to a string, but it could still be using an unsupported
     /// character encoding, so decoding to `String` needs to ensure that the data is valid UTF-8.
@@ -215,9 +214,7 @@ impl<M: ReadEntry> MultipartField<M> {
     ///
     /// Detecting character encodings by any means is (currently) beyond the scope of this crate.
     pub fn is_text(&self) -> bool {
-        self.headers.content_type.as_ref()
-            .map(|ct| ct.type_() == mime::TEXT && ct.subtype() == mime::PLAIN)
-            .unwrap_or(true)
+        self.headers.content_type.as_ref().map_or(true, |ct| ct.type_() == mime::TEXT)
     }
 
     /// Read the next entry in the request.
@@ -258,7 +255,7 @@ pub struct MultipartData<M> {
 }
 
 impl<M> MultipartData<M> where M: ReadEntry {
-    /// Get a builder type which can save the file with or without a size limit.
+    /// Get a builder type which can save the field with or without a size limit.
     pub fn save(&mut self) -> SaveBuilder<&mut Self> {
         SaveBuilder::new(self)
     }
@@ -338,18 +335,15 @@ pub trait ReadEntry: PrivReadEntry + Sized {
 
         let field_headers: FieldHeaders = try_read_entry!(self; self.read_headers());
 
-        match field_headers.cont_type {
-            Some(ref cont_type) if cont_type.type_() == mime::MULTIPART => {
-                let msg = format!("Error on field {:?}: nested multipart fields are \
-                                           not supported. However, reports of clients sending \
-                                           requests like this are welcome at \
-                                           https://github.com/abonander/multipart/issues/56",
-                                  field_headers.cont_disp.field_name);
-
-                return ReadEntryResult::invalid_data(self, msg);
-            },
-            _ => (),
-        }
+        field_headers.content_type.as_ref().map(|ct| if ct.type_() == mime::MULTIPART {
+            // fields of this type are sent by (supposedly) no known clients
+            // (https://tools.ietf.org/html/rfc7578#appendix-A) so I'd be fascinated
+            // to hear about any in the wild
+            note!("Found nested multipart field: {:?}:\r\n\
+                   Please report this client's User-Agent and any other available details \
+                   at https://github.com/abonander/multipart/issues/56",
+                   field_headers);
+        });
 
         Entry(
             MultipartField {

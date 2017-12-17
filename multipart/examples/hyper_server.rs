@@ -7,7 +7,7 @@ use hyper::server::{Handler, Server, Request, Response};
 use hyper::status::StatusCode;
 use hyper::server::response::Response as HyperResponse;
 use multipart::server::hyper::{Switch, MultipartHandler, HyperRequest};
-use multipart::server::{Multipart, Entries, SaveResult, SavedFile};
+use multipart::server::{Multipart, Entries, SaveResult, SavedField};
 
 struct NonMultipart;
 impl Handler for NonMultipart {
@@ -57,7 +57,7 @@ fn process_entries<'a>(entries: Entries) -> io::Result<()> {
     Ok(())
 }
 
-fn print_file(saved_file: &SavedFile) -> io::Result<()> {
+fn print_file(saved_file: &SavedField) -> io::Result<()> {
     let mut file = File::open(&saved_file.path)?;
 
     let mut contents = String::new();

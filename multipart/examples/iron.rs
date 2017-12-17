@@ -5,7 +5,7 @@ extern crate env_logger;
 
 use std::fs::File;
 use std::io::Read;
-use multipart::server::{Multipart, Entries, SaveResult, SavedFile};
+use multipart::server::{Multipart, Entries, SaveResult, SavedField};
 use iron::prelude::*;
 use iron::status;
 
@@ -62,7 +62,7 @@ fn process_entries(entries: Entries) -> IronResult<Response> {
     Ok(Response::with((status::Ok, "Multipart data is processed")))
 }
 
-fn print_file(saved_file: &SavedFile) -> IronResult<()> {
+fn print_file(saved_file: &SavedField) -> IronResult<()> {
     let mut file = match File::open(&saved_file.path) {
         Ok(file) => file,
         Err(error) => {

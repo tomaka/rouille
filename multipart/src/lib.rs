@@ -25,10 +25,15 @@
 //! * `tiny_http`: Integration with the [`tiny_http`](https://github.com/frewsxcv/tiny-http)
 //! crate. See the [`server::tiny_http`](server/tiny_http/index.html) module for more information.
 //!
-//! **Note**: in-crate integration for Nickel was removed in 0.11.0;
-//! integration will be provided in the
-//! [`multipart-nickel`](https://crates.io/crates/multipart-nickel)
-//! crate for the foreseeable future.
+//! `nickel` (returning in 0.14!): Integration with the  See the [`server::nickel`](server/nickel/index.html) module for more information.
+//!
+//! ### Note: Work in Progress
+//! I have left a number of Request-for-Comments (RFC) questions on various APIs and other places
+//! in the code as there are some cases where I'm not sure what the desirable behavior is.
+//!
+//! I have opened an issue as a place to collect responses and discussions for these questions
+//! [on Github](https://github.com/abonander/multipart/issues/96). Please quote the RFC-statement
+//! (and/or link to its source line) and provide your feedback there.
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy))]

@@ -31,10 +31,7 @@ via the `tiny_http` feature.
 
 Provides server-side integration with `tiny_http::Request` via `multipart::server::Multipart`.
 
-### [Nickel](http://nickel.rs/) 
-
-**Note**: Moved to `multipart-nickel` crate, see [nickel/examples/nickel.rs](nickel/examples/nickel.rs)
-for updated integration example.
+### [Nickel](http://nickel.rs/) ^(returning to `multipart` in 0.14!) 
 
 Provides server-side integration with `&mut nickel::Request` via `multipart::server::Multipart`. 
 
