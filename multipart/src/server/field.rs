@@ -6,7 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 //! `multipart` field header parsing.
-use mime::Mime;
+use mime::{self, Mime};
 
 use std::io::{self, Read, BufRead, Write};
 use std::ops::Deref;
@@ -127,7 +127,7 @@ impl FieldHeaders {
 }
 
 /// The `Content-Disposition` header.
-pub struct ContentDisp {
+struct ContentDisp {
     /// The name of the `multipart/form-data` field.
     field_name: String,
     /// The optional filename for this field.
@@ -339,7 +339,7 @@ pub trait ReadEntry: PrivReadEntry + Sized {
             // fields of this type are sent by (supposedly) no known clients
             // (https://tools.ietf.org/html/rfc7578#appendix-A) so I'd be fascinated
             // to hear about any in the wild
-            note!("Found nested multipart field: {:?}:\r\n\
+            info!("Found nested multipart field: {:?}:\r\n\
                    Please report this client's User-Agent and any other available details \
                    at https://github.com/abonander/multipart/issues/56",
                    field_headers);

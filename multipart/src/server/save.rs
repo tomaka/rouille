@@ -8,13 +8,15 @@
 
 use mime::Mime;
 
+pub use server::buf_redux::BufReader;
+
 pub use tempdir::TempDir;
 
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
-use std::{env, io, mem};
+use std::{env, io, mem, usize};
 
 use server::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry, ReadEntryResult};
 use server::ArcStr;
@@ -34,6 +36,15 @@ macro_rules! try_start (
             Err(e) => return SaveResult::Error(e),
         }
     )
+);
+
+macro_rules! try_full (
+    ($try:expr) => {
+        match $try {
+            SaveResult::Full(full) => full,
+            other => return other,
+        }
+    }
 );
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -158,7 +169,7 @@ impl<S> SaveBuilder<S> {
         Self { text_policy: TextPolicy::Ignore, ..self }
     }
 
-    fn fork<M_>(&self, savable: M_) -> Self<M_> {
+    fn fork<M_>(&self, savable: M_) -> SaveBuilder<M_> {
         // this actually forking works
         Self { savable, .. *self }
     }
@@ -298,59 +309,77 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
 /// Save API for individual files.
 impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: BufRead {
 
-    /// Save to a file with a random alphanumeric name in the OS temporary directory.
-    ///
-    /// Does not use user input to create the path.
+    /// Save the field data, potentially using a file with a random name in the
+    /// OS temporary directory.
     ///
     /// See `with_path()` for more details.
-    pub fn temp(&mut self) -> FileSaveResult {
+    pub fn temp(&mut self) -> FieldSaveResult {
         let path = env::temp_dir().join(rand_filename());
         self.with_path(path)
     }
 
-    /// Save to a file with the given name in the OS temporary directory.
+    /// Save the field data, potentially using a file with the given name in
+    /// the OS temporary directory.
     ///
     /// See `with_path()` for more details.
-    ///
-
-    pub fn with_filename(&mut self, filename: &str) -> FileSaveResult {
+    pub fn with_filename(&mut self, filename: &str) -> FieldSaveResult {
         let mut tempdir = env::temp_dir();
         tempdir.set_file_name(filename);
 
         self.with_path(tempdir)
     }
 
-    /// Save to a file with a random alphanumeric name in the given directory.
+    /// Save the field data, potentially using a file with a random alphanumeric name
+    /// in the given directory.
     ///
     /// See `with_path()` for more details.
-    pub fn with_dir<P: AsRef<Path>>(&mut self, dir: P) -> FileSaveResult {
+    pub fn with_dir<P: AsRef<Path>>(&mut self, dir: P) -> FieldSaveResult {
         let path = dir.as_ref().join(rand_filename());
         self.with_path(path)
     }
 
-    /// Save to a file with the given path.
+    /// Save the field data, potentially using a file with the given path.
+    ///
+    /// The file will not be created until the set `memory_threshold` is reached.
     ///
     /// Creates any missing directories in the path.
     /// Uses the contained `OpenOptions` to create the file.
     /// Truncates the file to the given limit, if set.
-    pub fn with_path<P: Into<PathBuf>>(&mut self, path: P) -> FileSaveResult {
-        let path = path.into();
-
-        let saved = SavedField {
-            headers: self.savable.headers.clone(),
-            data: Data
+    pub fn with_path<P: Into<PathBuf>>(&mut self, path: P) -> FieldSaveResult {
+        let bytes = match try_full!(self.save_mem()) {
+            (bytes, true) => return Full(bytes),
+            (bytes, false) => bytes,
         };
+
+        // TODO: progressively validate UTF-8 instead
+        // it'd perform about the same but could give better throughput as we can do the work
+        // while the network buffer refills
+        let bytes = match self.text_policy {
+            TextPolicy::Try => match String::from_utf8(bytes) {
+                Ok(string) => return Full(SavedData::Text(string)),
+                Err(e) => bytes,
+            },
+            TextPolicy::Force => match String::from_utf8(bytes) {
+                Ok(string) => return Full(SavedData::Text(string)),
+                Err(e) => return Error(io::Error::new(io::ErrorKind::InvalidData, e)),
+            },
+            TextPolicy::Ignore => bytes,
+        };
+
+        let path = path.into();
 
         let file = match create_dir_all(&path).and_then(|_| self.open_opts.open(&path)) {
             Ok(file) => file,
-            Err(e) => return Partial(saved, e.into())
+            Err(e) => return Error(e),
         };
 
-        self.write_to(file).map(move |written| saved.with_size(written))
+        let data = try_full!(try_write_all(&bytes).map(move |size| SavedData::File(path, size)));
+
+        self.write_to(file).map(move |written| data.add_size(written))
     }
 
 
-    /// Write out the file field to `dest`, truncating if a limit was set.
+    /// Write out the field data to `dest`, truncating if a limit was set.
     ///
     /// Returns the number of bytes copied, and whether or not the limit was reached
     /// (tested by `MultipartFile::fill_buf().is_empty()` so no bytes are consumed).
@@ -358,19 +387,24 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
     /// Retries on interrupts.
     pub fn write_to<W: Write>(&mut self, mut dest: W) -> SaveResult<u64, u64> {
         if let Some(limit) = self.size_limit {
-            let copied = match try_copy_buf(self.savable.take(limit), &mut dest) {
-                Full(copied) => copied,
-                other => return other,
-            };
-
-            // If there's more data to be read, the field was truncated
-            match self.savable.fill_buf() {
-                Ok(buf) if buf.is_empty() => Full(copied),
-                Ok(_) => Partial(copied, PartialReason::SizeLimit),
-                Err(e) => Partial(copied, PartialReason::IoError(e))
-            }
+            try_copy_limited(&mut self.savable, dest, limit)
         } else {
-            try_copy_buf(&mut self.savable, &mut dest)
+            try_copy_buf(self.savable, &mut dest)
+        }
+    }
+
+    fn save_mem(&mut self) -> SaveResult<(Vec<u8>, bool), Vec<u8>> {
+        let mut bytes = Vec::new();
+
+        if self.size_limit.map_or(false, |lim| lim < self.memory_threshold) {
+            return self.write_to(&mut bytes).map(move |_| bytes);
+        }
+
+        match try_copy_limited(self.savable, &mut bytes, self.memory_threshold) {
+            Full(_) => Full((bytes, true)),
+            Partial(_, PartialReason::SizeLimit) => Full((bytes, false)),
+            Partial(_, other) => Partial(bytes, other),
+            Error(e) => Error(e),
         }
     }
 }
@@ -400,7 +434,7 @@ impl SavedData {
         match *self {
             Text(ref text) => Ok(DataReader::Bytes(text.as_ref())),
             Bytes(ref bytes) => Ok(DataReader::Bytes(bytes)),
-            File(ref path, _) => File::open(path),
+            File(ref path, _) => Ok(DataReader::File(BufReader::new(fs::File::open(path)?))),
         }
     }
 
@@ -413,14 +447,51 @@ impl SavedData {
             File(_, size) => size,
         }
     }
+
+    fn add_size(self, add: u64) -> Self {
+        use self::SavedData::File;
+
+        match *self {
+            File(path, size) => File(path, size.saturating_add(add)),
+            other => other
+        }
+    }
 }
 
 pub enum DataReader<'a> {
     Bytes(&'a [u8]),
-    File(File),
+    File(BufReader<File>),
 }
 
-imp
+impl<'a> Read for DataReader<'a> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        use self::DataReader::*;
+
+        match *self {
+            Bytes(ref mut bytes) => bytes.read(buf),
+            File(ref mut file) => file.read(buf),
+        }
+    }
+}
+
+impl<'a> BufRead for DataReader<'a> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        use self::DataReader::*;
+
+        match *self {
+            Bytes(ref mut bytes) => bytes.fill_buf(),
+            File(ref mut file) => file.fill_buf(),
+        }    }
+
+    fn consume(&mut self, amt: usize) {
+        use self::DataReader::*;
+
+        match *self {
+            Bytes(ref mut bytes) => bytes.consume(amt),
+            File(ref mut file) => file.consume(amt),
+        }
+    }
+}
 
 /// A result of `Multipart::save_all()`.
 #[derive(Debug)]
@@ -576,7 +647,7 @@ impl PartialReason {
 ///
 /// May be partially saved to the filesystem if `dest` is `Some`.
 #[derive(Debug)]
-pub struct PartialSavedField<M> {
+pub struct PartialSavedField<M: ReadEntry> {
     pub source: MultipartField<M>,
     /// The partial file's entry on the filesystem, if the operation got that far.
     pub dest: Option<SavedField>,
@@ -588,7 +659,7 @@ pub struct PartialSavedField<M> {
 /// saved file that was in the process of being read when the error occurred,
 /// if applicable.
 #[derive(Debug)]
-pub struct PartialEntries<M> {
+pub struct PartialEntries<M: ReadEntry> {
     /// The entries that were saved successfully.
     pub entries: Entries,
     /// The field that was in the process of being read. `None` if the error
@@ -711,6 +782,17 @@ fn create_dir_all(path: &Path) -> io::Result<()> {
         // RFC: return an error instead?
         warn!("Attempting to save file in what looks like a root directory. File path: {:?}", path);
         Ok(())
+    }
+}
+
+fn try_copy_limited<R: BufRead, W: Write>(mut src: R, mut dest: W, limit: u64) -> SaveResult<u64, u64> {
+    let copied = try_full!(try_copy_buf(src.by_ref().take(limit), &mut dest));
+
+    // If there's more data to be read, the field was truncated
+    match src.fill_buf() {
+        Ok(buf) if buf.is_empty() => Full(copied),
+        Ok(_) => Partial(copied, PartialReason::SizeLimit),
+        Err(e) => Partial(copied, PartialReason::IoError(e))
     }
 }
 
