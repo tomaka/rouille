@@ -485,6 +485,7 @@ macro_rules! post_input {
     ($request:expr, {$($field:ident: $ty:ty $({$config:expr})*),*$(,)*}) => ({
         use std::io::Read;
         use std::mem;
+        use std::result::Result;
         use $crate::Request;
         use $crate::input::post::DecodePostField;
         use $crate::input::post::PostFieldError;
