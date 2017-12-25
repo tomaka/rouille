@@ -24,4 +24,3 @@ script:
   - cargo build --verbose;
   - cargo test --verbose;
   - cargo doc --verbose;
-  - (cd nickel && cargo test -v)
