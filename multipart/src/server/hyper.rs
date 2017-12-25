@@ -16,7 +16,7 @@ use hyper::server::{Handler, Request, Response};
 
 pub use hyper::server::Request as HyperRequest;
 
-use mime::{Mime, TopLevel, SubLevel, Attr, Value};
+use hyper::mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
 use super::{Multipart, HttpRequest};
 
