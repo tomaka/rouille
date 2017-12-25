@@ -90,6 +90,24 @@ enum TextPolicy {
 /// takes either `u32` or `Option<u32>`. This only has an effect when using
 /// `SaveBuilder<[&mut] Multipart>`.
 ///
+/// ### Memory Threshold and Text Policy
+/// By default, small fields (a few megabytes or smaller) will be read directly to memory
+/// without creating a file. This behavior is controlled by the `memory_threshold()` setter.
+///
+/// If a field appears to contain text data (its content-type is `text/*` or it doesn't declare
+/// one), `SaveBuilder` can read it to a string instead of saving the raw bytes as long as it falls
+/// below the set `memory_threshold`.
+///
+/// By default, the behavior is to attempt to validate the data as UTF-8, falling back to saving
+/// just the bytes if the validation fails at any point. You can restore/ensure this behavior
+/// with the `try_text()` modifier.
+///
+/// Alternately, you can use the `force_text()` modifier to have the save operation return an error
+/// when UTF-8 decoding fails, though this only holds true while the size is below
+/// `memory_threshold`. The `ignore_text()` modifier turns off UTF-8 validation altogether.
+///
+/// UTF-8 validation is performed incrementally to hopefully maximize throughput.
+///
 /// ### Warning: Do **not** trust user input!
 /// It is a serious security risk to create files or directories with paths based on user input.
 /// A malicious user could craft a path which can be used to overwrite important files, such as
