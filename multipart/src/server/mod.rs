@@ -27,7 +27,7 @@ use self::boundary::BoundaryReader;
 
 use self::field::PrivReadEntry;
 
-pub use self::field::{MultipartField, MultipartData, ReadEntry, ReadEntryResult};
+pub use self::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry, ReadEntryResult};
 
 use self::save::SaveBuilder;
 

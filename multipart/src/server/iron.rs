@@ -12,7 +12,7 @@ use iron::{BeforeMiddleware, IronError, IronResult};
 use std::path::PathBuf;
 use std::{error, fmt, io};
 
-use super::{HttpRequest, Multipart};
+use super::{FieldHeaders, HttpRequest, Multipart};
 use super::save::{Entries, PartialReason, TempDir};
 use super::save::SaveResult::*;
 
@@ -142,14 +142,14 @@ impl Intercept {
                               .count_limit(self.file_count_limit)
                               .with_temp_dir(tempdir) {
             Full(entries) => Ok(Some(entries)),
+            Partial(_, PartialReason::Utf8Error(_)) => unreachable!(),
             Partial(_, PartialReason::IoError(err)) => Err(io_to_iron(err, "Error midway through request")),
             Partial(_, PartialReason::CountLimit) => Err(FileCountLimitError(self.file_count_limit).into()),
             Partial(partial, PartialReason::SizeLimit) =>  {
-                let partial_file = partial.partial_file.expect(EXPECT_PARTIAL_FILE);
+                let partial = partial.partial.expect(EXPECT_PARTIAL_FILE);
                 Err(
                     FileSizeLimitError {
-                        field: partial_file.field_name,
-                        filename: partial_file.source.filename,
+                        field: partial.source.headers,
                     }.into()
                 )
             },
@@ -229,9 +229,7 @@ pub enum LimitBehavior {
 #[derive(Debug)]
 pub struct FileSizeLimitError {
     /// The field where the error occurred.
-    pub field: String,
-    /// The filename of the oversize file, if it was provided.
-    pub filename: Option<String>,
+    pub field: FieldHeaders,
 }
 
 impl error::Error for FileSizeLimitError {
@@ -242,9 +240,9 @@ impl error::Error for FileSizeLimitError {
 
 impl fmt::Display for FileSizeLimitError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.filename {
-            Some(ref filename) => write!(f, "File size limit reached for field \"{}\" (filename: \"{}\")", self.field, filename),
-            None => write!(f, "File size limit reached for field \"{}\" (no filename)", self.field),
+        match self.field.filename {
+            Some(ref filename) => write!(f, "File size limit reached for field \"{}\" (filename: \"{}\")", self.field.name, filename),
+            None => write!(f, "File size limit reached for field \"{}\" (no filename)", self.field.name),
         }
     }
 }
