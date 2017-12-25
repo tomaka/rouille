@@ -102,11 +102,15 @@ enum TextPolicy {
 /// just the bytes if the validation fails at any point. You can restore/ensure this behavior
 /// with the `try_text()` modifier.
 ///
-/// Alternately, you can use the `force_text()` modifier to have the save operation return an error
-/// when UTF-8 decoding fails, though this only holds true while the size is below
+/// Alternatively, you can use the `force_text()` modifier to make the save operation return
+/// an error when UTF-8 decoding fails, though this only holds true while the size is below
 /// `memory_threshold`. The `ignore_text()` modifier turns off UTF-8 validation altogether.
 ///
-/// UTF-8 validation is performed incrementally to hopefully maximize throughput.
+/// UTF-8 validation is performed incrementally (after every `BufRead::fill_buf()` call)
+/// to hopefully maximize throughput, instead of blocking while the field is read to completion
+/// and performing validation over the entire result at the end. (RFC: this could be a lot of
+/// unnecessary work if most fields end up being written to the filesystem, however, but this
+/// can be turned off with `ignore_text()` if it fits the use-case.)
 ///
 /// ### Warning: Do **not** trust user input!
 /// It is a serious security risk to create files or directories with paths based on user input.
