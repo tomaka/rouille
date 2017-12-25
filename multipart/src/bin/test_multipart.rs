@@ -51,7 +51,7 @@ fn main() {
     let mut multipart = Multipart::with_body(reader, boundary);
 
     while let Some(field) = multipart.read_entry().unwrap() {
-        println!("Read field: {:?}", field.name);
+        println!("Read field: {:?}", field.headers.name);
     }
 
     println!("All entries read!");

@@ -119,7 +119,7 @@ impl FieldHeaders {
     fn parse(headers: &[StrHeader]) -> Result<FieldHeaders, ParseHeaderError> {
         let cont_disp = ContentDisp::parse(headers)?.ok_or(ParseHeaderError::MissingContentDisposition)?;
         Ok(FieldHeaders {
-            name: cont_disp.name,
+            name: cont_disp.field_name.into(),
             filename: cont_disp.filename,
             content_type: parse_content_type(headers)?,
         })
@@ -254,22 +254,29 @@ pub struct MultipartData<M> {
     inner: Option<M>,
 }
 
+const DATA_INNER_ERR: &'static str = "MultipartFile::inner taken and not replaced; this is likely \
+                                      caused by a logic error in `multipart` or by resuming after \
+                                      a previously caught panic.\nPlease open an issue with the \
+                                      relevant backtrace and debug logs at \
+                                      https://github.com/abonander/multipart";
+
 impl<M> MultipartData<M> where M: ReadEntry {
     /// Get a builder type which can save the field with or without a size limit.
     pub fn save(&mut self) -> SaveBuilder<&mut Self> {
         SaveBuilder::new(self)
     }
 
+    /// Take the inner `Multipart` or `&mut Multipart`
+    pub fn into_inner(self) -> M {
+        self.inner.expect(DATA_INNER_ERR)
+    }
+
     fn inner_mut(&mut self) -> &mut M {
-        self.inner.as_mut().expect("MultipartFile::inner taken!")
+        self.inner.as_mut().expect(DATA_INNER_ERR)
     }
 
     fn take_inner(&mut self) -> M {
-        self.inner.take().expect("MultipartFile::inner already taken!")
-    }
-
-    fn into_inner(self) -> M {
-        self.inner.expect("MultipartFile::inner taken!")
+        self.inner.take().expect(DATA_INNER_ERR)
     }
 
     fn give_inner(&mut self, inner: M) {
