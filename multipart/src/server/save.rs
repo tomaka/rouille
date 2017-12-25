@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::io::prelude::*;
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
-use std::{cmp, env, io, mem, str};
+use std::{cmp, env, io, mem, str, u32, u64};
 
 use server::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry, ReadEntryResult};
 use server::ArcStr;
@@ -69,9 +69,6 @@ enum TextPolicy {
     Ignore
 }
 
-// 8 MiB, reasonable?
-const DEFAULT_MEMORY_THRESHOLD: u64 = 8 * 1024 * 1024;
-
 /// A builder for saving a file or files to the local filesystem.
 ///
 /// ### `OpenOptions`
@@ -108,8 +105,8 @@ const DEFAULT_MEMORY_THRESHOLD: u64 = 8 * 1024 * 1024;
 pub struct SaveBuilder<S> {
     savable: S,
     open_opts: OpenOptions,
-    size_limit: Option<u64>,
-    count_limit: Option<u32>,
+    size_limit: u64,
+    count_limit: u32,
     memory_threshold: u64,
     text_policy: TextPolicy,
 }
@@ -125,18 +122,19 @@ impl<S> SaveBuilder<S> {
         SaveBuilder {
             savable,
             open_opts,
-            size_limit: None,
-            count_limit: None,
-            memory_threshold: DEFAULT_MEMORY_THRESHOLD,
+            size_limit: u64::MAX,
+            count_limit: u32::MAX,
+            // 8 MiB, reasonable?
+            memory_threshold: 8 * 1024 * 1024,
             text_policy: TextPolicy::Try,
         }
     }
 
     /// Set the maximum number of bytes to write out *per file*.
     ///
-    /// Can be `u64` or `Option<u64>`. If `None`, clears the limit.
+    /// Can be `u64` or `Option<u64>`. If `None` or `u64::MAX`, clears the limit.
     pub fn size_limit<L: Into<Option<u64>>>(mut self, limit: L) -> Self {
-        self.size_limit = limit.into();
+        self.size_limit = limit.into().unwrap_or(u64::MAX);
         self
     }
 
@@ -188,18 +186,20 @@ impl<S> SaveBuilder<S> {
 
 /// Save API for whole multipart requests.
 impl<M> SaveBuilder<M> where M: ReadEntry {
-    /// Set the maximum number of files to write out.
+    /// Set the maximum number of fields to process.
     ///
-    /// Can be `u32` or `Option<u32>`. If `None`, clears the limit.
+    /// Can be `u32` or `Option<u32>`. If `None` or `u32::MAX`, clears the limit.
     pub fn count_limit<L: Into<Option<u32>>>(mut self, count_limit: L) -> Self {
-        self.count_limit = count_limit.into();
+        self.count_limit = count_limit.into().unwrap_or(u32::MAX);
         self
     }
 
-    /// Save the file fields in the request to a new temporary directory prefixed with
+    /// Save all fields in the request using a new temporary directory prefixed with
     /// `multipart-rs` in the OS temporary directory.
     ///
     /// For more options, create a `TempDir` yourself and pass it to `with_temp_dir()` instead.
+    ///
+    /// See `with_entries()` for more info.
     ///
     /// ### Note: Temporary
     /// See `SaveDir` for more info (the type of `Entries::save_dir`).
@@ -207,10 +207,12 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
         self.temp_with_prefix("multipart-rs")
     }
 
-    /// Save the file fields in the request to a new temporary directory with the given string
+    /// Save all fields in the request using a new temporary directory with the given string
     /// as a prefix in the OS temporary directory.
     ///
     /// For more options, create a `TempDir` yourself and pass it to `with_temp_dir()` instead.
+    ///
+    /// See `with_entries()` for more info.
     ///
     /// ### Note: Temporary
     /// See `SaveDir` for more info (the type of `Entries::save_dir`).
@@ -221,7 +223,9 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
         }
     }
 
-    /// Save the file fields to the given `TempDir`.
+    /// Save all fields in the request using the given `TempDir`.
+    ///
+    /// See `with_entries()` for more info.
     ///
     /// The `TempDir` is returned in the result under `Entries::save_dir`.
     pub fn with_temp_dir(self, tempdir: TempDir) -> EntriesSaveResult<M> {
@@ -231,6 +235,8 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
     /// Save the file fields in the request to a new permanent directory with the given path.
     ///
     /// Any nonexistent directories in the path will be created.
+    ///
+    /// See `with_entries()` for more info.
     pub fn with_dir<P: Into<PathBuf>>(self, dir: P) -> EntriesSaveResult<M> {
         let dir = dir.into();
 
@@ -243,12 +249,11 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
     ///
     /// May be used to resume a saving operation after handling an error.
     ///
-    /// If `count_limit` is set, only reads that many fields before returning an error;
-    /// re-running this method will read another `count_limit` fields before returning another
-    /// error.
+    /// If `count_limit` is set, only reads that many fields before returning an error.
+    /// If you wish to resume from `PartialReason::CountLimit`, simply remove some entries.
     ///
-    /// Note that `PartialReason::CountLimit` will still be returned if the number of fields over-
-    /// flows `u32`, but this would be an extremely degenerate case.
+    /// Note that `PartialReason::CountLimit` will still be returned if the number of fields
+    /// reaches `u32::MAX`, but this would be an extremely degenerate case.
     pub fn with_entries(mut self, mut entries: Entries) -> EntriesSaveResult<M> {
         let SaveBuilder {
             savable, open_opts, count_limit, size_limit,
@@ -256,6 +261,8 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
         } = self;
 
         let mut res = ReadEntry::read_entry(savable);
+
+        let _ = entries.recount_fields();
 
         let save_field = |field: &mut MultipartField<M>, entries: &Entries| {
             let text_policy = if field.is_text() { text_policy } else { Ignore };
@@ -265,14 +272,10 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
                 count_limit, size_limit, memory_threshold, text_policy
             };
 
-            if let Some(dir) = entries.save_dir_path() {
-                saver.with_dir(dir)
-            } else {
-                saver.temp()
-            }
+            saver.with_dir(entries.save_dir.as_path())
         };
 
-        for _ in 0 .. self.count_limit.unwrap_or(::std::u32::MAX) {
+        while entries.fields_count < count_limit {
             let mut field: MultipartField<M> = match res {
                 ReadEntryResult::Entry(field) => field,
                 ReadEntryResult::End(_) => return Full(entries), // normal exit point
@@ -350,13 +353,13 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
 
     /// Save the field data, potentially using a file with the given path.
     ///
-    /// The file will not be created until the set `memory_threshold` is reached.
-    /// If `size_limit` is set and less than or equal to `memory_threshold`,
-    /// then the file will never be created.
-    ///
-    /// Creates any missing directories in the path.
+    /// Creates any missing directories in the path (RFC: skip this step?).
     /// Uses the contained `OpenOptions` to create the file.
-    /// Truncates the file to the given limit, if set.
+    /// Truncates the file to the given `size_limit`, if set.
+    ///
+    /// The no directories or files will be created until the set `memory_threshold` is reached.
+    /// If `size_limit` is set and less than or equal to `memory_threshold`,
+    /// then the disk will never be touched.
     pub fn with_path<P: Into<PathBuf>>(&mut self, path: P) -> FieldSaveResult {
         let bytes = if self.text_policy != Ignore {
             let (text, reason) = try_partial!(self.save_text());
@@ -399,15 +402,15 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
     ///
     /// Retries on interrupts.
     pub fn write_to<W: Write>(&mut self, mut dest: W) -> SaveResult<u64, u64> {
-        if let Some(limit) = self.size_limit {
-            try_copy_limited(&mut self.savable, |buf| try_write_all(buf, &mut dest), limit)
+        if self.size_limit < u64::MAX {
+            try_copy_limited(&mut self.savable, |buf| try_write_all(buf, &mut dest), self.size_limit)
         } else {
             try_read_buf(&mut self.savable, |buf| try_write_all(buf, &mut dest))
         }
     }
 
     fn save_mem(&mut self, mut bytes: Vec<u8>) -> SaveResult<Vec<u8>, Vec<u8>> {
-        let pre_read = Some(bytes.len() as u64);
+        let pre_read = bytes.len() as u64;
         match self.read_mem(|buf| { bytes.extend_from_slice(buf); Full(buf.len()) }, pre_read) {
             Full(_) => Full(bytes),
             Partial(_, reason) => Partial(bytes, reason),
@@ -430,7 +433,7 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
                     Full(e.valid_up_to())
                 }
             }
-        }, None);
+        }, 0);
 
         match res {
             Full(_) => Full(string),
@@ -439,14 +442,14 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
         }
     }
 
-    fn read_mem<Wb: FnMut(&[u8]) -> SaveResult<usize, usize>>(&mut self, with_buf: Wb, pre_read: Option<u64>) -> SaveResult<u64, u64> {
-        let limit = cmp::min(self.size_limit.unwrap_or(self.memory_threshold), self.memory_threshold)
-            .saturating_sub(pre_read.unwrap_or(0));
+    fn read_mem<Wb: FnMut(&[u8]) -> SaveResult<usize, usize>>(&mut self, with_buf: Wb, pre_read: u64) -> SaveResult<u64, u64> {
+        let limit = cmp::min(self.size_limit, self.memory_threshold)
+            .saturating_sub(pre_read);
         try_copy_limited(&mut self.savable, with_buf, limit)
     }
 
     fn cmp_size_limit(&self, size: usize) -> bool {
-        self.size_limit.map_or(false, |limit| size as u64 >= limit)
+        size as u64 >= self.size_limit
     }
 }
 
@@ -580,14 +583,17 @@ pub struct Entries {
     /// Each vector is guaranteed not to be empty unless externally modified.
     pub fields: HashMap<ArcStr, Vec<SavedField>>,
     /// The directory that the entries in `fields` were saved into.
-    pub save_dir: Option<SaveDir>,
+    pub save_dir: SaveDir,
+    fields_count: u32,
 }
 
 impl Entries {
-    fn new(save_dir: SaveDir) -> Self {
+    /// Create a new `Entries` with the given `SaveDir`
+    pub fn new(save_dir: SaveDir) -> Self {
         Entries {
             fields: HashMap::new(),
-            save_dir: Some(save_dir),
+            save_dir,
+            fields_count: 0,
         }
     }
 
@@ -596,13 +602,29 @@ impl Entries {
         self.fields.is_empty()
     }
 
-    fn save_dir_path(&self) -> Option<&Path> {
-        self.save_dir.as_ref().map(SaveDir::as_path)
+    /// The number of actual fields contained within this `Entries`.
+    ///
+    /// Effectively `self.fields.values().map(Vec::len).sum()` but maintained separately.
+    ///
+    /// ## Note
+    /// This will be incorrect if `fields` is modified externally. Call `recount_fields()`
+    /// to get the correct count.
+    pub fn fields_count(&self) -> u32 {
+        self.fields_count
+    }
+
+    /// Sum the number of fields in this `Entries` and then return the updated value.
+    pub fn recount_fields(&mut self) -> u32 {
+        let fields_count = self.fields.values().map(Vec::len).sum();
+        // saturating cast
+        self.fields_count = cmp::min(u32::MAX as usize, fields_count) as u32;
+        self.fields_count
     }
 
     fn push_field(&mut self, headers: FieldHeaders, data: SavedData) {
         self.fields.entry(headers.name.clone())
-            .or_insert(Vec::new()).push(SavedField { headers, data })
+            .or_insert(Vec::new()).push(SavedField { headers, data });
+        self.fields_count = self.fields_count.saturating_add(1);
     }
 }
 
