@@ -47,8 +47,7 @@ macro_rules! try_or_400 {
     );
 }
 
-#[cfg_attr(feature = "rustc-serialize", derive(RustcEncodable))]
-#[cfg_attr(feature = "serdejson", derive(Serialize))]
+#[derive(Serialize)]
 pub struct ErrJson<'a> {
     description: &'a str,
     cause: Option<Box<ErrJson<'a>>>,
