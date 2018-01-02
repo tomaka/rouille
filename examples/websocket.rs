@@ -80,12 +80,8 @@ fn main() {
 
 // Function run in a separate thread.
 fn websocket_handling_thread(mut websocket: websocket::Websocket) {
-    loop {
-        // We wait for a new message to come from the websocket.
-        let message = match websocket.next() {
-            Some(m) => m,
-            None => break,
-        };
+    // We wait for a new message to come from the websocket.
+    while let Some(message) = websocket.next() {
 
         match message {
             websocket::Message::Text(txt) => {
