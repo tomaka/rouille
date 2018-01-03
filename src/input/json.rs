@@ -15,13 +15,14 @@
 //! # Example
 //!
 //! ```
-//! extern crate rustc_serialize;
+//! # extern crate serde;
+//! # #[macro_use] extern crate serde_derive;
 //! # #[macro_use] extern crate rouille;
 //! # use rouille::{Request, Response};
 //! # fn main() {}
 //!
 //! fn route_handler(request: &Request) -> Response {
-//!     #[derive(RustcDecodable)]
+//!     #[derive(Deserialize)]
 //!     struct Json {
 //!         field1: String,
 //!         field2: i32,
@@ -36,9 +37,8 @@
 use std::error;
 use std::fmt;
 use std::io::Error as IoError;
-use std::io::Read;
-use rustc_serialize::Decodable;
-use rustc_serialize::json;
+use serde;
+use serde_json;
 use Request;
 
 /// Error that can happen when parsing the JSON input.
@@ -54,7 +54,7 @@ pub enum JsonError {
     IoError(IoError),
 
     /// Error while parsing.
-    ParseError(json::DecoderError),
+    ParseError(serde_json::Error),
 }
 
 impl From<IoError> for JsonError {
@@ -63,8 +63,8 @@ impl From<IoError> for JsonError {
     }
 }
 
-impl From<json::DecoderError> for JsonError {
-    fn from(err: json::DecoderError) -> JsonError {
+impl From<serde_json::Error> for JsonError {
+    fn from(err: serde_json::Error) -> JsonError {
         JsonError::ParseError(err)
     }
 }
@@ -112,24 +112,25 @@ impl fmt::Display for JsonError {
 /// # Example
 ///
 /// ```
-/// extern crate rustc_serialize;
+/// # extern crate serde;
+/// # #[macro_use] extern crate serde_derive;
 /// # #[macro_use] extern crate rouille;
 /// # use rouille::{Request, Response};
-/// # fn main() {}
+/// fn main() {}
 ///
 /// fn route_handler(request: &Request) -> Response {
-///     #[derive(RustcDecodable)]
+///     #[derive(Deserialize)]
 ///     struct Json {
 ///         field1: String,
 ///         field2: i32,
 ///     }
-/// 
+///
 ///     let json: Json = try_or_400!(rouille::input::json_input(request));
 ///     Response::text(format!("field1's value is {}", json.field1))
 /// }
 /// ```
 ///
-pub fn json_input<O>(request: &Request) -> Result<O, JsonError> where O: Decodable {
+pub fn json_input<O>(request: &Request) -> Result<O, JsonError> where O: serde::de::DeserializeOwned {
     // TODO: add an optional bytes limit
 
     if let Some(header) = request.header("Content-Type") {
@@ -140,16 +141,9 @@ pub fn json_input<O>(request: &Request) -> Result<O, JsonError> where O: Decodab
         return Err(JsonError::WrongContentType);
     }
 
-    let content = {
-        let mut out = String::new();
-        if let Some(mut b) = request.data() {
-            try!(b.read_to_string(&mut out));
-        } else {
-            return Err(JsonError::BodyAlreadyExtracted);
-        };
-        out
-    };
-
-    let data = try!(json::decode(&content));
-    Ok(data)
+    if let Some(b) = request.data() {
+        serde_json::from_reader::<_, O>(b).map_err(From::from)
+    } else {
+        Err(JsonError::BodyAlreadyExtracted)
+    }
 }

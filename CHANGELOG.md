@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 2.0.0
+
+- Dropped the use of [rustc-serialize](https://crates.io/rustc-serialize)
+  in favor of using [serde](https://crates.io/serde).
+
 ## Version 1.0.0
 
 - `input::cookies` changed to return an iterator that yields `(&str, &str)`.

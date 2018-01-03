@@ -14,7 +14,8 @@ use std::io::Cursor;
 use std::io::Read;
 use std::fs::File;
 use std::fmt;
-use rustc_serialize;
+use serde;
+use serde_json;
 use url::percent_encoding;
 use Request;
 use Upgrade;
@@ -341,12 +342,13 @@ impl Response {
     /// # Example
     ///
     /// ```
-    /// extern crate rustc_serialize;
-    /// # #[macro_use] extern crate rouille;
+    /// extern crate serde;
+    /// #[macro_use] extern crate serde_derive;
+    /// #[macro_use] extern crate rouille;
     /// use rouille::Response;
     /// # fn main() {
     ///
-    /// #[derive(RustcEncodable)]
+    /// #[derive(Serialize)]
     /// struct MyStruct {
     ///     field1: String,
     ///     field2: i32,
@@ -357,8 +359,8 @@ impl Response {
     /// # }
     /// ```
     #[inline]
-    pub fn json<T>(content: &T) -> Response where T: rustc_serialize::Encodable {
-        let data = rustc_serialize::json::encode(content).unwrap();
+    pub fn json<T>(content: &T) -> Response where T: serde::Serialize {
+        let data = serde_json::to_string(content).unwrap();
 
         Response {
             status_code: 200,

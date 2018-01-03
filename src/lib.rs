@@ -61,7 +61,10 @@ extern crate filetime;
 extern crate flate2;
 extern crate multipart;
 extern crate rand;
-extern crate rustc_serialize;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 extern crate sha1;
 extern crate time;
 extern crate tiny_http;

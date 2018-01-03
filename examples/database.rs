@@ -10,7 +10,9 @@
 #[macro_use]
 extern crate rouille;
 extern crate postgres;
-extern crate rustc_serialize;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 
 use std::sync::Mutex;
 
@@ -106,7 +108,7 @@ fn note_routes(request: &Request, db: &Transaction) -> Response {
         (GET) (/notes) => {
             // This route returns the list of notes. We perform the query and output it as JSON.
 
-            #[derive(RustcEncodable)]
+            #[derive(Serialize)]
             struct Elem { id: String }
 
             let mut out = Vec::new();

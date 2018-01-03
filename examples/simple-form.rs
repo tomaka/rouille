@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate rouille;
-extern crate rustc_serialize;
 
 use std::io;
 
