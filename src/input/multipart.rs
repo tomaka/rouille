@@ -82,7 +82,7 @@ pub struct Multipart<'a> {
 }
 
 impl<'a> Multipart<'a> {
-    pub fn next(&mut self) -> Option<MultipartField<RequestBody<'a>>> {
+    pub fn next(&mut self) -> Option<MultipartField<&mut InnerMultipart<RequestBody<'a>>>> {
         match self.inner.read_entry() {
             Ok(e) => e,
             _ => return None

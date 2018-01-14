@@ -4,6 +4,8 @@
 
 - Dropped the use of [rustc-serialize](https://crates.io/rustc-serialize)
   in favor of using [serde](https://crates.io/serde).
+- Updated `multipart` to 0.13. The `input::multipart::get_multipart_input` function returns
+  types reexported from `multipart` which have small but breaking API changes.
 
 ## Version 1.0.0
 
