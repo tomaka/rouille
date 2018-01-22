@@ -40,7 +40,7 @@ env_logger = "0.3"
 
 [features]
 client = []
-default = ["iron", "hyper", "server"]
+default = ["client", "hyper", "iron", "nickel", "server", "tiny_http"]
 server = ["buf_redux", "httparse", "safemem", "twoway"]
 mock = []
 nightly = []

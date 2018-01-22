@@ -52,31 +52,9 @@ fn process_request<'a, 'b>(request: &'a mut Request) -> io::Result<Response<&'b 
 /// Processes saved entries from multipart request.
 /// Returns an OK response or an error.
 fn process_entries<'a>(entries: Entries) -> io::Result<Response<&'a [u8]>> {
-    for (name, field) in entries.fields {
-        println!("Field {:?}: {:?}", name, field);
-    }
 
-    for (name, files) in entries.files {
-        println!("Field {:?} has {} files:", name, files.len());
-
-        for file in files {
-            print_file(&file)?;
-        }
-    }
 
     Ok(build_response(200, "Multipart data is received!"))
-}
-
-fn print_file(saved_file: &SavedField) -> io::Result<()> {
-    let mut file = File::open(&saved_file.path)?;
-
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-
-    println!("File {:?} ({:?}):", saved_file.filename, saved_file.content_type);
-    println!("{}", contents);
-
-    Ok(())
 }
 
 /// A utility function to build responses using only two arguments

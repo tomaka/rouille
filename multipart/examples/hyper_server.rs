@@ -46,7 +46,7 @@ fn process_entries<'a>(entries: Entries) -> io::Result<()> {
         println!("Field {:?}: {:?}", name, field);
     }
 
-    for (name, files) in entries.files {
+    for (name, files) in &entries.fields {
         println!("Field {:?} has {} files:", name, files.len());
 
         for file in files {

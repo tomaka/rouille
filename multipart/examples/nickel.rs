@@ -2,11 +2,12 @@ extern crate multipart;
 extern crate nickel;
 
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read};
 use nickel::{HttpRouter, MiddlewareResult, Nickel, Request, Response};
 
-use multipart_nickel::MultipartBody;
-use multipart_nickel::multipart_server::{Entries, SaveResult};
+use multipart::nickel::MultipartBody;
+use multipart::server::{Entries, SaveResult};
+use multipart::mock::StdoutTee;
 
 fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
     match req.multipart_body() {
@@ -36,32 +37,8 @@ fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewar
 /// Processes saved entries from multipart request.
 /// Returns an OK response or an error.
 fn process_entries<'mw>(res: Response<'mw>, entries: Entries) -> MiddlewareResult<'mw> {
-    for (name, field) in entries.fields {
-        println!("Field {:?}: {:?}", name, field);
-    }
+    if let Err(e) = entries.write_debug(StdoutTee::new(res.start()?)) {
 
-    for (name, files) in entries.files {
-        println!("Field {:?} has {} files:", name, files.len());
-
-        for saved_file in files {
-            match File::open(&saved_file.path) {
-                Ok(mut file) => {
-                    let mut contents = String::new();
-                    if let Err(e) = file.read_to_string(&mut contents) {
-                        println!("Could not read file {:?}. Error: {:?}", saved_file.filename, e);
-                        return res.error(nickel::status::StatusCode::BadRequest, "The uploaded file was not readable")
-                    }
-
-                    println!("File {:?} ({:?}):", saved_file.filename, saved_file.content_type);
-                    println!("{}", contents);
-                    file
-                }
-                Err(e) => {
-                    println!("Could open file {:?}. Error: {:?}", saved_file.filename, e);
-                    return res.error(nickel::status::StatusCode::BadRequest, "The uploaded file was not readable")
-                }
-            };
-        }
     }
 
     res.send("Ok")

@@ -173,3 +173,30 @@ impl<'a> ::server::HttpRequest for ServerRequest<'a> {
         self
     }
 }
+
+/// A `Write` adapter that duplicates all data written to the inner writer as well as stdout.
+pub struct StdoutTee<W> {
+    inner: W,
+    stdout: io::Stdout,
+}
+
+impl<W> StdoutTee<W> {
+    /// Constructor
+    pub fn new(inner: W) -> Self {
+        Self {
+            inner, stdout: io::stdout(),
+        }
+    }
+}
+
+impl<W: Write> Write for StdoutTee<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        inner.write(buf)?;
+        stdout.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        inner.flush();
+        stdout.flush()
+    }
+}

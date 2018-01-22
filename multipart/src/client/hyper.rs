@@ -20,7 +20,7 @@ use hyper::net::{Fresh, Streaming};
 
 use hyper::Error as HyperError;
 
-use mime::{Mime, TopLevel, SubLevel, Attr, Value};
+use hyper::mime::{Mime, TopLevel, SubLevel, Attr, Value};
 
 use super::{HttpRequest, HttpStream};
 

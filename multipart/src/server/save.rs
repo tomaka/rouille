@@ -648,6 +648,31 @@ impl Entries {
             .or_insert(Vec::new()).push(SavedField { headers, data });
         self.fields_count = self.fields_count.saturating_add(1);
     }
+
+    /// Print all fields and their contents to stdout. Mostly for testing purposes.
+    pub fn print_debug(&self) -> io::Result<()> {
+        let stdout = io::stdout();
+        write_debug(stdout.lock())
+    }
+
+    /// Write all fields and their contents to the given output. Mostly for testing purposes.
+    pub fn write_debug<W: Write>(&self, mut writer: W) -> io::Result<()> {
+        for (name, field) in &self.fields {
+            write!(writer, "Field {:?}: {:?}", name, field);
+        }
+
+        for (name, fields) in &entries.fields {
+            writeln!(writer, "Field {:?} has {} entries:", name, fields.len());
+
+            for (idx, field) in fields.iter().enumerate() {
+                let mut data = saved_field.data.readable()?;
+
+                writeln!(writer, "Field {:?}({}) ({:?}):",
+                         saved_field.filename, idx, saved_field.content_type);
+                io::copy(&mut data, &mut writer);
+            }
+        }
+    }
 }
 
 /// The save directory for `Entries`. May be temporary (delete-on-drop) or permanent.

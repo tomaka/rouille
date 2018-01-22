@@ -8,7 +8,7 @@ use mock::{ClientRequest, HttpBuffer};
 
 use server::{MultipartField, MultipartData, ReadEntry};
 
-use mime::Mime;
+use mime::{self, Mime};
 
 use rand::{self, Rng};
 
@@ -380,8 +380,8 @@ fn rand_mime() -> Mime {
     rand::thread_rng().choose(&[
         // TODO: fill this out, preferably with variants that may be hard to parse
         // i.e. containing hyphens, mainly
-        mime!(Application/OctetStream),
-        mime!(Text/Plain),
-        mime!(Image/Png),
+        mime::APPLICATION_OCTET_STREAM,
+        mime::TEXT_PLAIN,
+        mime::IMAGE_PNG,
     ]).unwrap().clone()
 }
