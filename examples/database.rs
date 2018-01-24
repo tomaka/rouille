@@ -30,19 +30,19 @@ fn main() {
 
     // The first thing we do is try to connect to the database.
     //
-    // One important thing to note here is that we wrap the connection around a `Mutex`. Since the
+    // One important thing to note here is that we wrap a `Mutex` around the connection. Since the
     // request handler can be called multiple times in parallel, everything that we use in it must
     // be thread-safe. By default the PostgresSQL connection isn't thread-safe, so we need a mutex
     // to make it thread-safe.
     //
-    // Not wrapping the database around a mutex would lead to a compilation error when we attempt
+    // Not wrapping a mutex around the database would lead to a compilation error when we attempt
     // to use the variable `db` from within the closure passed to `start_server`.
     let db = {
         let db = Connection::connect("postgres://test:test@localhost/test", TlsMode::None);
         Mutex::new(db.expect("Failed to connect to database"))
     };
 
-    // We perform some initialization for the same of the example.
+    // We perform some initialization for the sake of the example.
     // In a real application you probably want to have a migrations system. This is out of scope
     // of rouille.
     {
@@ -54,11 +54,11 @@ fn main() {
     }
 
     // Small message so that people don't need to read the source code.
-    // Note that like all examples we only listen on `localhost`, so you can't access this server
-    // from another machine than your own.
+    // Note that like all the other examples, we only listen on `localhost`, so you can't access this server
+    // from any machine other than your own.
     println!("Now listening on localhost:8000");
 
-    // Now starting to listen. The `move` keyword will ensure that we move the `db` variable
+    // Now the server starts listening. The `move` keyword will ensure that we move the `db` variable
     // into the closure. Not putting `move` here would result in a compilation error.
     //
     // Note that in an ideal world, `move` wouldn't be necessary here. Unfortunately Rust isn't
@@ -100,7 +100,7 @@ fn main() {
 fn note_routes(request: &Request, db: &Transaction) -> Response {
     router!(request,
         (GET) (/) => {
-            // For the sake of the example we just put a dummy road for `/` so that you see
+            // For the sake of the example we just put a dummy route for `/` so that you see
             // something if you connect to the server with a browser.
             Response::text("Hello! Unfortunately there is nothing to see here.")
         },
@@ -154,7 +154,7 @@ fn note_routes(request: &Request, db: &Transaction) -> Response {
             let updated = db.execute("UPDATE notes SET content = $2 WHERE id = $1",
                                      &[&id, &body]).unwrap();
 
-            // We determine whether the note exists thanks to the number of rows that
+            // We determine whether the note existed based on the number of rows that
             // were modified.
             if updated >= 1 {
                 Response::text("The note has been updated")
@@ -164,7 +164,7 @@ fn note_routes(request: &Request, db: &Transaction) -> Response {
         },
 
         (POST) (/note) => {
-            // This route creates a new node whose initial content is the body.
+            // This route creates a new note whose initial content is the body.
 
             // We start by reading the body of the HTTP request into a `String`.
             let body = try_or_400!(rouille::input::plain_text_body(&request));
