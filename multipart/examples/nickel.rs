@@ -3,7 +3,8 @@ extern crate nickel;
 
 use std::fs::File;
 use std::io::{self, Read};
-use nickel::{HttpRouter, MiddlewareResult, Nickel, Request, Response};
+use nickel::{Action, Fresh, HttpRouter, MiddlewareResult, Nickel, NickelError, Request, Response};
+use nickel::status::StatusCode;
 
 use multipart::nickel::MultipartBody;
 use multipart::server::{Entries, SaveResult};
@@ -22,13 +23,13 @@ fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewar
 
                 SaveResult::Error(e) => {
                     println!("There are errors in multipart POSTing ... {:?}", e);
-                    res.set(nickel::status::StatusCode::InternalServerError);
+                    res.set(StatusCode::InternalServerError);
                     return res.send(format!("Server could not handle multipart POST! {:?}", e));
                 },
             }
         }
         None => {
-            res.set(nickel::status::StatusCode::BadRequest);
+            res.set(StatusCode::BadRequest);
             return res.send("Request seems not was a multipart request")
         }
     }
@@ -37,11 +38,21 @@ fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewar
 /// Processes saved entries from multipart request.
 /// Returns an OK response or an error.
 fn process_entries<'mw>(res: Response<'mw>, entries: Entries) -> MiddlewareResult<'mw> {
-    if let Err(e) = entries.write_debug(StdoutTee::new(res.start()?)) {
-
+    let stdout = io::stdout();
+    let mut res = res.start()?;
+    if let Err(e) = entries.write_debug(StdoutTee::new(&mut res, stdout.lock())) {
+        writeln!(res, "Error while reading entries: {}", e);
+        return Err(NickelError::new(
+            res, StatusCode::InternalServerError, format!("Error while reading entries: {}", e)
+        ));
     }
 
-    res.send("Ok")
+    if let Err(e) = res.end() {
+        // I don't like this, see https://github.com/nickel-org/nickel.rs/issues/427
+        unsafe {
+            Err(NickelError::without_response("error flushing response"))
+        }
+    }
 }
 
 fn main() {

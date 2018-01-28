@@ -652,26 +652,24 @@ impl Entries {
     /// Print all fields and their contents to stdout. Mostly for testing purposes.
     pub fn print_debug(&self) -> io::Result<()> {
         let stdout = io::stdout();
-        write_debug(stdout.lock())
+        let stdout_lock = stdout.lock();
+        self.write_debug(stdout_lock)
     }
 
     /// Write all fields and their contents to the given output. Mostly for testing purposes.
     pub fn write_debug<W: Write>(&self, mut writer: W) -> io::Result<()> {
-        for (name, field) in &self.fields {
-            write!(writer, "Field {:?}: {:?}", name, field);
-        }
+        for (name, entries) in &self.fields {
+            writeln!(writer, "Field {:?} has {} entries:", name, entries.len())?;
 
-        for (name, fields) in &entries.fields {
-            writeln!(writer, "Field {:?} has {} entries:", name, fields.len());
-
-            for (idx, field) in fields.iter().enumerate() {
-                let mut data = saved_field.data.readable()?;
-
-                writeln!(writer, "Field {:?}({}) ({:?}):",
-                         saved_field.filename, idx, saved_field.content_type);
-                io::copy(&mut data, &mut writer);
+            for (idx, field) in entries.iter().enumerate() {
+                let mut data = field.data.readable()?;
+                let headers = &field.headers;
+                writeln!(writer, "{}: {:?} ({:?}):", idx, headers.filename, headers.content_type)?;
+                io::copy(&mut data, &mut writer)?;
             }
         }
+
+        Ok(())
     }
 }
 

@@ -175,28 +175,28 @@ impl<'a> ::server::HttpRequest for ServerRequest<'a> {
 }
 
 /// A `Write` adapter that duplicates all data written to the inner writer as well as stdout.
-pub struct StdoutTee<W> {
+pub struct StdoutTee<'s, W> {
     inner: W,
-    stdout: io::Stdout,
+    stdout: io::StdoutLock<'s>,
 }
 
-impl<W> StdoutTee<W> {
+impl<'s, W> StdoutTee<'s, W> {
     /// Constructor
-    pub fn new(inner: W) -> Self {
+    pub fn new(inner: W, stdout: &'s io::Stdout) -> Self {
         Self {
-            inner, stdout: io::stdout(),
+            inner, stdout: stdout.lock(),
         }
     }
 }
 
-impl<W: Write> Write for StdoutTee<W> {
+impl<'s, W: Write> Write for StdoutTee<'s, W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        inner.write(buf)?;
-        stdout.write(buf)
+        self.inner.write(buf)?;
+        self.stdout.write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        inner.flush();
-        stdout.flush()
+        self.inner.flush();
+        self.stdout.flush()
     }
 }
