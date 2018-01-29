@@ -583,7 +583,7 @@ macro_rules! post_input {
 
                             match multipart_entry.data {
                                 multipart::MultipartData::Text(txt) => {
-                                    let decoded = match DecodePostField::from_field(config, txt) {
+                                    let decoded = match DecodePostField::from_field(config, &txt.text) {
                                         Ok(d) => d,
                                         Err(err) => return Err(PostError::Field {
                                             field: stringify!($field).into(),
@@ -599,9 +599,9 @@ macro_rules! post_input {
                                     };
                                 },
                                 multipart::MultipartData::File(f) => {
-                                    let name = f.filename().map(|n| n.to_owned());
+                                    let name = f.filename.as_ref().map(|n| n.to_owned());
                                     let name = name.as_ref().map(|n| &n[..]);
-                                    let mime = f.content_type().to_string();
+                                    let mime = f.content_type.to_string();
                                     let decoded = match DecodePostField::from_file(config, f, name, &mime) {
                                         Ok(d) => d,
                                         Err(err) => return Err(PostError::Field {
