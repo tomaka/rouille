@@ -38,7 +38,6 @@ impl<'mw, 'server, D: 'mw> MultipartBody<'mw, 'server> for NickelRequest<'mw, 's
     }
 }
 
-
 impl<'r, 'mw: 'r, 'server: 'mw, D: 'mw> AsRef<&'r mut NickelRequest<'mw, 'server, D>> for Maybe<'r, 'mw, 'server, D> {
     fn as_ref(&self) -> &&'r mut NickelRequest<'mw, 'server, D> {
         &self.0

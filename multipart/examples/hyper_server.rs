@@ -8,6 +8,7 @@ use hyper::status::StatusCode;
 use hyper::server::response::Response as HyperResponse;
 use multipart::server::hyper::{Switch, MultipartHandler, HyperRequest};
 use multipart::server::{Multipart, Entries, SaveResult, SavedField};
+use multipart::mock::StdoutTee;
 
 struct NonMultipart;
 impl Handler for NonMultipart {
@@ -21,10 +22,10 @@ struct EchoMultipart;
 impl MultipartHandler for EchoMultipart {
     fn handle_multipart(&self, mut multipart: Multipart<HyperRequest>, mut res: HyperResponse) {
         let processing = match multipart.save().temp() {
-            SaveResult::Full(entries) => process_entries(entries),
+            SaveResult::Full(entries) => process_entries(&mut res, entries),
             SaveResult::Partial(entries, error) => {
                 println!("Errors saving multipart:\n{:?}", error);
-                process_entries(entries.into())
+                process_entries(&mut res, entries.into())
             }
             SaveResult::Error(error) => {
                 println!("Errors saving multipart:\n{:?}", error);
@@ -41,32 +42,10 @@ impl MultipartHandler for EchoMultipart {
     }
 }
 
-fn process_entries<'a>(entries: Entries) -> io::Result<()> {
-    for (name, field) in entries.fields {
-        println!("Field {:?}: {:?}", name, field);
-    }
-
-    for (name, files) in &entries.fields {
-        println!("Field {:?} has {} files:", name, files.len());
-
-        for file in files {
-            print_file(&file)?;
-        }
-    }
-
-    Ok(())
-}
-
-fn print_file(saved_file: &SavedField) -> io::Result<()> {
-    let mut file = File::open(&saved_file.path)?;
-
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-
-    println!("File {:?} ({:?}):", saved_file.filename, saved_file.content_type);
-    println!("{}", contents);
-
-    Ok(())
+fn process_entries(res: &mut HyperResponse, entries: Entries) -> io::Result<()> {
+    let mut res = res.start();
+    let stdout = io::stdout();
+    entries.write_debug(StdoutTee::new(&mut res, &stdout))
 }
 
 fn main() {

@@ -41,74 +41,53 @@ macro_rules! expect_fmt (
 
 #[derive(Debug)]
 struct TestFields {
-    texts: HashMap<String, String>,
-    files: HashMap<String, HashSet<FileEntry>>,
+    fields: HashMap<String, HashSet<FieldEntry>>,
 }
 
 impl TestFields {
     fn gen() -> Self {
         TestFields {
-            texts: collect_rand(|| (gen_string(), gen_string())),
-            files: collect_rand(|| (gen_string(), FileEntry::gen_many())),
+            fields: collect_rand(|| (gen_string(), FieldEntry::gen_many())),
         }
     }
 
-    fn check_field<M: ReadEntry>(&mut self, field: &mut MultipartField<M>) {
-        match field.data {
-            MultipartData::Text(ref text) => {
-                let test_text = expect_fmt!(self.texts.remove(&field.name),
-                    "Got text field that wasn't in original dataset: {:?} : {:?} ",
-                    field.name, text.text
-                );
+    fn check_field<M: ReadEntry>(&mut self, field: MultipartField<M>) {
+        let field_entries = expect_fmt!(self.fields.remove(&*field.headers.name),
+                                        "Got field that wasn't in original dataset: {:?}",
+                                        field.headers);
 
-                assert!(
-                    text.text == test_text,
-                    "Unexpected data for field {:?}: Expected {:?}, got {:?}",
-                    field.name, test_text, text.text
-                );
-            },
-            MultipartData::File(ref mut file) => {
-                let mut bytes = Vec::with_capacity(MAX_LEN);
-                file.read_to_end(&mut bytes).unwrap();
+        let test_entry = FieldEntry::from_field(field);
 
-                let curr_file = FileEntry {
-                    content_type: file.content_type.clone(),
-                    filename: file.filename.take(),
-                    data: PrintHex(bytes),
-                };
-
-                let files_empty = {
-                    let mut files = expect_fmt!(self.files.get_mut(&field.name),
-                    "Got file field that wasn't in original dataset: {:?} : {:?}",
-                    field.name, curr_file);
-
-                    assert!(files.remove(&curr_file), "Unexpected data for file field {:?}: {:?}",
-                        field.name, curr_file);
-
-                    files.is_empty()
-                };
-
-                if files_empty {
-                    let _ = self.files.remove(&field.name);
-                }
-            },
-        }
+        assert!(field_entries.contains(&test_entry),
+            "Got field entry that wasn't in original dataset: {:?}\nEntries: {:?}",
+            test_entry, field_entries
+        );
     }
 
     fn assert_is_empty(&self) {
-        assert!(self.texts.is_empty(), "Text fields were not exhausted! Text fields: {:?}", self.texts);
-        assert!(self.files.is_empty(), "File fields were not exhausted! File fields: {:?}", self.files);
+        assert!(self.fields.is_empty(), "Fields were not exhausted! {:?}", self.fields);
     }
 }
 
 #[derive(Debug, Hash, PartialEq, Eq)]
-struct FileEntry {
+struct FieldEntry {
     content_type: Mime,
     filename: Option<String>,
     data: PrintHex,
 }
 
-impl FileEntry {
+impl FieldEntry {
+    fn from_field<M: ReadEntry>(mut field: MultipartField<M>) -> FieldEntry {
+        let mut data = Vec::new();
+        field.data.read_to_end(&mut data).expect("failed reading field");
+
+        FieldEntry {
+            content_type: field.headers.content_type.unwrap_or(mime::APPLICATION_OCTET_STREAM),
+            filename: field.headers.filename,
+            data: PrintHex(data),
+        }
+    }
+
     fn gen_many() -> HashSet<Self> {
         collect_rand(Self::gen)
     }
@@ -119,10 +98,15 @@ impl FileEntry {
             false => None,
         };
 
-        FileEntry {
+        let data = PrintHex(match gen_bool() {
+            true => gen_string().into_bytes(),
+            false => gen_bytes(),
+        });
+
+        FieldEntry {
             content_type: rand_mime(),
-            filename: filename,
-            data: PrintHex(gen_bytes())
+            filename,
+            data,
         }
     }
 
@@ -274,7 +258,7 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
 
     let request = ClientRequest::default();
 
-    let mut test_files = test_fields.files.iter();
+    let mut test_files = test_fields.fields.iter();
 
     let mut multipart = Multipart::from_request(request).unwrap();
    
@@ -306,7 +290,7 @@ fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
 
     let mut multipart = Multipart::new();
 
-    let mut test_files = test_fields.files.iter();
+    let mut test_files = test_fields.fields.iter();
 
     for (name, text) in &test_fields.texts {
         if let Some((file_name, files)) = test_files.next() {
@@ -351,7 +335,7 @@ fn test_server(buf: HttpBuffer, fields: &mut TestFields) {
         .unwrap_or_else(|_| panic!("Buffer should be multipart!"));
 
     while let Some(mut field) = multipart.read_entry_mut().unwrap_opt() {
-        fields.check_field(&mut field);
+        fields.check_field(field);
     }
 }
 

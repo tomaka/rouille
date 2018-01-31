@@ -2,11 +2,11 @@ extern crate multipart;
 extern crate nickel;
 
 use std::fs::File;
-use std::io::{self, Read};
-use nickel::{Action, Fresh, HttpRouter, MiddlewareResult, Nickel, NickelError, Request, Response};
+use std::io::{self, Read, Write};
+use nickel::{Action, HttpRouter, MiddlewareResult, Nickel, NickelError, Request, Response};
 use nickel::status::StatusCode;
 
-use multipart::nickel::MultipartBody;
+use multipart::server::nickel::MultipartBody;
 use multipart::server::{Entries, SaveResult};
 use multipart::mock::StdoutTee;
 
@@ -40,19 +40,14 @@ fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewar
 fn process_entries<'mw>(res: Response<'mw>, entries: Entries) -> MiddlewareResult<'mw> {
     let stdout = io::stdout();
     let mut res = res.start()?;
-    if let Err(e) = entries.write_debug(StdoutTee::new(&mut res, stdout.lock())) {
+    if let Err(e) = entries.write_debug(StdoutTee::new(&mut res, &stdout)) {
         writeln!(res, "Error while reading entries: {}", e);
         return Err(NickelError::new(
             res, StatusCode::InternalServerError, format!("Error while reading entries: {}", e)
         ));
     }
 
-    if let Err(e) = res.end() {
-        // I don't like this, see https://github.com/nickel-org/nickel.rs/issues/427
-        unsafe {
-            Err(NickelError::without_response("error flushing response"))
-        }
-    }
+    Ok(Action::Halt(res))
 }
 
 fn main() {
