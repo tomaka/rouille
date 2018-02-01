@@ -2,7 +2,8 @@
 
 Client- and server-side abstractions for HTTP file uploads (POST requests with  `Content-Type: multipart/form-data`).
 
-Supports several different HTTP crates.
+Supports several different (**sync**hronous API) HTTP crates. 
+**Async**hronous API support will be provided by [multipart-async].
 
 Minimum supported Rust version: 1.17.0
 
@@ -15,6 +16,8 @@ Example files demonstrating how to use `multipart` with these crates are availab
 ### [Hyper](http://hyper.rs) 
 via the `hyper` feature (enabled by default). 
 
+**Note: Hyper 0.9, 0.10 (synchronous API) only**; support for asynchronous APIs will be provided by [multipart-async].
+ 
 Client integration includes support for regular `hyper::client::Request` objects via `multipart::client::Multipart`, as well
 as integration with the new `hyper::Client` API via `multipart::client::lazy::Multipart` (new in 0.5).
 
@@ -50,3 +53,5 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
 additional terms or conditions.
+
+[multipart-async]: https://github.com/abonander/multipart-async
