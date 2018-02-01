@@ -643,9 +643,18 @@ impl Entries {
         self.fields_count
     }
 
-    fn push_field(&mut self, headers: FieldHeaders, data: SavedData) {
-        self.fields.entry(headers.name.clone())
-            .or_insert(Vec::new()).push(SavedField { headers, data });
+    fn push_field(&mut self, mut headers: FieldHeaders, data: SavedData) {
+        use std::collections::hash_map::Entry::*;
+
+        match self.fields.entry(headers.name.clone()) {
+            Vacant(vacant) => { vacant.insert(vec![SavedField { headers, data }]); },
+            Occupied(occupied) => {
+                // dedup the field name by reusing the key's `Arc`
+                headers.name = occupied.key().clone();
+                occupied.into_mut().push({ SavedField { headers, data }});
+            },
+        }
+
         self.fields_count = self.fields_count.saturating_add(1);
     }
 
