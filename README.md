@@ -8,7 +8,7 @@ it doesn't employ middlewares. Instead everything is handled in a linear way.
 
 Concepts closely related to websites (like cookies, CGI, form input, etc.) are directly supported
 by rouille. More general concepts (like database handling or templating) are not directly handled,
-as they as considered orthogonal to the micro web framework. However rouille's design makes it easy
+as they are considered orthogonal to the micro web framework. However rouille's design makes it easy
 to use in conjunction with any third-party library without the need for any glue code.
 
 ## [Documentation](https://docs.rs/rouille)
