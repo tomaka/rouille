@@ -6,6 +6,7 @@
   in favor of using [serde](https://crates.io/serde).
 - Updated `multipart` to 0.13. The `input::multipart::get_multipart_input` function returns
   types reexported from `multipart` which have small but breaking API changes.
+- Update `Server` with an option to use a thread pool to process requests
 
 ## Version 1.0.0
 
