@@ -40,7 +40,7 @@ env_logger = "0.3"
 
 [features]
 client = []
-default = ["client", "hyper", "iron", "mock", "nickel", "server", "tiny_http"]
+default = ["client", "hyper", "iron", "mock", "nickel", "server", "tiny_http", "use_arc_str"]
 server = ["buf_redux", "httparse", "safemem", "twoway"]
 mock = []
 nightly = []
@@ -50,4 +50,4 @@ bench = []
 sse4 = ["nightly", "twoway/pcmp"]
 all = ["client", "server", "hyper", "iron", "tiny_http", "nickel", "mock"]
 # switch uses of `Arc<str>` (`From<String>` impl only stabilized in 1.21) for `Arc<String>`
-no_arc_str = []
+use_arc_str = []

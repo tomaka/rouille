@@ -11,7 +11,7 @@ use multipart::server::{Entries, SaveResult};
 use multipart::mock::StdoutTee;
 
 fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
-    match req.multipart_body() {
+    match (*req).multipart_body() {
         Some(mut multipart) => {
             match multipart.save().temp() {
                 SaveResult::Full(entries) => process_entries(res, entries),

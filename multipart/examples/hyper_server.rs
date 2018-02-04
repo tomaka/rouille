@@ -21,31 +21,24 @@ impl Handler for NonMultipart {
 struct EchoMultipart;
 impl MultipartHandler for EchoMultipart {
     fn handle_multipart(&self, mut multipart: Multipart<HyperRequest>, mut res: HyperResponse) {
-        let processing = match multipart.save().temp() {
-            SaveResult::Full(entries) => process_entries(&mut res, entries),
+        match multipart.save().temp() {
+            SaveResult::Full(entries) => process_entries(res, entries).unwrap(),
             SaveResult::Partial(entries, error) => {
                 println!("Errors saving multipart:\n{:?}", error);
-                process_entries(&mut res, entries.into())
+                process_entries(res, entries.into()).unwrap();
             }
             SaveResult::Error(error) => {
                 println!("Errors saving multipart:\n{:?}", error);
-                Err(error)
+                res.send(format!("An error occurred {}", error).as_bytes()).unwrap();
             }
         };
-        match processing {
-            Ok(_) => res.send(b"All good in the hood :)\n").unwrap(),
-            Err(_) => {
-                *res.status_mut() = StatusCode::BadRequest;
-                res.send(b"An error occurred :(\n").unwrap();
-            }
-        }
     }
 }
 
-fn process_entries(res: &mut HyperResponse, entries: Entries) -> io::Result<()> {
-    let mut res = res.start();
-    let stdout = io::stdout();
-    entries.write_debug(StdoutTee::new(&mut res, &stdout))
+fn process_entries(res: HyperResponse, entries: Entries) -> io::Result<()> {
+    let mut res = res.start()?;
+    let ref stdout = io::stdout();
+    entries.write_debug(StdoutTee::new(&mut res, stdout))
 }
 
 fn main() {

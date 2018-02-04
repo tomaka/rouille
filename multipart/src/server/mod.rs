@@ -36,14 +36,14 @@ pub use self::save::{Entries, SaveResult, SavedField};
 use self::save::EntriesSaveResult;
 
 /// Replacement typedef for `Arc<str>` for older Rust releases.
-#[cfg(feature = "no_arc_str")]
+#[cfg(not(feature = "use_arc_str"))]
 pub type ArcStr = Arc<String>;
 
 /// Typedef for `Arc<str>`.
 ///
 /// Construction of `Arc<str>` was only stabilized in Rust 1.21, so to continue to support
 /// older versions, an alternate typedef of `Arc<String>` is available under the `no_arc_str` feature.
-#[cfg(not(feature = "no_arc_str"))]
+#[cfg(feature = "use_arc_str")]
 pub type ArcStr = Arc<str>;
 
 macro_rules! try_opt (
@@ -84,6 +84,9 @@ pub mod iron;
 
 #[cfg(feature = "tiny_http")]
 pub mod tiny_http;
+
+#[cfg(feature = "nickel")]
+pub mod nickel;
 
 pub mod save;
 
