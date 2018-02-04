@@ -1,6 +1,6 @@
 [package]
 name = "rouille"
-version = "1.0.3"
+version = "2.0.0"
 authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/tomaka/rouille"
