@@ -69,6 +69,8 @@ extern crate sha1;
 extern crate time;
 extern crate tiny_http;
 extern crate url;
+extern crate threadpool;
+extern crate num_cpus;
 
 pub use assets::extension_to_mime;
 pub use assets::match_assets;
@@ -211,6 +213,50 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
     panic!("The server socket closed unexpectedly")
 }
 
+
+/// Identical to `start_server` but uses a `ThreadPool` of the given size.
+///
+/// When `pool_size` is `None`, the thread pool size will default to `8 * num-cpus`.
+/// `pool_size` must be greater than zero or this function will panic.
+pub fn start_server_with_pool<A, F>(addr: A, pool_size: Option<usize>, handler: F) -> !
+                          where A: ToSocketAddrs,
+                                F: Send + Sync + 'static + Fn(&Request) -> Response
+{
+    Server::new(addr, handler).expect("Failed to start server")
+        .pool_size(pool_size.unwrap_or_else(|| 8 * num_cpus::get()))
+        .run();
+    panic!("The server socket closed unexpectedly")
+}
+
+
+/// Executes a function in either a thread of a thread pool
+enum Executor {
+    Threaded,
+    Pooled {
+        pool: threadpool::ThreadPool,
+    }
+}
+impl Executor {
+    /// `size` must be greater than zero or the call to `ThreadPool::new` will panic.
+    fn with_size(size: usize) -> Self {
+        let pool = threadpool::ThreadPool::new(size);
+        Executor::Pooled { pool }
+    }
+
+    #[inline]
+    fn execute<F: FnOnce() + Send + 'static>(&self, f: F) {
+        match self {
+            &Executor::Threaded => {
+                thread::spawn(f);
+            }
+            &Executor::Pooled { ref pool } => {
+                pool.execute(f);
+            }
+        }
+    }
+}
+
+
 /// A listening server.
 ///
 /// This struct is the more manual server creation API of rouille and can be used as an alternative
@@ -234,7 +280,9 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
 pub struct Server<F> {
     server: tiny_http::Server,
     handler: Arc<AssertUnwindSafe<F>>,
+    executor: Executor,
 }
+
 
 impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     /// Builds a new `Server` object.
@@ -247,11 +295,19 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         where A: ToSocketAddrs
     {
         let server = try!(tiny_http::Server::http(addr));
-
         Ok(Server {
             server: server,
-            handler: Arc::new(AssertUnwindSafe(handler)),       // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
+            executor: Executor::Threaded,
+            handler: Arc::new(AssertUnwindSafe(handler)),   // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
         })
+    }
+
+    /// Use a `ThreadPool` of the given size to process requests
+    ///
+    /// `pool_size` must be greater than zero or this function will panic.
+    pub fn pool_size(mut self, pool_size: usize) -> Self {
+        self.executor = Executor::with_size(pool_size);
+        self
     }
 
     /// Returns the address of the listening socket.
@@ -284,7 +340,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     fn process(&self, request: tiny_http::Request) {
         // We spawn a thread so that requests are processed in parallel.
         let handler = self.handler.clone();
-        thread::spawn(move || {
+        self.executor.execute(|| {
             // Small helper struct that makes it possible to put
             // a `tiny_http::Request` inside a `Box<Read>`.
             struct RequestRead(Arc<Mutex<Option<tiny_http::Request>>>);
