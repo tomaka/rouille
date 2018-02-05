@@ -13,7 +13,7 @@ Minimum supported Rust version: 1.17.0
 
 Example files demonstrating how to use `multipart` with these crates are available under [`examples/`](examples).
 
-### [Hyper](http://hyper.rs) 
+### [Hyper ![](https://img.shields.io/crates/v/hyper.svg)](https://crates.io/crates/hyper) 
 via the `hyper` feature (enabled by default). 
 
 **Note: Hyper 0.9, 0.10 (synchronous API) only**; support for asynchronous APIs will be provided by [multipart-async].
@@ -23,21 +23,20 @@ as integration with the new `hyper::Client` API via `multipart::client::lazy::Mu
 
 Server integration for `hyper::server::Request` via `multipart::server::Multipart`.
 
-### [Iron](http://ironframework.io) 
+### [Iron ![](https://img.shields.io/crates/v/iron.svg)](https://crates.io/crates/iron) 
 via the `iron` feature.
 
 Provides regular server-side integration with `iron::Request` via `multipart::server::Multipart`, 
 as well as a convenient `BeforeMiddleware` implementation in `multipart::server::iron::Intercept`.
 
-### [tiny\_http](https://crates.io/crates/tiny_http/)
-via the `tiny_http` feature.
-
-Provides server-side integration with `tiny_http::Request` via `multipart::server::Multipart`.
-
-### [Nickel](http://nickel.rs/) <sup>returning to `multipart` in 0.14!</sup>
+### [Nickel ![](https://img.shields.io/crates/v/nickel.svg)](https://crates.io/crates/nickel) <sup>returning to `multipart` in 0.14!</sup>
 
 Provides server-side integration with `&mut nickel::Request` via `multipart::server::Multipart`. 
 
+### [tiny_http ![](https://img.shields.io/crates/v/tiny_http.svg)](https://crates.io/crates/tiny_http)
+via the `tiny_http` feature.
+
+Provides server-side integration with `tiny_http::Request` via `multipart::server::Multipart`.
 
 ## ⚡ Powered By ⚡
 
