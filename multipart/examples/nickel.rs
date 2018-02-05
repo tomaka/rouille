@@ -42,9 +42,6 @@ fn process_entries<'mw>(res: Response<'mw>, entries: Entries) -> MiddlewareResul
     let mut res = res.start()?;
     if let Err(e) = entries.write_debug(StdoutTee::new(&mut res, &stdout)) {
         writeln!(res, "Error while reading entries: {}", e);
-        return Err(NickelError::new(
-            res, StatusCode::InternalServerError, format!("Error while reading entries: {}", e)
-        ));
     }
 
     Ok(Action::Halt(res))

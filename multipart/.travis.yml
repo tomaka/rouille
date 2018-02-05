@@ -14,13 +14,18 @@ os:
   # openssl is broken on OS X again
   # - osx
 env:
-  - RUST_LOG=multipart=info RUST_BACKTRACE=1
+  global:
+   - RUST_LOG=multipart=info RUST_BACKTRACE=1 ARGS=
+  matrix:
+   - ARGS+=--no-default-features
+   # ensure nickel works without hyper
+   - ARGS+='--no-default-features --features "nickel"'
 script:
   - if [ ${TRAVIS_RUST_VERSION} = "nightly" ]; then
-      cargo build --verbose --features "nightly";
-      cargo test --verbose --features "nightly";
-      cargo doc --verbose --features "nightly";
+       cargo build --verbose $ARGS --features "nightly";
+       cargo test --verbose $ARGS --features "nightly";
+       cargo doc --verbose $ARGS --features "nightly";
     fi
-  - cargo build --verbose;
-  - cargo test --verbose;
-  - cargo doc --verbose;
+  - cargo build --verbose $ARGS;
+  - cargo test --verbose $ARGS;
+  - cargo doc --verbose $ARGS;

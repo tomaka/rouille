@@ -83,16 +83,23 @@ enum TextPolicy {
 /// `mod_open_opts()`.
 ///
 /// ### File Size and Count Limits
-/// You can set a size limit for individual files with `size_limit()`, which takes either `u64`
+/// You can set a size limit for individual fields with `size_limit()`, which takes either `u64`
 /// or `Option<u64>`.
 ///
-/// You can also set the maximum number of files to process with `count_limit()`, which
+/// You can also set the maximum number of fields to process with `count_limit()`, which
 /// takes either `u32` or `Option<u32>`. This only has an effect when using
 /// `SaveBuilder<[&mut] Multipart>`.
 ///
+/// By default, these limits are set conservatively to limit the maximum memory and disk space
+/// usage of a single request. You should set `count_limit` specifically for each request endpoint
+/// based on the number of fields you're expecting (exactly to that number if you're not expecting
+/// duplicate fields).
+///
 /// ### Memory Threshold and Text Policy
-/// By default, small fields (a few megabytes or smaller) will be read directly to memory
-/// without creating a file. This behavior is controlled by the `memory_threshold()` setter.
+/// By default, small fields (a few kilobytes or smaller) will be read directly to memory
+/// without creating a file. This behavior is controlled by the `memory_threshold()` setter. You can
+/// *roughly* tune the maximum memory a single request uses by tuning
+/// `count_limit * memory_threshold`
 ///
 /// If a field appears to contain text data (its content-type is `text/*` or it doesn't declare
 /// one), `SaveBuilder` can read it to a string instead of saving the raw bytes as long as it falls
@@ -144,10 +151,13 @@ impl<S> SaveBuilder<S> {
         SaveBuilder {
             savable,
             open_opts,
-            size_limit: u64::MAX,
-            count_limit: u32::MAX,
-            // 8 MiB, reasonable?
-            memory_threshold: 8 * 1024 * 1024,
+            // 8 MiB, on the conservative end compared to most frameworks
+            size_limit: 8 * 1024 * 1024,
+            // Arbitrary, I have no empirical data for this
+            count_limit: 256,
+            // 10KiB, used by Apache Commons
+            // https://commons.apache.org/proper/commons-fileupload/apidocs/org/apache/commons/fileupload/disk/DiskFileItemFactory.html
+            memory_threshold: 10 * 1024,
             text_policy: TextPolicy::Try,
         }
     }
@@ -603,6 +613,8 @@ pub struct Entries {
     /// common case is a single field.
     ///
     /// Each vector is guaranteed not to be empty unless externally modified.
+    // Even though individual fields might only have one entry, it's better to limit the
+    // size of a value type in `HashMap` to improve cache efficiency in lookups.
     pub fields: HashMap<ArcStr, Vec<SavedField>>,
     /// The directory that the entries in `fields` were saved into.
     pub save_dir: SaveDir,
@@ -779,7 +791,7 @@ pub enum PartialReason {
     SizeLimit,
     /// An error occurred during the operation.
     IoError(io::Error),
-    /// An error returned from validating a field as UTF-8 due to `TextPolicy::Force`
+    /// An error returned from validating a field as UTF-8 due to `SaveBuilder::force_text()`
     Utf8Error(str::Utf8Error),
 }
 

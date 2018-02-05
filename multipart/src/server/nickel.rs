@@ -1,8 +1,11 @@
 //! Support for `multipart/form-data` bodies in [Nickel](https://nickel.rs).
-extern crate nickel;
+pub extern crate nickel;
 
-use self::nickel::Request as NickelRequest;
-use self::nickel::hyper::server::Request as HyperRequest;
+use self::nickel::hyper;
+use self::hyper::header::ContentType;
+
+pub use self::nickel::Request as NickelRequest;
+pub use self::nickel::hyper::server::Request as HyperRequest;
 
 use server::{HttpRequest, Multipart};
 
@@ -16,7 +19,9 @@ impl<'r, 'mw: 'r, 'server: 'mw, D: 'mw> HttpRequest for Maybe<'r, 'mw, 'server, 
     type Body = &'r mut HyperRequest<'mw, 'server>;
 
     fn multipart_boundary(&self) -> Option<&str> {
-        self.0.origin.multipart_boundary()
+        // we can't use the impl from the `hyper` module because it might be the wrong version
+        let cont_type = try_opt!(self.0.origin.headers.get::<ContentType>());
+        cont_type.get_param("boundary").map(|v| v.as_str())
     }
 
     fn body(self) -> Self::Body {

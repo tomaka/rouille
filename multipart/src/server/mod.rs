@@ -11,7 +11,7 @@
 //!
 //! See the `Multipart` struct for more info.
 
-extern crate buf_redux;
+pub extern crate buf_redux;
 extern crate httparse;
 extern crate twoway;
 
