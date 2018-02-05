@@ -39,7 +39,7 @@ Provides server-side integration with `tiny_http::Request` via `multipart::serve
 Provides server-side integration with `&mut nickel::Request` via `multipart::server::Multipart`. 
 
 
-## ⚡⚡ Powered By ⚡⚡
+## ⚡ Powered By ⚡
 
 * [buf_redux ![](https://img.shields.io/crates/v/buf_redux.svg)](https://crates.io/crates/buf_redux)
 
