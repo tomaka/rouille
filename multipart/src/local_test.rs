@@ -72,7 +72,8 @@ impl TestFields {
     }
 
     fn check_field<M: ReadEntry>(&mut self, mut field: MultipartField<M>) -> M {
-        if field.is_text() {
+        // text/plain fields would be considered a file by `TestFields`
+        if field.headers.content_type.is_none() {
             let mut text_entries = expect_fmt!(get_field(&field.headers, &mut self.texts),
                                         "Got text field that wasn't in original dataset: {:?}",
                                         field.headers);
