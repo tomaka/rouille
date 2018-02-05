@@ -41,18 +41,18 @@ Provides server-side integration with `&mut nickel::Request` via `multipart::ser
 
 ## ⚡ Powered By ⚡
 
-#### [buf_redux ![](https://img.shields.io/crates/v/buf_redux.svg)](https://crates.io/crates/buf_redux)
+### [buf_redux ![](https://img.shields.io/crates/v/buf_redux.svg)](https://crates.io/crates/buf_redux)
 
 Customizable drop-in `std::io::BufReader` replacement, created to be used in this crate.
 Needed because it can read more bytes into the buffer without the buffer being empty, necessary
 when a boundary falls across two reads. (It was easier to author a new crate than try to get this added
 to `std::io::BufReader`.)
 
-##### [httparse ![](https://img.shields.io/crates/v/httparse.svg)](https://crates.io/crates/httparse)
+### [httparse ![](https://img.shields.io/crates/v/httparse.svg)](https://crates.io/crates/httparse)
 
 Fast, zero-copy HTTP header parsing, used to read field headers in `multipart/form-data` request bodies.
 
-#### [twoway ![](https://img.shields.io/crates/v/twoway.svg)](https://crates.io/crates/twoway)
+### [twoway ![](https://img.shields.io/crates/v/twoway.svg)](https://crates.io/crates/twoway)
 
 Fast string and byte-string search. Used to find boundaries in the request body. SSE 4.2 acceleration available
 under the `sse42` or `twoway/pcmp` features.
