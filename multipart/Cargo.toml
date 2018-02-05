@@ -15,6 +15,8 @@ documentation = "http://docs.rs/multipart/"
 
 license = "MIT OR Apache-2.0"
 
+readme = "README.md"
+
 [dependencies]
 log = "0.3"
 mime = "0.3"
