@@ -15,7 +15,7 @@ os:
   # - osx
 env:
   global:
-   - RUST_LOG=multipart=info RUST_BACKTRACE=1 ARGS=
+   - RUST_LOG=multipart=trace RUST_BACKTRACE=1 ARGS=
   matrix:
    - ARGS+=--no-default-features
    # ensure nickel works without hyper
