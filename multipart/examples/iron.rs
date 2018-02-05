@@ -4,7 +4,8 @@ extern crate iron;
 extern crate env_logger;
 
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read, Write};
+use multipart::mock::StdoutTee;
 use multipart::server::{Multipart, Entries, SaveResult, SavedField};
 use iron::prelude::*;
 use iron::status;
@@ -47,38 +48,20 @@ fn process_request(request: &mut Request) -> IronResult<Response> {
 /// Processes saved entries from multipart request.
 /// Returns an OK response or an error.
 fn process_entries(entries: Entries) -> IronResult<Response> {
-    for (name, field) in entries.fields {
-        println!("Field {:?}: {:?}", name, field);
+    let mut data = Vec::new();
+
+    {
+        let stdout = io::stdout();
+        let tee = StdoutTee::new(&mut data, &stdout);
+        entries.write_debug(tee).map_err(|e| {
+            IronError::new(
+                e,
+                (status::InternalServerError, "Error printing request fields")
+            )
+        })?;
     }
 
-    for (name, files) in entries.files {
-        println!("Field {:?} has {} files:", name, files.len());
+    let _ = writeln!(data, "Entries processed");
 
-        for file in files {
-            print_file(&file)?;
-        }
-    }
-
-    Ok(Response::with((status::Ok, "Multipart data is processed")))
-}
-
-fn print_file(saved_file: &SavedField) -> IronResult<()> {
-    let mut file = match File::open(&saved_file.path) {
-        Ok(file) => file,
-        Err(error) => {
-            return Err(IronError::new(error,
-                                      (status::InternalServerError,
-                                       "Server couldn't open saved file")))
-        }
-    };
-
-    let mut contents = String::new();
-    if let Err(error) = file.read_to_string(&mut contents) {
-        return Err(IronError::new(error, (status::BadRequest, "The file was not a text")));
-    }
-
-    println!("File {:?} ({:?}):", saved_file.filename, saved_file.content_type);
-    println!("{}", contents);
-
-    Ok(())
+    Ok(Response::with((status::Ok, data)))
 }

@@ -2,8 +2,9 @@ extern crate tiny_http;
 extern crate multipart;
 
 use std::fs::File;
-use std::io::{self, Read};
+use std::io::{self, Cursor, Read, Write};
 use multipart::server::{Multipart, Entries, SaveResult, SavedField};
+use multipart::mock::StdoutTee;
 use tiny_http::{Response, StatusCode, Request};
 fn main() {
     // Starting a server on `localhost:80`
@@ -27,8 +28,10 @@ fn main() {
     }
 }
 
+type RespBody = Cursor<Vec<u8>>;
+
 /// Processes a request and returns response or an occured error.
-fn process_request<'a, 'b>(request: &'a mut Request) -> io::Result<Response<&'b [u8]>> {
+fn process_request(request: &mut Request) -> io::Result<Response<RespBody>> {
     // Getting a multipart reader wrapper
     match Multipart::from_request(request) {
         Ok(mut multipart) => {
@@ -51,18 +54,26 @@ fn process_request<'a, 'b>(request: &'a mut Request) -> io::Result<Response<&'b 
 
 /// Processes saved entries from multipart request.
 /// Returns an OK response or an error.
-fn process_entries<'a>(entries: Entries) -> io::Result<Response<&'a [u8]>> {
+fn process_entries<'a>(entries: Entries) -> io::Result<Response<RespBody>> {
+    let mut data = Vec::new();
 
+    {
+        let stdout = io::stdout();
+        let tee = StdoutTee::new(&mut data, &stdout);
+        entries.write_debug(tee)?;
+    }
 
-    Ok(build_response(200, "Multipart data is received!"))
+    writeln!(data, "Entries processed")?;
+
+    Ok(build_response(200, data))
 }
 
-/// A utility function to build responses using only two arguments
-fn build_response(status_code: u16, response: &str) -> Response<&[u8]> {
-    let bytes = response.as_bytes();
+fn build_response<D: Into<Vec<u8>>>(status_code: u16, data: D) -> Response<RespBody> {
+    let data = data.into();
+    let data_len = data.len();
     Response::new(StatusCode(status_code),
                   vec![],
-                  bytes,
-                  Some(bytes.len()),
+                  Cursor::new(data),
+                  Some(data_len),
                   None)
 }

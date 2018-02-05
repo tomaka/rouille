@@ -35,14 +35,17 @@ pub use self::save::{Entries, SaveResult, SavedField};
 
 use self::save::EntriesSaveResult;
 
-/// Replacement typedef for `Arc<str>` for older Rust releases.
+/// Default typedef for shared strings.
+///
+/// Enable the `use_arc_str` feature to use `Arc<str>` instead, which saves an indirection but
+/// cannot be constructed in Rust versions older than 1.21 (the `From<String>` impl was stabilized
+/// in that release).
 #[cfg(not(feature = "use_arc_str"))]
 pub type ArcStr = Arc<String>;
 
-/// Typedef for `Arc<str>`.
+/// Optimized typedef for shared strings, replacing `Arc<String>`.
 ///
-/// Construction of `Arc<str>` was only stabilized in Rust 1.21, so to continue to support
-/// older versions, an alternate typedef of `Arc<String>` is available under the `no_arc_str` feature.
+/// Enabled with the `use_arc_str` feature.
 #[cfg(feature = "use_arc_str")]
 pub type ArcStr = Arc<str>;
 

@@ -37,8 +37,9 @@ impl MultipartHandler for EchoMultipart {
 
 fn process_entries(res: HyperResponse, entries: Entries) -> io::Result<()> {
     let mut res = res.start()?;
-    let ref stdout = io::stdout();
-    entries.write_debug(StdoutTee::new(&mut res, stdout))
+    let stdout = io::stdout();
+    let out = StdoutTee::new(&mut res, &stdout);
+    entries.write_debug(out)
 }
 
 fn main() {

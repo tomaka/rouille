@@ -48,23 +48,33 @@ bench = []
 # Use this to enable SSE4.2 instructions in boundary finding
 # TODO: Benchmark this
 sse4 = ["nightly", "twoway/pcmp"]
-# switch uses of `Arc<str>` (`From<String>` impl only stabilized in 1.21) for `Arc<String>`
+# switch uses of `Arc<String>` for `Arc<str>` (`From<String>` impl only stabilized in 1.21)
 use_arc_str = []
 
-[examples.hyper_client]
-required_features = ["hyper"]
+[[example]]
+name = "hyper_client"
+required-features = ["mock", "hyper"]
 
-[examples.hyper_server]
-required_features = ["hyper"]
+[[example]]
+name = "hyper_reqbuilder"
+required-features = ["mock", "hyper"]
 
-[examples.iron]
-required_features = ["iron"]
+[[example]]
+name = "hyper_server"
+required-features = ["mock", "hyper"]
 
-[examples.iron_intercept]
-required_features = ["iron"]
+[[example]]
+name = "iron"
+required-features = ["mock", "iron"]
 
-[examples.nickel]
-required_features = ["nickel"]
+[[example]]
+name = "iron_intercept"
+required-features = ["mock", "iron"]
 
-[examples.tiny_http]
-required_features = ["tiny_http"]
+[[example]]
+name = "nickel"
+required-features = ["mock", "nickel"]
+
+[[example]]
+name = "tiny_http"
+required-features = ["mock", "tiny_http"]

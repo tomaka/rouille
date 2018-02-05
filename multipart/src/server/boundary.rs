@@ -127,7 +127,7 @@ impl<R> BoundaryReader<R> where R: Read {
         let consume_amt = {
             let min_len = self.boundary.len() + 4;
 
-            let buf = fill_buf_min(&mut self.source, min_len)?;
+            let buf = self.source.fill_buf()?;
 
             if buf.len() < min_len {
                 return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
