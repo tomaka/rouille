@@ -10,6 +10,7 @@
 use ::safemem;
 
 use super::buf_redux::BufReader;
+use super::buf_redux::strategy::{LessThan, AtEndLessThan};
 use super::twoway;
 
 use log::LogLevel;
@@ -32,7 +33,7 @@ enum State {
 /// A struct implementing `Read` and `BufRead` that will yield bytes until it sees a given sequence.
 #[derive(Debug)]
 pub struct BoundaryReader<R> {
-    source: BufReader<R>,
+    source: BufReader<R, LessThan, AtEndLessThan>,
     boundary: Vec<u8>,
     search_idx: usize,
     state: State,
@@ -45,22 +46,19 @@ impl<R> BoundaryReader<R> where R: Read {
         safemem::prepend(b"--", &mut boundary);
 
         BoundaryReader {
-            source: BufReader::new(reader),
-            boundary: boundary,
+            source: BufReader::with_strategies(
+                reader,
+                LessThan(boundary.len() * 2),
+                AtEndLessThan(boundary.len() * 2),
+            ),
+            boundary,
             search_idx: 0,
             state: Searching,
         }
     }
 
     fn read_to_boundary(&mut self) -> io::Result<&[u8]> {
-        // Make sure there's enough bytes in the buffer to positively identify the boundary.
-        let min_len = self.search_idx + (self.boundary.len() * 2);
-
-        let buf = fill_buf_min(&mut self.source, min_len)?;
-
-        if buf.is_empty() {
-            debug!("fill_buf_min returned zero-sized buf");
-        }
+        let buf = self.source.fill_buf()?;
 
         trace!("Buf: {:?}", String::from_utf8_lossy(buf));
 
@@ -213,17 +211,6 @@ impl<R> BufRead for BoundaryReader<R> where R: Read {
         self.source.consume(true_amt);
         self.search_idx -= true_amt;
     }
-}
-
-fn fill_buf_min<R: Read>(buf: &mut BufReader<R>, min: usize) -> io::Result<&[u8]> {
-    let mut attempts = 0;
-
-    while buf.available() < min && attempts < min {
-        if buf.read_into_buf()? == 0 { break; };
-        attempts += 1;
-    }
-
-    Ok(buf.get_buf())
 }
 
 #[cfg(test)]
