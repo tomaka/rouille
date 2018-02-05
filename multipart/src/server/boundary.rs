@@ -23,6 +23,8 @@ use std::io::prelude::*;
 
 use self::State::*;
 
+pub const MIN_BUF_SIZE: usize = 1024;
+
 #[derive(Debug, PartialEq, Eq)]
 enum State {
     Searching,
@@ -48,8 +50,8 @@ impl<R> BoundaryReader<R> where R: Read {
         BoundaryReader {
             source: BufReader::with_strategies(
                 reader,
-                LessThan(boundary.len() * 2),
-                AtEndLessThan(boundary.len() * 2),
+                LessThan(MIN_BUF_SIZE),
+                AtEndLessThan(MIN_BUF_SIZE),
             ),
             boundary,
             search_idx: 0,
@@ -106,6 +108,13 @@ impl<R> BoundaryReader<R> where R: Read {
         trace!("Returning buf: {:?}", String::from_utf8_lossy(ret_buf));
 
         Ok(ret_buf)
+    }
+
+    pub fn set_min_buf_size(&mut self, min_buf_size: usize) {
+        let min_buf_size = cmp::min(self.boundary.len() * 2, min_buf_size);
+
+        self.source.read_strategy_mut().0 = min_buf_size;
+        self.source.move_strategy_mut().0 = min_buf_size;
     }
 
     #[doc(hidden)]

@@ -184,8 +184,12 @@ impl<R> Borrow<R> for Multipart<R> {
 impl<R: Read> PrivReadEntry for Multipart<R> {
     type Source = BoundaryReader<R>;
 
-    fn source(&mut self) -> &mut BoundaryReader<R> {
+    fn source_mut(&mut self) -> &mut BoundaryReader<R> {
         &mut self.reader
+    }
+
+    fn set_min_buf_size(&mut self, min_buf_size: usize) {
+        self.reader.set_min_buf_size(min_buf_size)
     }
 
     /// Consume the next boundary.

@@ -23,7 +23,6 @@ use super::save::{SaveBuilder, SavedField};
 
 use super::ArcStr;
 
-
 const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader {
     name: "",
     val: "",
@@ -42,37 +41,25 @@ fn with_headers<R, F, Ret>(r: &mut R, closure: F) -> Result<Ret, ParseHeaderErro
 where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
     const HEADER_LEN: usize = 4;
 
-    // These are only written once so they don't need to be `mut` or initialized.
-    let consume;
-    let ret;
-
-    let mut attempts = 0;
-
-    loop {
-        let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
-
+    let (consume, ret) = {
         let buf = r.fill_buf()?;
 
-        if attempts == MAX_ATTEMPTS {
-            return Err(ParseHeaderError::Other("Could not read field headers".to_string()));
-        }
+        let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
 
         match httparse::parse_headers(buf, &mut raw_headers) {
-            Ok(Status::Complete((consume_, raw_headers))) =>  {
-                consume = consume_;
+            Err(err) => return Err(ParseHeaderError::from(err)),
+            Ok(Status::Partial) => return Err(
+                // FIXME: make this a variant
+                ParseHeaderError::Other("Field headers too large".to_string())
+            ),
+            Ok(Status::Complete((consume, raw_headers))) =>  {
                 let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
                 let headers = copy_headers(raw_headers, &mut headers)?;
                 debug!("Parsed headers: {:?}", headers);
-                ret = closure(headers);
-                break;
+                (consume, closure(headers))
             },
-            Ok(Status::Partial) => {
-                attempts += 1;
-                continue;
-            },
-            Err(err) => return Err(ParseHeaderError::from(err)),
-        };
-    }
+        }
+    };
 
     r.consume(consume);
     Ok(ret)
@@ -271,6 +258,16 @@ impl<M> MultipartData<M> where M: ReadEntry {
         self.inner.expect(DATA_INNER_ERR)
     }
 
+    /// Set the minimum buffer size that `BufRead::fill_buf(self)` will return
+    /// until the end of the stream is reached. Set this as small as you can tolerate
+    /// to minimize `read()` calls (`read()` won't be called again until the buffer
+    /// is smaller than this).
+    ///
+    /// This value is reset between fields.
+    pub fn set_min_buf_size(&mut self, min_buf_size: usize) {
+        self.inner_mut().set_min_buf_size(min_buf_size)
+    }
+
     fn inner_mut(&mut self) -> &mut M {
         self.inner.as_mut().expect(DATA_INNER_ERR)
     }
@@ -286,17 +283,18 @@ impl<M> MultipartData<M> where M: ReadEntry {
 
 impl<M: ReadEntry> Read for MultipartData<M> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
-        self.inner_mut().source().read(buf)
+        self.inner_mut().source_mut().read(buf)
     }
 }
 
+/// Unlike `std::io::BufReader`,
 impl<M: ReadEntry> BufRead for MultipartData<M> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.inner_mut().source().fill_buf()
+        self.inner_mut().source_mut().fill_buf()
     }
 
     fn consume(&mut self, amt: usize) {
-        self.inner_mut().source().consume(amt)
+        self.inner_mut().source_mut().consume(amt)
     }
 }
 
@@ -334,6 +332,8 @@ fn find_header<'a, 'b>(headers: &'a [StrHeader<'b>], name: &str) -> Option<&'a S
 pub trait ReadEntry: PrivReadEntry + Sized {
     /// Attempt to read the next entry in the multipart stream.
     fn read_entry(mut self) -> ReadEntryResult<Self> {
+        self.set_min_buf_size(super::boundary::MIN_BUF_SIZE);
+
         debug!("ReadEntry::read_entry()");
 
         if try_read_entry!(self; self.consume_boundary()) {
@@ -374,21 +374,23 @@ impl<T> ReadEntry for T where T: PrivReadEntry {}
 pub trait PrivReadEntry {
     type Source: BufRead;
 
-    fn source(&mut self) -> &mut Self::Source;
+    fn source_mut(&mut self) -> &mut Self::Source;
+
+    fn set_min_buf_size(&mut self, min_buf_size: usize);
 
     /// Consume the next boundary.
     /// Returns `true` if the last boundary was read, `false` otherwise.
     fn consume_boundary(&mut self) -> io::Result<bool>;
 
     fn read_headers(&mut self) -> Result<FieldHeaders, io::Error> {
-        FieldHeaders::read_from(&mut self.source())
+        FieldHeaders::read_from(self.source_mut())
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
     fn read_to_string(&mut self) -> io::Result<String> {
         let mut buf = String::new();
 
-        match self.source().read_to_string(&mut buf) {
+        match self.source_mut().read_to_string(&mut buf) {
             Ok(_) => Ok(buf),
             Err(err) => Err(err),
         }
@@ -398,8 +400,12 @@ pub trait PrivReadEntry {
 impl<'a, M: ReadEntry> PrivReadEntry for &'a mut M {
     type Source = M::Source;
 
-    fn source(&mut self) -> &mut M::Source {
-        (**self).source()
+    fn source_mut(&mut self) -> &mut M::Source {
+        (**self).source_mut()
+    }
+
+    fn set_min_buf_size(&mut self, min_buf_size: usize) {
+        (**self).set_min_buf_size(min_buf_size)
     }
 
     fn consume_boundary(&mut self) -> io::Result<bool> {
