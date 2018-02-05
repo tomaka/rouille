@@ -54,7 +54,7 @@ Fast, zero-copy HTTP header parsing, used to read field headers in `multipart/fo
 
 * [twoway ![](https://img.shields.io/crates/v/twoway.svg)](https://crates.io/crates/twoway)
 
-Fast string and byte-string search. Used to find boundaries in the request body. SEE 4.2 acceleration available
+Fast string and byte-string search. Used to find boundaries in the request body. SSE 4.2 acceleration available
 under the `sse42` or `twoway/pcmp` features.
 
 ## License
