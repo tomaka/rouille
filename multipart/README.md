@@ -30,6 +30,7 @@ Provides regular server-side integration with `iron::Request` via `multipart::se
 as well as a convenient `BeforeMiddleware` implementation in `multipart::server::iron::Intercept`.
 
 ### [Nickel ![](https://img.shields.io/crates/v/nickel.svg)](https://crates.io/crates/nickel) <sup>returning to `multipart` in 0.14!</sup>
+via the `nickel` feature.
 
 Provides server-side integration with `&mut nickel::Request` via `multipart::server::Multipart`. 
 

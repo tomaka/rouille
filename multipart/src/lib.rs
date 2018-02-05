@@ -16,16 +16,18 @@
 //! * `mock`: Provides mock implementations of core `client` and `server` traits for debugging
 //! or non-standard use.
 //!
-//! * `hyper`: Integration with the [Hyper](https://github.com/hyperium/hyper) HTTP library
+//! * `hyper`: Integration with the [Hyper](https://crates.io/crates/hyper) HTTP library
 //! for client and/or server depending on which other feature flags are set.
 //!
-//! * `iron`: Integration with the [Iron](http://ironframework.io) web application
+//! * `iron`: Integration with the [Iron](http://crates.io/crates/iron) web application
 //! framework. See the [`server::iron`](server/iron/index.html) module for more information.
 //!
-//! * `tiny_http`: Integration with the [`tiny_http`](https://github.com/frewsxcv/tiny-http)
-//! crate. See the [`server::tiny_http`](server/tiny_http/index.html) module for more information.
+//! * `nickel` (returning in 0.14!): Integration with the [Nickel](https://crates.io/crates/nickel)
+//! web application framework. See the [`server::nickel`](server/nickel/index.html) module for more
+//! information.
 //!
-//! `nickel` (returning in 0.14!): Integration with the  See the [`server::nickel`](server/nickel/index.html) module for more information.
+//! * `tiny_http`: Integration with the [`tiny_http`](https://crates.io/crates/tiny_http)
+//! crate. See the [`server::tiny_http`](server/tiny_http/index.html) module for more information.
 //!
 //! ### Note: Work in Progress
 //! I have left a number of Request-for-Comments (RFC) questions on various APIs and other places
