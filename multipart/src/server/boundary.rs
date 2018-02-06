@@ -111,7 +111,8 @@ impl<R> BoundaryReader<R> where R: Read {
     }
 
     pub fn set_min_buf_size(&mut self, min_buf_size: usize) {
-        let min_buf_size = cmp::min(self.boundary.len() * 2, min_buf_size);
+        // ensure the minimum buf size is at least enough to find a boundary with some extra
+        let min_buf_size = cmp::max(self.boundary.len() * 2, min_buf_size);
 
         self.source.read_strategy_mut().0 = min_buf_size;
         self.source.move_strategy_mut().0 = min_buf_size;
