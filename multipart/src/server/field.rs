@@ -6,8 +6,11 @@
 // copied, modified, or distributed except according to those terms.
 
 //! `multipart` field header parsing.
-use mime::{self, Mime};
+use mime::{self, Mime, FromStrError as MimeParseErr};
 
+use quick_error::ResultExt;
+
+use std::error::Error;
 use std::io::{self, Read, BufRead, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -15,7 +18,7 @@ use std::{str, fmt, error};
 
 use std::ascii::AsciiExt;
 
-use super::httparse::{self, EMPTY_HEADER, Header, Status};
+use super::httparse::{self, EMPTY_HEADER, Header, Status, Error as HttparseError};
 
 use self::ReadEntryResult::*;
 
@@ -28,11 +31,31 @@ const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader {
     val: "",
 };
 
+macro_rules! invalid_cont_disp {
+    ($reason: expr, $cause: expr) => {
+        return Err(
+            ParseHeaderError::InvalidContDisp($reason, $cause.to_string())
+        );
+    }
+}
+
 /// Not exposed
 #[derive(Copy, Clone, Debug)]
 pub struct StrHeader<'a> {
     name: &'a str,
     val: &'a str,
+}
+
+struct DisplayHeaders<'s, 'a: 's>(&'s [StrHeader<'a>]);
+
+impl <'s, 'a: 's> fmt::Display for  DisplayHeaders<'s, 'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for hdr in self.0 {
+            writeln!(f, "{}: {}", hdr.name, hdr.val)?;
+        }
+
+        Ok(())
+    }
 }
 
 const MAX_ATTEMPTS: usize = 30;
@@ -46,13 +69,9 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
 
         let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
 
-        match httparse::parse_headers(buf, &mut raw_headers) {
-            Err(err) => return Err(ParseHeaderError::from(err)),
-            Ok(Status::Partial) => return Err(
-                // FIXME: make this a variant
-                ParseHeaderError::Other("Field headers too large".to_string())
-            ),
-            Ok(Status::Complete((consume, raw_headers))) =>  {
+        match httparse::parse_headers(buf, &mut raw_headers)? {
+            Status::Partial => return Err(ParseHeaderError::TooLarge),
+            Status::Complete((consume, raw_headers)) => {
                 let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
                 let headers = copy_headers(raw_headers, &mut headers)?;
                 debug!("Parsed headers: {:?}", headers);
@@ -104,7 +123,8 @@ impl FieldHeaders {
     }
 
     fn parse(headers: &[StrHeader]) -> Result<FieldHeaders, ParseHeaderError> {
-        let cont_disp = ContentDisp::parse(headers)?.ok_or(ParseHeaderError::MissingContentDisposition)?;
+        let cont_disp = ContentDisp::parse_required(headers)?;
+
         Ok(FieldHeaders {
             name: cont_disp.field_name.into(),
             filename: cont_disp.filename,
@@ -122,58 +142,54 @@ struct ContentDisp {
 }
 
 impl ContentDisp {
-    fn parse(headers: &[StrHeader]) -> Result<Option<ContentDisp>, ParseHeaderError> {
-        const CONT_DISP: &'static str = "Content-Disposition";
-        let header = if let Some(header) = find_header(headers, CONT_DISP) {
+    fn parse_required(headers: &[StrHeader]) -> Result<ContentDisp, ParseHeaderError> {
+        let header = if let Some(header) = find_header(headers, "Content-Disposition") {
             header
         } else {
-            return Ok(None);
+            return Err(ParseHeaderError::MissingContentDisposition(
+                DisplayHeaders(headers).to_string()
+            ));
         };
 
-        const NAME: &'static str = "name=";
-        const FILENAME: &'static str = "filename=";
-
+        // Content-Disposition: ?
         let after_disp_type = match split_once(header.val, ';') {
             Some((disp_type, after_disp_type)) => {
+                // assert Content-Disposition: form-data
+                // but needs to be parsed out to trim the spaces (allowed by spec IIRC)
                 if disp_type.trim() != "form-data" {
-                    let err = format!("Unexpected Content-Disposition value: {:?}", disp_type);
-                    return Err(ParseHeaderError::Invalid(err));
+                    invalid_cont_disp!("unexpected Content-Disposition value", disp_type);
                 }
                 after_disp_type
             },
-            None => {
-                let err = format!("Expected additional data after Content-Disposition type, got {:?}", header.val);
-                return Err(ParseHeaderError::Invalid(err));
-            }
+            None => invalid_cont_disp!("expected additional data after Content-Disposition type",
+                                       header.val),
         };
 
-        let (field_name, filename) = match get_str_after(NAME, ';', after_disp_type) {
-            None => {
-                let err = format!("Expected field name and maybe filename, got {:?}", after_disp_type);
-                return Err(ParseHeaderError::Invalid(err));
-            },
+        // Content-Disposition: form-data; name=?
+        let (field_name, filename) = match get_str_after("name=", ';', after_disp_type) {
+            None => invalid_cont_disp!("expected field name and maybe filename, got",
+                                       after_disp_type),
+            // Content-Disposition: form-data; name={field_name}; filename=?
             Some((field_name, after_field_name)) => {
                 let field_name = trim_quotes(field_name);
-                let filename = get_str_after(FILENAME, ';', after_field_name).map(|(filename, _)| trim_quotes(filename).to_owned());
+                let filename = get_str_after("filename=", ';', after_field_name)
+                    .map(|(filename, _)| trim_quotes(filename).to_owned());
                 (field_name, filename)
             },
         };
 
-        Ok(Some(ContentDisp { field_name: field_name.to_owned(), filename: filename }))
+        Ok(ContentDisp { field_name: field_name.to_owned(), filename })
     }
 }
 
 fn parse_content_type(headers: &[StrHeader]) -> Result<Option<Mime>, ParseHeaderError> {
-    const CONTENT_TYPE: &'static str = "Content-Type";
-    let header = if let Some(header) = find_header(headers, CONTENT_TYPE) {
-        header
+    if let Some(header) = find_header(headers, "Content-Type") {
+        // Boundary parameter will be parsed into the `Mime`
+        debug!("Found Content-Type: {:?}", header.val);
+        Ok(Some(header.val.parse::<Mime>().context(header.val)?))
     } else {
-        return Ok(None)
-    };
-
-    // Boundary parameter will be parsed into the `Mime`
-    debug!("Found Content-Type: {:?}", header.val);
-    Ok(Some(read_content_type(header.val.trim())))
+        Ok(None)
+    }
 }
 
 /// A field in a multipart request with its associated headers and data.
@@ -296,10 +312,6 @@ impl<M: ReadEntry> BufRead for MultipartData<M> {
     fn consume(&mut self, amt: usize) {
         self.inner_mut().source_mut().consume(amt)
     }
-}
-
-fn read_content_type(cont_type: &str) -> Mime {
-    cont_type.parse().ok().unwrap_or_else(::mime_guess::octet_stream)
 }
 
 fn split_once(s: &str, delim: char) -> Option<(&str, &str)> {
@@ -484,56 +496,44 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
     }
 }
 
+const GENERIC_PARSE_ERR: &'static str = "an error occurred while parsing field headers";
 
-#[derive(Debug)]
-enum ParseHeaderError {
-    /// The `Content-Disposition` header was not found
-    MissingContentDisposition,
-    /// The header was found but could not be parsed
-    Invalid(String),
-    /// IO error
-    Io(io::Error),
-    Other(String),
-}
-
-impl fmt::Display for ParseHeaderError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            ParseHeaderError::MissingContentDisposition => write!(f, "\"Content-Disposition\" header not found (ParseHeaderError::MissingContentDisposition)"),
-            ParseHeaderError::Invalid(ref msg) => write!(f, "invalid header (ParseHeaderError::Invalid({}))", msg),
-            ParseHeaderError::Io(_) => write!(f, "could not read header (ParseHeaderError::Io)"),
-            ParseHeaderError::Other(ref reason) => write!(f, "unknown parsing error (ParseHeaderError::Other(\"{}\"))", reason),
+quick_error! {
+    #[derive(Debug)]
+    enum ParseHeaderError {
+        /// The `Content-Disposition` header was not found
+        MissingContentDisposition(headers: String) {
+            display(x) -> ("{}:\n{}", x.description(), headers)
+            description("\"Content-Disposition\" header not found in field headers")
         }
-    }
-}
-
-impl error::Error for ParseHeaderError {
-    fn description(&self) -> &str {
-        match *self {
-            ParseHeaderError::MissingContentDisposition => "\"Content-Disposition\" header not found",
-            ParseHeaderError::Invalid(_) => "the header is not formatted correctly",
-            ParseHeaderError::Io(_) => "failed to read the header",
-            ParseHeaderError::Other(_) => "unknown parsing error",
+        InvalidContDisp(reason: &'static str, cause: String) {
+            display(x) -> ("{}: {}: {}", x.description(), reason, cause)
+            description("invalid \"Content-Disposition\" header")
         }
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        match *self {
-            ParseHeaderError::Io(ref e) => Some(e),
-            _ => None,
+        /// The header was found but could not be parsed
+        TokenizeError(err: HttparseError) {
+            description(GENERIC_PARSE_ERR)
+            display(x) -> ("{}: {}", x.description(), err)
+            cause(err)
+            from()
         }
-    }
-}
-
-impl From<io::Error> for ParseHeaderError {
-    fn from(err: io::Error) -> ParseHeaderError {
-        ParseHeaderError::Io(err)
-    }
-}
-
-impl From<httparse::Error> for ParseHeaderError {
-    fn from(err: httparse::Error) -> ParseHeaderError {
-        ParseHeaderError::Invalid(format!("{}", err))
+        MimeError(err: MimeParseErr, cont_type: String) {
+            description(err.description())
+            display("{}\nwhile parsing Content-Type value: {}", err.description(), cont_type)
+            cause(err)
+            context(cont_type: &'a str, err: MimeParseErr) ->
+                (err, cont_type.to_string())
+        }
+        TooLarge {
+            description("field headers section ridiculously long or missing trailing CRLF-CRLF")
+        }
+        /// IO error
+        Io(err: io::Error) {
+            description("an io error occurred while parsing the headers")
+            display(x) -> ("{}: {}", x.description(), err)
+            cause(err)
+            from()
+        }
     }
 }
 

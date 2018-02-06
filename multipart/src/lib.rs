@@ -55,6 +55,10 @@ extern crate mime_guess;
 extern crate rand;
 extern crate tempdir;
 
+#[cfg(feature = "quick-error")]
+#[macro_use]
+extern crate quick_error;
+
 #[cfg(feature = "server")]
 extern crate safemem;
 

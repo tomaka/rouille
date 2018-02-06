@@ -30,6 +30,7 @@ clippy = { version = ">=0.0, <0.1", optional = true}
 buf_redux = { version = "0.6", optional = true }
 httparse = { version = "1.2", optional = true }
 twoway = { version = "0.1", optional = true }
+quick-error = { version = "1.2", optional = true }
 
 # Optional Integrations
 hyper = { version = ">=0.9, <0.11", optional = true, default-features = false }
@@ -43,7 +44,7 @@ env_logger = "0.3"
 [features]
 client = []
 default = ["client", "hyper", "iron", "mock", "nickel", "server", "tiny_http"]
-server = ["buf_redux", "httparse", "safemem", "twoway"]
+server = ["buf_redux", "httparse", "quick-error", "safemem", "twoway"]
 mock = []
 nightly = []
 bench = []
