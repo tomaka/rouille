@@ -1,5 +1,9 @@
 # Changelog
 
+## Version [Unreleased]
+
+- Replace `flate2` with `deflate`
+
 ## Version 2.0.0
 
 - Dropped the use of [rustc-serialize](https://crates.io/rustc-serialize)

@@ -57,8 +57,8 @@ extern crate base64;
 extern crate brotli2;
 extern crate chrono;
 extern crate filetime;
-#[cfg(feature = "flate2")]
-extern crate flate2;
+#[cfg(feature = "gzip")]
+extern crate deflate;
 extern crate multipart;
 extern crate rand;
 extern crate serde;

@@ -13,14 +13,14 @@ categories = ["web-programming::http-server", "web-programming::websocket"]
 [features]
 default = ["gzip", "brotli"]
 brotli = ["brotli2"]
-gzip = ["flate2"]
+gzip = ["deflate"]
 
 [dependencies]
 base64 = "0.7.0"
 brotli2 = { version = "0.2.1", optional = true }
 chrono = "0.4.0"
 filetime = "0.1.10"
-flate2 = { version = "0.2.14", optional = true }
+deflate = { version = "0.7", optional = true, features = ["gzip"] }
 multipart = { version = "0.13.6", default-features = false, features = ["server"] }
 rand = "0.3.11"
 serde = "1"
