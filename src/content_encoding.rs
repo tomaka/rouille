@@ -146,8 +146,8 @@ impl<'a> Iterator for AcceptedContentEncodingsIter<'a> {
 fn gzip(e: &str, response: &mut Option<Response>) -> bool {
     use ResponseBody;
     use std::mem;
-    use flate2::Compression;
-    use flate2::read::GzEncoder;
+    use std::io;
+    use deflate::deflate_bytes_gzip;
 
     if !e.eq_ignore_ascii_case("gzip") {
         return false;
@@ -156,8 +156,14 @@ fn gzip(e: &str, response: &mut Option<Response>) -> bool {
     let response = response.as_mut().unwrap();
     response.headers.push(("Content-Encoding".into(), "gzip".into()));
     let previous_body = mem::replace(&mut response.data, ResponseBody::empty());
-    let (raw_data, _) = previous_body.into_reader_and_size();
-    response.data = ResponseBody::from_reader(GzEncoder::new(raw_data, Compression::Default));
+    let (mut raw_data, size) = previous_body.into_reader_and_size();
+    let mut src = match size {
+        Some(size) => Vec::with_capacity(size),
+        None => Vec::new(),
+    };
+    io::copy(&mut raw_data, &mut src).expect("Failed reading response body while gzipping");
+    let zipped = deflate_bytes_gzip(&src);
+    response.data = ResponseBody::from_data(zipped);
     true
 }
 
