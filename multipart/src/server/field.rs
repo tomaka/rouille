@@ -64,21 +64,35 @@ fn with_headers<R, F, Ret>(r: &mut R, closure: F) -> Result<Ret, ParseHeaderErro
 where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
     const HEADER_LEN: usize = 4;
 
-    let (consume, ret) = {
+    let consume;
+    let ret;
+
+    let mut last_len = 0;
+
+    loop {
+        // this should return a larger buffer each time
         let buf = r.fill_buf()?;
+
+        // buffer has stopped growing
+        if buf.len() == last_len {
+            return Err(ParseHeaderError::TooLarge);
+        }
 
         let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
 
         match httparse::parse_headers(buf, &mut raw_headers)? {
-            Status::Partial => return Err(ParseHeaderError::TooLarge),
-            Status::Complete((consume, raw_headers)) => {
+            // read more and try again
+            Status::Partial => last_len = buf.len(),
+            Status::Complete((consume_, raw_headers)) => {
                 let mut headers = [EMPTY_STR_HEADER; HEADER_LEN];
                 let headers = copy_headers(raw_headers, &mut headers)?;
                 debug!("Parsed headers: {:?}", headers);
-                (consume, closure(headers))
+                consume = consume_;
+                ret = closure(headers);
+                break;
             },
         }
-    };
+    }
 
     r.consume(consume);
     Ok(ret)
@@ -303,7 +317,9 @@ impl<M: ReadEntry> Read for MultipartData<M> {
     }
 }
 
-/// Unlike `std::io::BufReader`,
+/// In this implementation, `fill_buf()` can return more data with each call.
+///
+/// Use `set_min_buf_size()` if you require a minimum buffer length.
 impl<M: ReadEntry> BufRead for MultipartData<M> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.inner_mut().source_mut().fill_buf()

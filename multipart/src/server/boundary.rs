@@ -9,11 +9,9 @@
 
 use ::safemem;
 
-use super::buf_redux::BufReader;
+use super::buf_redux;
 use super::buf_redux::strategy::{LessThan, AtEndLessThan};
 use super::twoway;
-
-use log::LogLevel;
 
 use std::cmp;
 use std::borrow::Borrow;
@@ -25,6 +23,8 @@ use self::State::*;
 
 pub const MIN_BUF_SIZE: usize = 1024;
 
+type BufReader<R> = buf_redux::BufReader<R, LessThan, AtEndLessThan>;
+
 #[derive(Debug, PartialEq, Eq)]
 enum State {
     Searching,
@@ -35,7 +35,7 @@ enum State {
 /// A struct implementing `Read` and `BufRead` that will yield bytes until it sees a given sequence.
 #[derive(Debug)]
 pub struct BoundaryReader<R> {
-    source: BufReader<R, LessThan, AtEndLessThan>,
+    source: BufReader<R>,
     boundary: Vec<u8>,
     search_idx: usize,
     state: State,
@@ -60,7 +60,7 @@ impl<R> BoundaryReader<R> where R: Read {
     }
 
     fn read_to_boundary(&mut self) -> io::Result<&[u8]> {
-        let buf = self.source.fill_buf()?;
+        let buf = fill_buf_min(&mut self.source, self.search_idx + self.boundary.len())?;
 
         trace!("Buf: {:?}", String::from_utf8_lossy(buf));
 
@@ -137,7 +137,7 @@ impl<R> BoundaryReader<R> where R: Read {
         let consume_amt = {
             let min_len = self.boundary.len() + 4;
 
-            let buf = self.source.fill_buf()?;
+            let buf = fill_buf_min(&mut self.source, min_len)?;
 
             if buf.len() < min_len {
                 return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
@@ -223,6 +223,19 @@ impl<R> BufRead for BoundaryReader<R> where R: Read {
     }
 }
 
+fn fill_buf_min<R: BufRead>(rdr: &mut R, min: usize) -> io::Result<&[u8]> {
+    let mut last_len = 0;
+
+    while {
+        let buf = rdr.fill_buf()?;
+        let cont = buf.len() > last_len && buf.len() < min;
+        last_len = buf.len();
+        cont
+    } { /* nop */ }
+
+    rdr.fill_buf()
+}
+
 #[cfg(test)]
 mod test {
     use super::BoundaryReader;
@@ -240,7 +253,8 @@ mod test {
         
     #[test]
     fn test_boundary() {
-        let _ = ::env_logger::init();        
+        ::mock::log_on_panic();
+
         debug!("Testing boundary (no split)");
 
         let src = &mut TEST_VAL.as_bytes();
@@ -285,7 +299,8 @@ mod test {
 
     #[test]
     fn test_split_boundary() {
-        let _ = ::env_logger::init();        
+        let logger = ::mock::log_on_panic();
+
         debug!("Testing boundary (split)");
 
         let mut buf = String::new();
@@ -299,6 +314,7 @@ mod test {
             test_boundary_reader(&mut reader, &mut buf);
         }
 
+        logger.clear();
     }
 
     fn test_boundary_reader<R: Read>(reader: &mut BoundaryReader<R>, buf: &mut String) {

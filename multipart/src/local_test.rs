@@ -205,7 +205,7 @@ impl fmt::Debug for PrintHex {
 
 macro_rules! do_test (
     ($client_test:ident, $server_test:ident) => (
-        let _ = ::env_logger::init();
+        let panic_logger = ::mock::log_on_panic();
 
         info!("Client Test: {:?} Server Test: {:?}", stringify!($client_test),
               stringify!($server_test));
@@ -224,6 +224,8 @@ macro_rules! do_test (
         $server_test(buf, &mut test_fields);
 
         test_fields.assert_is_empty();
+
+        panic_logger.clear();
     );
 );
 
@@ -252,7 +254,7 @@ mod extended {
 
     use std::time::Instant;
 
-    const TIME_LIMIT_SECS: u64 = 300;
+    const TIME_LIMIT_SECS: u64 = 600;
 
     #[test]
     #[ignore]

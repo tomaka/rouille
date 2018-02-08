@@ -2,8 +2,6 @@
 extern crate multipart;
 extern crate rand;
 
-use log::{LogRecord, LogMetadata, LogLevelFilter};
-
 use multipart::server::Multipart;
 
 use rand::{Rng, ThreadRng};
@@ -12,28 +10,29 @@ use std::fs::File;
 use std::env;
 use std::io::{self, Read};
 
-const LOG_LEVEL: LogLevelFilter = LogLevelFilter::Debug;
+const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Debug;
 
 struct SimpleLogger;
 
 impl log::Log for SimpleLogger {
-    fn enabled(&self, metadata: &LogMetadata) -> bool {
-        LOG_LEVEL.to_log_level()
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        LOG_LEVEL.to_level()
             .map_or(false, |level| metadata.level() <= level)
     }
 
-    fn log(&self, record: &LogRecord) {
+    fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
             println!("{} - {}", record.level(), record.args());
         }
     }
+    
+    fn flush(&self) {}
 }
 
+static LOGGER: SimpleLogger = SimpleLogger;
+
 fn main() {
-    log::set_logger(|max_log_level| {
-        max_log_level.set(LOG_LEVEL);
-        Box::new(SimpleLogger)
-    }).expect("Could not initialize logger");
+    log::set_logger(&LOGGER).expect("Could not initialize logger");
 
     let mut args = env::args().skip(1);
 

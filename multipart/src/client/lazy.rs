@@ -1,7 +1,4 @@
 //! Multipart requests which write out their data in one fell swoop.
-
-use log::LogLevel;
-
 use mime::Mime;
 
 use std::borrow::Cow;

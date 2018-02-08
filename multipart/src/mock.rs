@@ -5,8 +5,12 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 //! Mocked types for client-side and server-side APIs.
+use std::cell::RefCell;
 use std::io::{self, Read, Write};
-use std::fmt;
+use std::sync::{Once, ONCE_INIT};
+use std::{fmt, ptr, thread};
+
+use log::{Metadata, Record};
 
 use rand::{self, Rng, ThreadRng};
 
@@ -199,4 +203,67 @@ impl<'s, W: Write> Write for StdoutTee<'s, W> {
         self.inner.flush();
         self.stdout.flush()
     }
+}
+
+/// Suppress all logging inside `closure` unless there is a panic
+pub fn log_on_panic() -> PanicLogger {
+    ::log::set_max_level(::log::LevelFilter::Trace);
+
+    if ::log::logger() as *const ::log::Log != &LOGGER as *const ::log::Log {
+        ::log::set_logger(&LOGGER).unwrap();
+    }
+
+    PanicLogger(())
+}
+
+/// Struct that logs if the thread panics before it is dropped.
+#[must_use]
+pub struct PanicLogger(());
+
+impl PanicLogger {
+    /// Clear the buffered logs
+    pub fn clear(self) {
+        drop(self);
+    }
+}
+
+impl Drop for PanicLogger {
+    fn drop(&mut self) {
+        LOG.with(|log| {
+            let mut log = log.borrow_mut();
+            if thread::panicking() {
+                println!("log for failing test:\n{}", *log);
+            }
+            log.clear();
+        });
+    }
+}
+
+static INIT_PANIC_LOGGER: Once = ONCE_INIT;
+
+thread_local! {
+    static LOG: RefCell<String> = RefCell::new(String::new())
+}
+
+static LOGGER: ThreadLocalLogger = ThreadLocalLogger;
+
+struct ThreadLocalLogger;
+
+impl ::log::Log for ThreadLocalLogger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        true // metadata.target().contains("multipart")
+    }
+
+    fn log(&self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            LOG.with(|log| {
+                // format the message before pushing it to `ptr` since the fmt
+                // impls of the record arguments could try to log as well
+                let msg = format!("{}:{}: {}\n", record.level(), record.target(), record.args());
+                log.borrow_mut().push_str(&msg);
+            });
+        }
+    }
+
+    fn flush(&self) {}
 }

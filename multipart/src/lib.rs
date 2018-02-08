@@ -45,9 +45,6 @@
 #[macro_use]
 extern crate log;
 
-#[cfg(test)]
-extern crate env_logger;
-
 #[cfg_attr(test, macro_use)]
 extern crate mime;
 
