@@ -5,7 +5,7 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 //! Mocked types for client-side and server-side APIs.
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::io::{self, Read, Write};
 use std::sync::{Once, ONCE_INIT};
 use std::{fmt, ptr, thread};
@@ -205,13 +205,20 @@ impl<'s, W: Write> Write for StdoutTee<'s, W> {
     }
 }
 
-/// Suppress all logging inside `closure` unless there is a panic
+/// Capture all logging on this thread during `PanicLogger`'s lifetime.
+///
+/// When `PanicLogger` is dropped: if the thread is panicking, all captured logs are printed
+/// to stdout, otherwise the captured logs are deleted.
+///
+/// RFC: break this functionality out into its own crate?
 pub fn log_on_panic() -> PanicLogger {
     ::log::set_max_level(::log::LevelFilter::Trace);
 
     if ::log::logger() as *const ::log::Log != &LOGGER as *const ::log::Log {
-        ::log::set_logger(&LOGGER).unwrap();
+        ::log::set_logger(&LOGGER).expect("failed to set logger for `log_on_panic()`");
     }
+
+    LOG_ENABLED.with(|flag| flag.set(true));
 
     PanicLogger(())
 }
@@ -229,10 +236,11 @@ impl PanicLogger {
 
 impl Drop for PanicLogger {
     fn drop(&mut self) {
+        LOG_ENABLED.with(|flag| flag.set(false));
         LOG.with(|log| {
             let mut log = log.borrow_mut();
             if thread::panicking() {
-                println!("log for failing test:\n{}", *log);
+                println!("captured logs before panic:\n{}", *log);
             }
             log.clear();
         });
@@ -242,7 +250,8 @@ impl Drop for PanicLogger {
 static INIT_PANIC_LOGGER: Once = ONCE_INIT;
 
 thread_local! {
-    static LOG: RefCell<String> = RefCell::new(String::new())
+    static LOG: RefCell<String> = RefCell::new(String::new());
+    static LOG_ENABLED: Cell<bool> = Cell::new(bool);
 }
 
 static LOGGER: ThreadLocalLogger = ThreadLocalLogger;
@@ -251,7 +260,7 @@ struct ThreadLocalLogger;
 
 impl ::log::Log for ThreadLocalLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        true // metadata.target().contains("multipart")
+        LOG_ENABLED.with(Cell::get)
     }
 
     fn log(&self, record: &Record) {
