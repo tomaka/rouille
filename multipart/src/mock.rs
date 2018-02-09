@@ -210,7 +210,9 @@ impl<'s, W: Write> Write for StdoutTee<'s, W> {
 /// When `PanicLogger` is dropped: if the thread is panicking, all captured logs are printed
 /// to stdout, otherwise the captured logs are deleted.
 ///
-/// RFC: break this functionality out into its own crate?
+/// RFC: break this functionality out into its own crate? Could also support nested invocations
+/// (where each instance of `PanicLogger` only prints the logs captured during its lifetime)
+/// but that's currently unused here.
 pub fn log_on_panic() -> PanicLogger {
     ::log::set_max_level(::log::LevelFilter::Trace);
 
