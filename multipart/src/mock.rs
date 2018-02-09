@@ -253,7 +253,7 @@ static INIT_PANIC_LOGGER: Once = ONCE_INIT;
 
 thread_local! {
     static LOG: RefCell<String> = RefCell::new(String::new());
-    static LOG_ENABLED: Cell<bool> = Cell::new(bool);
+    static LOG_ENABLED: Cell<bool> = Cell::new(false);
 }
 
 static LOGGER: ThreadLocalLogger = ThreadLocalLogger;
