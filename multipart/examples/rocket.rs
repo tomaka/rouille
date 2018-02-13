@@ -67,6 +67,8 @@ fn process_upload(boundary: &str, data: Data) -> io::Result<Vec<u8>> {
     Ok(out)
 }
 
+// having a streaming output would be nice; there's one for returning a `Read` impl
+// but not one that you can `write()` to
 fn process_entries(entries: Entries, mut out: &mut Vec<u8>) -> io::Result<()> {
     {
         let stdout = io::stdout();
