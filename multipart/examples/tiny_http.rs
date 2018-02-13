@@ -54,7 +54,7 @@ fn process_request(request: &mut Request) -> io::Result<Response<RespBody>> {
 
 /// Processes saved entries from multipart request.
 /// Returns an OK response or an error.
-fn process_entries<'a>(entries: Entries) -> io::Result<Response<RespBody>> {
+fn process_entries(entries: Entries) -> io::Result<Response<RespBody>> {
     let mut data = Vec::new();
 
     {

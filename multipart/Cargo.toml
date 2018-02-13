@@ -1,7 +1,7 @@
 [package]
 name = "multipart"
 
-version = "0.14.0"
+version = "0.14.1"
 
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
@@ -40,6 +40,8 @@ nickel = { version = ">=0.10.1", optional = true }
 
 [dev-dependencies]
 env_logger = "0.4"
+rocket = "0.3"
+rocket_codegen = "0.3"
 
 [features]
 client = []
@@ -56,28 +58,32 @@ use_arc_str = []
 
 [[example]]
 name = "hyper_client"
-required-features = ["mock", "hyper"]
+required-features = ["client", "mock", "hyper"]
 
 [[example]]
 name = "hyper_reqbuilder"
-required-features = ["mock", "hyper"]
+required-features = ["client", "mock", "hyper"]
 
 [[example]]
 name = "hyper_server"
-required-features = ["mock", "hyper"]
+required-features = ["mock", "hyper", "server"]
 
 [[example]]
 name = "iron"
-required-features = ["mock", "iron"]
+required-features = ["mock", "iron", "server"]
 
 [[example]]
 name = "iron_intercept"
-required-features = ["mock", "iron"]
+required-features = ["mock", "iron", "server"]
 
 [[example]]
 name = "nickel"
-required-features = ["mock", "nickel"]
+required-features = ["mock", "nickel", "server"]
 
 [[example]]
 name = "tiny_http"
-required-features = ["mock", "tiny_http"]
+required-features = ["mock", "tiny_http", "server"]
+
+[[example]]
+name = "rocket"
+required-features = ["mock", "nightly", "server"]
