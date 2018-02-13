@@ -13,7 +13,7 @@ use multipart::server::Multipart;
 use multipart::server::save::Entries;
 use multipart::server::save::SaveResult::*;
 
-use rocket::{Data, Request};
+use rocket::Data;
 use rocket::http::{ContentType, Status};
 use rocket::response::Stream;
 use rocket::response::status::Custom;
@@ -21,8 +21,10 @@ use rocket::response::status::Custom;
 use std::io::{self, Cursor, Write};
 
 #[post("/upload", data = "<data>")]
+// signature requires the request to have a `Content-Type`
 fn multipart_upload(cont_type: &ContentType, data: Data) -> Result<Stream<Cursor<Vec<u8>>>, Custom<String>> {
-    // this can be implemented as a request guard but it seems like just more boilerplate
+    // this and the next check can be implemented as a request guard but it seems like just
+    // more boilerplate than necessary
     if !cont_type.is_form_data() {
         return Err(Custom(
             Status::BadRequest,
@@ -30,7 +32,7 @@ fn multipart_upload(cont_type: &ContentType, data: Data) -> Result<Stream<Cursor
         ));
     }
 
-    let (_, boundary) = cont_type.params().find(|&(k, v)| k == "boundary").ok_or_else(
+    let (_, boundary) = cont_type.params().find(|&(k, _)| k == "boundary").ok_or_else(
             || Custom(
                 Status::BadRequest,
                 "`Content-Type: multipart/form-data` boundary param not provided".into()
@@ -48,7 +50,7 @@ fn process_upload(boundary: &str, data: Data) -> io::Result<Vec<u8>> {
 
     // saves all fields, any field longer than 10kB goes to a temporary directory
     // Entries could implement FromData though that would give zero control over
-    // how the files are saved
+    // how the files are saved; Multipart would be a good impl candidate though
     match Multipart::with_body(data.open(), boundary).save().temp() {
         Full(entries) => process_entries(entries, &mut out)?,
         Partial(partial, reason) => {
@@ -65,7 +67,7 @@ fn process_upload(boundary: &str, data: Data) -> io::Result<Vec<u8>> {
     Ok(out)
 }
 
-fn process_entries(entries: Entries, out: &mut Vec<u8>) -> io::Result<()> {
+fn process_entries(entries: Entries, mut out: &mut Vec<u8>) -> io::Result<()> {
     {
         let stdout = io::stdout();
         let tee = StdoutTee::new(&mut out, &stdout);
