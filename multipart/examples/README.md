@@ -104,6 +104,9 @@ This example shows how `multipart`'s server API can be used with [Rocket](https:
 explicit support (the Rocket folks seem to want to handle `multipart/form-data` behind the scenes
 but haven't gotten around to implementing it yet; this would supercede any integration from `multipart`). 
 
+```
+$ cargo run --example rocket --features "rocket,rocket_codegen"
+```
 
 [iamsebastian]: https://github.com/iamsebastian
 [Puhrez]: https://github.com/puhrez
