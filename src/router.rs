@@ -106,7 +106,7 @@ macro_rules! router {
             let request = &$request;
 
             // ignoring the GET parameters (everything after `?`)
-            let request_url = request.url();
+            let request_url = request.raw_url();
             let request_url = {
                 let pos = request_url.find('?').unwrap_or(request_url.len());
                 &request_url[..pos]
@@ -154,7 +154,9 @@ macro_rules! router {
     //       and we can't actually "return None" since we'd be returning from whatever scope the macro is being used in.
     (__check_parse_pattern $request_url_str:ident, $url_pattern:expr => $handle:expr ; $($param:ident: $param_type:ty),*) => {
         {
-            let request_url = $request_url_str.split("/").collect::<Vec<_>>();
+            let request_url = $request_url_str.split("/")
+                .map(|s| $crate::url::percent_encoding::percent_decode(s.as_bytes()).decode_utf8_lossy().into_owned())
+                .collect::<Vec<_>>();
             let url_pattern = $url_pattern.split("/").collect::<Vec<_>>();
             if request_url.len() != url_pattern.len() {
                 None
@@ -251,7 +253,7 @@ macro_rules! router {
             let request = &$request;
 
             // ignoring the GET parameters (everything after `?`)
-            let request_url = request.url();
+            let request_url = request.raw_url();
             let request_url = {
                 let pos = request_url.find('?').unwrap_or(request_url.len());
                 &request_url[..pos]
@@ -297,7 +299,8 @@ macro_rules! router {
             let pat_end = url.find('/').unwrap_or(url.len());
             let rest_url = &url[pat_end..];
 
-            if let Ok($p) = url[0 .. pat_end].parse() {
+            if let Ok($p) = $crate::url::percent_encoding::percent_decode(url[0 .. pat_end].as_bytes())
+                .decode_utf8_lossy().parse() {
                 let $p: $t = $p;
                 router!(__check_pattern rest_url $value $($rest)*)
             } else {
@@ -569,12 +572,31 @@ mod tests {
     }
 
     #[test]
-    #[ignore]       // TODO: not implemented
+    fn encoded() {
+        let request = Request::fake_http("GET", "/hello/%3Fa/test", vec![], vec![]);
+
+        assert_eq!("?a", router!(request, 
+           (GET) ["/hello/{val}/test", val: String] => { val },
+           _ => String::from("")));
+    }
+
+    #[test]
+    fn encoded_old() {
+        let request = Request::fake_http("GET", "/hello/%3Fa/test", vec![], vec![]);
+
+        assert_eq!("?a", router!(request, 
+           (GET) (/hello/{val: String}/test) => { val },
+           _ => String::from("")));
+    }
+
+
+
+    #[test]
     fn param_slash() {
         let request = Request::fake_http("GET", "/hello%2F5", vec![], vec![]);
 
         router!(request,
-            (GET) ["/", a: String] => { assert_eq!(a, "hello/5") },
+            (GET) ["/{a}", a: String] => { assert_eq!(a, "hello/5") },
             _ => panic!()
         );
     }
