@@ -68,7 +68,7 @@ extern crate serde_json;
 extern crate sha1;
 extern crate time;
 extern crate tiny_http;
-extern crate url;
+pub extern crate url;
 extern crate threadpool;
 extern crate num_cpus;
 

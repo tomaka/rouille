@@ -3,6 +3,10 @@
 ## Version [Unreleased]
 
 - Replace `flate2` with `deflate`
+- Fixed handling of url-encoded path components in route!() macro. 
+  Previously, URL was eagerly decoded and thus would fail to match
+  intended routes if special characters were used (such as ? or /).
+  Now, individual matched components are decoded after matching.
 
 ## Version 2.0.0
 
