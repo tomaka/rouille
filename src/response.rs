@@ -390,6 +390,24 @@ impl Response {
         }
     }
 
+    /// Builds an empty `Response` with a 204 status code.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rouille::Response;
+    /// let response = Response::empty_204();
+    /// ```
+    #[inline]
+    pub fn empty_204() -> Response {
+        Response {
+            status_code: 204,
+            headers: vec![],
+            data: ResponseBody::empty(),
+            upgrade: None,
+        }
+    }
+
     /// Builds an empty `Response` with a 400 status code.
     ///
     /// # Example
