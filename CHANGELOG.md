@@ -7,6 +7,7 @@
   Previously, URL was eagerly decoded and thus would fail to match
   intended routes if special characters were used (such as ? or /).
   Now, individual matched components are decoded after matching.
+- Added `Response::empty_204`.
 
 ## Version 2.0.0
 
