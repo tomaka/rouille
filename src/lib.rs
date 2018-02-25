@@ -302,6 +302,31 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         })
     }
 
+    /// Builds a new `Server` object with SSL support.
+    ///
+    /// After this function returns, the HTTPS server is listening.
+    ///
+    /// Returns an error if there was an error while creating the listening socket, for example if
+    /// the port is already in use.
+    #[cfg(feature = "ssl")]
+    pub fn new_ssl<A>(
+        addr: A,
+        handler: F,
+        certificate: Vec<u8>,
+        private_key: Vec<u8>,
+    ) -> Result<Server<F>, Box<Error + Send + Sync>> where A: ToSocketAddrs {
+        let ssl_config = tiny_http::SslConfig {
+            certificate,
+            private_key,
+        };
+        let server = try!(tiny_http::Server::https(addr, ssl_config));
+        Ok(Server {
+            server: server,
+            executor: Executor::Threaded,
+            handler: Arc::new(AssertUnwindSafe(handler)),   // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
+        })
+    }
+
     /// Use a `ThreadPool` of the given size to process requests
     ///
     /// `pool_size` must be greater than zero or this function will panic.

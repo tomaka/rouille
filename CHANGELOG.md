@@ -8,6 +8,8 @@
   intended routes if special characters were used (such as ? or /).
   Now, individual matched components are decoded after matching.
 - Added `Response::empty_204`.
+- Added ssl feature and new_ssl constructor to Server, for https
+  support. The certificate and private key must be supplied by user.
 
 ## Version 2.0.0
 
