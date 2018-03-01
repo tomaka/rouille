@@ -1,7 +1,7 @@
 [package]
 name = "multipart"
 
-version = "0.14.1"
+version = "0.14.2"
 
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
 
@@ -34,7 +34,7 @@ quick-error = { version = "1.2", optional = true }
 
 # Optional Integrations
 hyper = { version = ">=0.9, <0.11", optional = true, default-features = false }
-iron = { version = ">=0.4,<0.6", optional = true }
+iron = { version = ">=0.4,<0.7", optional = true }
 tiny_http = { version = "0.5", optional = true }
 nickel = { version = ">=0.10.1", optional = true }
 
