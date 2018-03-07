@@ -2,6 +2,8 @@
 
 ## Version [Unreleased]
 
+## Version 2.1.0
+
 - Replace `flate2` with `deflate`
 - Fixed handling of url-encoded path components in route!() macro. 
   Previously, URL was eagerly decoded and thus would fail to match
