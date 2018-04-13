@@ -20,7 +20,7 @@ ssl = ["tiny_http/ssl"]
 base64 = "0.9.0"
 brotli2 = { version = "0.3.2", optional = true }
 chrono = "0.4.0"
-filetime = "0.1.10"
+filetime = "0.2.0"
 deflate = { version = "0.7", optional = true, features = ["gzip"] }
 multipart = { version = "0.13.6", default-features = false, features = ["server"] }
 rand = "0.4.2"
