@@ -17,24 +17,24 @@ gzip = ["deflate"]
 ssl = ["tiny_http/ssl"]
 
 [dependencies]
-base64 = "0.7.0"
-brotli2 = { version = "0.2.1", optional = true }
+base64 = "0.9.0"
+brotli2 = { version = "0.3.2", optional = true }
 chrono = "0.4.0"
 filetime = "0.1.10"
 deflate = { version = "0.7", optional = true, features = ["gzip"] }
 multipart = { version = "0.13.6", default-features = false, features = ["server"] }
-rand = "0.3.11"
+rand = "0.4.2"
 serde = "1"
 serde_derive = "1"
 serde_json = "1"
-sha1 = "0.2.0"
-term = "0.2"
+sha1 = "0.6.0"
+term = "0.5.1"
 time = "0.1.31"
-tiny_http = "0.5.6"
+tiny_http = "0.6.0"
 url = "1.2"
 threadpool = "1"
 num_cpus = "1"
 
 [dev-dependencies]
-postgres = { version = "0.13", default-features = false }
-log = "0.3"
+postgres = { version = "0.15.2", default-features = false }
+log = "0.4"
