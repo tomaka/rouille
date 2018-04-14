@@ -70,13 +70,17 @@ pub use self::websocket::SendError;
 pub use self::websocket::Websocket;
 
 use base64;
-use std::ascii::AsciiExt;
 use std::borrow::Cow;
 use std::error;
 use std::fmt;
 use std::sync::mpsc;
 use std::vec::IntoIter as VecIntoIter;
 use sha1::Sha1;
+
+// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
+// be removed when supporting older Rust is no longer needed.
+#[allow(unused_imports)]
+use std::ascii::AsciiExt;
 
 use Request;
 use Response;
