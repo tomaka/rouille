@@ -99,7 +99,7 @@ impl fmt::Display for PlainTextError {
 ///
 #[inline]
 pub fn plain_text_body(request: &Request) -> Result<String, PlainTextError> {
-    plain_text_body_with_limit(request, 1 * 1024 * 1024)
+    plain_text_body_with_limit(request, 1024 * 1024)
 }
 
 /// Reads plain text data from the body of a request.
