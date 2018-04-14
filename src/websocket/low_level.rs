@@ -100,10 +100,7 @@ impl StateMachine {
     /// received.
     #[inline]
     pub fn feed<'a>(&'a mut self, data: &'a [u8]) -> ElementsIter<'a> {
-        ElementsIter {
-            state: self,
-            data: data,
-        }
+        ElementsIter { state: self, data }
     }
 }
 
@@ -153,7 +150,7 @@ impl<'a> Iterator for ElementsIter<'a> {
                         desc: "Client-to-server messages must be masked"
                     });
                 }
-    
+
                 // Find the length of the frame and the mask.
                 let (length, mask) = match second_byte & 0x7f {
                     126 => {
@@ -166,17 +163,17 @@ impl<'a> Iterator for ElementsIter<'a> {
                         let mut mask_iter = self.state.buffer.iter().chain(self.data.iter()).skip(2);
 
                         let length = {
-                            let a = *mask_iter.next().unwrap() as u64;
-                            let b = *mask_iter.next().unwrap() as u64;
+                            let a = u64::from(*mask_iter.next().unwrap());
+                            let b = u64::from(*mask_iter.next().unwrap());
                             (a << 8) | (b << 0)
                         };
 
                         let mask = {
-                            let a = *mask_iter.next().unwrap() as u32;
-                            let b = *mask_iter.next().unwrap() as u32;
-                            let c = *mask_iter.next().unwrap() as u32;
-                            let d = *mask_iter.next().unwrap() as u32;
-                            (a << 24) | (b << 16) | (c << 8) | (d << 0) 
+                            let a = u32::from(*mask_iter.next().unwrap());
+                            let b = u32::from(*mask_iter.next().unwrap());
+                            let c = u32::from(*mask_iter.next().unwrap());
+                            let d = u32::from(*mask_iter.next().unwrap());
+                            (a << 24) | (b << 16) | (c << 8) | (d << 0)
                         };
 
                         (length, mask)
@@ -191,14 +188,14 @@ impl<'a> Iterator for ElementsIter<'a> {
                         let mut mask_iter = self.state.buffer.iter().chain(self.data.iter()).skip(2);
 
                         let length = {
-                            let a = *mask_iter.next().unwrap() as u64;
-                            let b = *mask_iter.next().unwrap() as u64;
-                            let c = *mask_iter.next().unwrap() as u64;
-                            let d = *mask_iter.next().unwrap() as u64;
-                            let e = *mask_iter.next().unwrap() as u64;
-                            let f = *mask_iter.next().unwrap() as u64;
-                            let g = *mask_iter.next().unwrap() as u64;
-                            let h = *mask_iter.next().unwrap() as u64;
+                            let a = u64::from(*mask_iter.next().unwrap());
+                            let b = u64::from(*mask_iter.next().unwrap());
+                            let c = u64::from(*mask_iter.next().unwrap());
+                            let d = u64::from(*mask_iter.next().unwrap());
+                            let e = u64::from(*mask_iter.next().unwrap());
+                            let f = u64::from(*mask_iter.next().unwrap());
+                            let g = u64::from(*mask_iter.next().unwrap());
+                            let h = u64::from(*mask_iter.next().unwrap());
 
                             // The most significant bit must be zero according to the specs.
                             if (a & 0x80) != 0 {
@@ -212,32 +209,32 @@ impl<'a> Iterator for ElementsIter<'a> {
                         };
 
                         let mask = {
-                            let a = *mask_iter.next().unwrap() as u32;
-                            let b = *mask_iter.next().unwrap() as u32;
-                            let c = *mask_iter.next().unwrap() as u32;
-                            let d = *mask_iter.next().unwrap() as u32;
-                            (a << 24) | (b << 16) | (c << 8) | (d << 0) 
+                            let a = u32::from(*mask_iter.next().unwrap());
+                            let b = u32::from(*mask_iter.next().unwrap());
+                            let c = u32::from(*mask_iter.next().unwrap());
+                            let d = u32::from(*mask_iter.next().unwrap());
+                            (a << 24) | (b << 16) | (c << 8) | (d << 0)
                         };
 
                         (length, mask)
                     },
-                    n => {             
+                    n => {
                         let mut mask_iter = self.state.buffer.iter().chain(self.data.iter()).skip(2);
-           
+
                         let mask = {
-                            let a = *mask_iter.next().unwrap() as u32;
-                            let b = *mask_iter.next().unwrap() as u32;
-                            let c = *mask_iter.next().unwrap() as u32;
-                            let d = *mask_iter.next().unwrap() as u32;
-                            (a << 24) | (b << 16) | (c << 8) | (d << 0) 
+                            let a = u32::from(*mask_iter.next().unwrap());
+                            let b = u32::from(*mask_iter.next().unwrap());
+                            let c = u32::from(*mask_iter.next().unwrap());
+                            let d = u32::from(*mask_iter.next().unwrap());
+                            (a << 24) | (b << 16) | (c << 8) | (d << 0)
                         };
 
-                        (n as u64, mask)
+                        (u64::from(n), mask)
                     },
                 };
 
                 // Builds a slice containing the start of the data.
-                let data_start = { 
+                let data_start = {
                     let data_start_off = match second_byte & 0x7f {
                         126 => 8,
                         127 => 14,
@@ -251,11 +248,14 @@ impl<'a> Iterator for ElementsIter<'a> {
                 // Update ourselves for the next loop and return a FrameStart message.
                 self.data = data_start;
                 self.state.buffer.clear();
-                self.state.inner = StateMachineInner::InData { mask: mask, remaining_len: length,
-                                                               offset: 0 };
+                self.state.inner = StateMachineInner::InData {
+                    mask,
+                    remaining_len: length,
+                    offset: 0
+                };
                 Some(Element::FrameStart {
                     fin: (first_byte & 0x80) != 0,
-                    length: length,
+                    length,
                     opcode: first_byte & 0xf,
                 })
             },
@@ -267,7 +267,7 @@ impl<'a> Iterator for ElementsIter<'a> {
             {
                 let data = Data {
                     data: self.data,
-                    mask: mask,
+                    mask,
                     offset: *offset,
                 };
 
@@ -277,7 +277,7 @@ impl<'a> Iterator for ElementsIter<'a> {
 
                 self.data = &[];
 
-                Some(Element::Data { data: data, last_in_frame: false })
+                Some(Element::Data { data, last_in_frame: false })
             },
 
             // Third situation, we have enough data to finish the frame.
@@ -286,15 +286,15 @@ impl<'a> Iterator for ElementsIter<'a> {
 
                 let data = Data {
                     data: &self.data[0 .. remaining_len as usize],
-                    mask: mask,
-                    offset: offset,
+                    mask,
+                    offset,
                 };
 
                 self.data = &self.data[remaining_len as usize ..];
                 self.state.inner = StateMachineInner::InHeader;
                 debug_assert!(self.state.buffer.is_empty());
 
-                Some(Element::Data { data: data, last_in_frame: true })
+                Some(Element::Data { data, last_in_frame: true })
             },
         }
     }
