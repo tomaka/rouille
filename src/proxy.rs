@@ -175,13 +175,13 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
 
         try!(socket.write_all(format!("{}: {}\r\n", header, value).as_bytes()));
     }
-    try!(socket.write_all("Connection: close\r\n\r\n".as_bytes()));
+    try!(socket.write_all(b"Connection: close\r\n\r\n"));
     try!(io::copy(&mut data, &mut socket));
 
     let mut socket = io::BufReader::new(socket);
 
     let mut headers = Vec::new();
-    let status;
+    let status_code;
     {
         let mut lines = socket.by_ref().lines();
 
@@ -196,7 +196,7 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
                 Some(l) => l,
                 None => return Err(ProxyError::HttpParseError),
             };
-            status = match status_str.parse() {
+            status_code = match status_str.parse() {
                 Ok(s) => s,
                 Err(_) => return Err(ProxyError::HttpParseError),
             };
@@ -222,8 +222,8 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
     }
 
     Ok(Response {
-        status_code: status,
-        headers: headers,
+        status_code,
+        headers,
         data: ResponseBody::from_reader(socket),
         upgrade: None,
     })

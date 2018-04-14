@@ -131,7 +131,7 @@ fn format_time(duration: Duration) -> String {
         None => return format!("{}s", duration.as_secs() as f64),
     };
 
-    let duration_in_ns = secs_part + duration.subsec_nanos() as u64;
+    let duration_in_ns = secs_part + u64::from(duration.subsec_nanos());
 
     if duration_in_ns < 1_000 {
         format!("{}ns", duration_in_ns)
