@@ -553,7 +553,7 @@ impl Response {
     /// }
     /// ```
     #[inline]
-    pub fn with_etag<E>(mut self, request: &Request, etag: E) -> Response
+    pub fn with_etag<E>(self, request: &Request, etag: E) -> Response
         where E: Into<Cow<'static, str>>
     {
         self.with_etag_keep(etag).simplify_if_etag_match(request)
