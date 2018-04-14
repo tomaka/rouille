@@ -249,13 +249,9 @@ impl Executor {
 
     #[inline]
     fn execute<F: FnOnce() + Send + 'static>(&self, f: F) {
-        match self {
-            &Executor::Threaded => {
-                thread::spawn(f);
-            }
-            &Executor::Pooled { ref pool } => {
-                pool.execute(f);
-            }
+        match *self {
+            Executor::Threaded => { thread::spawn(f); }
+            Executor::Pooled { ref pool } => { pool.execute(f); }
         }
     }
 }
@@ -300,7 +296,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     {
         let server = try!(tiny_http::Server::http(addr));
         Ok(Server {
-            server: server,
+            server,
             executor: Executor::Threaded,
             handler: Arc::new(AssertUnwindSafe(handler)),   // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
         })
@@ -325,7 +321,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         };
         let server = try!(tiny_http::Server::https(addr, ssl_config));
         Ok(Server {
-            server: server,
+            server,
             executor: Executor::Threaded,
             handler: Arc::new(AssertUnwindSafe(handler)),   // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
         })
@@ -386,17 +382,18 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
                 let url = request.url().to_owned();
                 let method = request.method().as_str().to_owned();
                 let headers = request.headers().iter().map(|h| (h.field.to_string(), h.value.clone().into())).collect();
-                let remote_addr = request.remote_addr().clone();
+                let remote_addr = *request.remote_addr();
 
                 tiny_http_request = Arc::new(Mutex::new(Some(request)));
+                let data = Arc::new(Mutex::new(Some(Box::new(RequestRead(tiny_http_request.clone())) as Box<_>)));
 
                 Request {
-                    url: url,
-                    method: method,
-                    headers: headers,
+                    url,
+                    method,
+                    headers,
                     https: false,
-                    data: Arc::new(Mutex::new(Some(Box::new(RequestRead(tiny_http_request.clone())) as Box<_>))),
-                    remote_addr: remote_addr,
+                    data,
+                    remote_addr,
                 }
             };
 
@@ -500,13 +497,16 @@ impl Request {
     pub fn fake_http<U, M>(method: M, url: U, headers: Vec<(String, String)>, data: Vec<u8>)
                            -> Request where U: Into<String>, M: Into<String>
     {
+        let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
+        let remote_addr = "127.0.0.1:12345".parse().unwrap();
+
         Request {
             url: url.into(),
             method: method.into(),
             https: false,
-            data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
-            headers: headers,
-            remote_addr: "127.0.0.1:12345".parse().unwrap(),
+            data,
+            headers,
+            remote_addr,
         }
     }
 
@@ -515,12 +515,14 @@ impl Request {
                                 headers: Vec<(String, String)>, data: Vec<u8>)
                                 -> Request where U: Into<String>, M: Into<String>
     {
+        let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
+
         Request {
             url: url.into(),
             method: method.into(),
             https: false,
-            data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
-            headers: headers,
+            data,
+            headers,
             remote_addr: from,
         }
     }
@@ -532,13 +534,16 @@ impl Request {
     pub fn fake_https<U, M>(method: M, url: U, headers: Vec<(String, String)>, data: Vec<u8>)
                             -> Request where U: Into<String>, M: Into<String>
     {
+        let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
+        let remote_addr = "127.0.0.1:12345".parse().unwrap();
+
         Request {
             url: url.into(),
             method: method.into(),
             https: true,
-            data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
-            headers: headers,
-            remote_addr: "127.0.0.1:12345".parse().unwrap(),
+            data,
+            headers,
+            remote_addr,
         }
     }
 
@@ -547,12 +552,14 @@ impl Request {
                                  headers: Vec<(String, String)>, data: Vec<u8>)
                                  -> Request where U: Into<String>, M: Into<String>
     {
+        let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
+
         Request {
             url: url.into(),
             method: method.into(),
             https: true,
-            data: Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>))),
-            headers: headers,
+            data,
+            headers,
             remote_addr: from,
         }
     }
@@ -585,9 +592,9 @@ impl Request {
             method: self.method.clone(),
             url: self.url[prefix.len() ..].to_owned(),
             headers: self.headers.clone(),      // TODO: expensive
-            https: self.https.clone(),
+            https: self.https,
             data: self.data.clone(),
-            remote_addr: self.remote_addr.clone(),
+            remote_addr: self.remote_addr,
         })
     }
 

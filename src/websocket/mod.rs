@@ -181,7 +181,7 @@ pub fn start<S>(request: &Request, subprotocol: Option<S>)
     response.status_code = 101;
     response.headers.push(("Upgrade".into(), "websocket".into()));
     if let Some(sp) = subprotocol {
-        response.headers.push(("Sec-Websocket-Protocol".into(), sp.into()));
+        response.headers.push(("Sec-Websocket-Protocol".into(), sp));
     }
     response.headers.push(("Sec-Websocket-Accept".into(), key.into()));
     response.upgrade = Some(Box::new(tx) as Box<_>);
@@ -210,7 +210,7 @@ pub fn requested_protocols(request: &Request) -> RequestedProtocolsIter {
                         .filter(|s| !s.is_empty())
                         .map(|s| s.to_owned())
                         .collect::<Vec<_>>().into_iter();
-            RequestedProtocolsIter { iter: iter }
+            RequestedProtocolsIter { iter }
         }
     }
 }

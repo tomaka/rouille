@@ -70,20 +70,20 @@ pub fn basic_http_auth(request: &Request) -> Option<HttpAuthCredentials> {
         return None;
     }
 
-    let authvalue = match split.next() { None => return None, Some(v) => v };
-    let authvalue = match base64::decode(authvalue) { Ok(v) => v, Err(_) => return None };
+    let authvalue = match split.next().and_then(|val| base64::decode(val).ok()) {
+        Some(v) => v, None => return None
+    };
 
     let mut split = authvalue.splitn(2, |&c| c == b':');
-    let login = match split.next() { Some(l) => l, None => return None };
-    let pass = match split.next() { Some(p) => p, None => return None };
 
-    let login = match String::from_utf8(login.to_owned()) { Ok(l) => l, Err(_) => return None };
-    let pass = match String::from_utf8(pass.to_owned()) { Ok(p) => p, Err(_) => return None };
+    let login = match split.next().map(Vec::from).and_then(|l| String::from_utf8(l).ok()) {
+        Some(l) => l, None => return None
+    };
+    let password = match split.next().map(Vec::from).and_then(|p| String::from_utf8(p).ok()) {
+        Some(p) => p, None => return None
+    };
 
-    Some(HttpAuthCredentials {
-        login: login,
-        password: pass,
-    })
+    Some(HttpAuthCredentials { login, password })
 }
 
 #[cfg(test)]

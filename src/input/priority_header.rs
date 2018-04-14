@@ -130,9 +130,8 @@ impl<'a> Iterator for PriorityHeaderIter<'a> {
             for p in params {
                 let trimmed_p = p.trim_left();
                 if trimmed_p.starts_with("q=") {
-                    match FromStr::from_str(&trimmed_p[2..].trim()) {
-                        Ok(val) => { value = val; break },
-                        _ => ()
+                    if let Ok(val) = FromStr::from_str(&trimmed_p[2..].trim()) {
+                        value = val; break;
                     }
                 }
             }

@@ -143,7 +143,7 @@ impl CgiRun for Command {
             let mut stdout = io::BufReader::new(child.stdout.take().unwrap());
 
             let mut headers = Vec::new();
-            let mut status = 200;
+            let mut status_code = 200;
             for header in stdout.by_ref().lines() {
                 let header = try!(header);
                 if header.is_empty() { break; }
@@ -154,15 +154,15 @@ impl CgiRun for Command {
                 let val = &val[1..];
 
                 if header == "Status" {
-                    status = val[0..3].parse().expect("Status returned by CGI program is invalid");
+                    status_code = val[0..3].parse().expect("Status returned by CGI program is invalid");
                 } else {
                     headers.push((header.to_owned().into(), val.to_owned().into()));
                 }
             }
 
             Response {
-                status_code: status,
-                headers: headers,
+                status_code,
+                headers,
                 data: ResponseBody::from_reader(stdout),
                 upgrade: None,
             }

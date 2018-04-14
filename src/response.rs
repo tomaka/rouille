@@ -525,7 +525,7 @@ impl Response {
         });
 
         if found_one {
-            for &mut (ref h, ref mut v) in self.headers.iter_mut() {
+            for &mut (ref h, ref mut v) in &mut self.headers {
                 if !h.eq_ignore_ascii_case(&header) { continue; }
                 *v = value.into();
                 break;
@@ -557,7 +557,7 @@ impl Response {
     /// }
     /// ```
     #[inline]
-    pub fn with_etag<E>(mut self, request: &Request, etag: E) -> Response
+    pub fn with_etag<E>(self, request: &Request, etag: E) -> Response
         where E: Into<Cow<'static, str>>
     {
         self.with_etag_keep(etag).simplify_if_etag_match(request)
@@ -571,20 +571,12 @@ impl Response {
         }
 
         let mut not_modified = false;
-        for &(ref key, ref etag) in self.headers.iter() {
+        for &(ref key, ref etag) in &self.headers {
             if !key.eq_ignore_ascii_case("ETag") {
                 continue;
             }
 
-            not_modified = if let Some(header) = request.header("If-None-Match") {
-                if header == etag {
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
+            not_modified = request.header("If-None-Match").map(|header| header == etag).unwrap_or(false);
         }
 
         if not_modified {
@@ -634,7 +626,7 @@ impl Response {
         // TODO: it's maybe possible to specify multiple file names
         let mut header = Some(format!("attachment; filename*=UTF8''{}", name).into());
 
-        for &mut (ref key, ref mut val) in self.headers.iter_mut() {
+        for &mut (ref key, ref mut val) in &mut self.headers {
             if key.eq_ignore_ascii_case("Content-Disposition") {
                 *val = header.take().unwrap();
                 break;
@@ -642,7 +634,7 @@ impl Response {
         }
 
         if let Some(header) = header {
-            self.headers.push(("Content-Disposition".into(), header.into()));
+            self.headers.push(("Content-Disposition".into(), header));
         }
 
         self

@@ -55,15 +55,7 @@ pub struct ErrJson<'a> {
 
 impl<'a> ErrJson<'a> {
     pub fn from_err<E: ?Sized + Error>(err: &'a E) -> ErrJson<'a> {
-        let cause = if let Some(cause) = err.cause() {
-            Some(Box::new(ErrJson::from_err(cause)))
-        } else {
-            None
-        };
-
-        ErrJson {
-            description: err.description(),
-            cause: cause,
-        }
+        let cause = err.cause().map(ErrJson::from_err).map(Box::new);
+        ErrJson { description: err.description(), cause }
     }
 }

@@ -83,15 +83,12 @@ pub struct Multipart<'a> {
 
 impl<'a> Multipart<'a> {
     pub fn next(&mut self) -> Option<MultipartField<&mut InnerMultipart<RequestBody<'a>>>> {
-        match self.inner.read_entry() {
-            Ok(e) => e,
-            _ => return None
-        }
+        self.inner.read_entry().unwrap_or(None)
     }
 }
 
 fn multipart_boundary(request: &Request) -> Option<String> {
-    const BOUNDARY: &'static str = "boundary=";
+    const BOUNDARY: &str = "boundary=";
 
     let content_type = match request.header("Content-Type") {
         None => return None,
