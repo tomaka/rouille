@@ -91,8 +91,12 @@ use std::slice::Iter as SliceIter;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
-use std::ascii::AsciiExt;
 use std::fmt;
+
+// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
+// be removed when supporting older Rust is no longer needed.
+#[allow(unused_imports)]
+use std::ascii::AsciiExt;
 
 pub mod cgi;
 pub mod content_encoding;
