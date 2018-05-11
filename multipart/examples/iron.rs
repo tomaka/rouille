@@ -10,7 +10,7 @@ use iron::prelude::*;
 use iron::status;
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::init();
 
     Iron::new(process_request).http("localhost:80").expect("Could not bind localhost:80");
 }
