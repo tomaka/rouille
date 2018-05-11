@@ -272,7 +272,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
 
         try_start!(create_dir_all(&dir));
 
-        self.with_entries(Entries::new(SaveDir::Perm(dir.into())))
+        self.with_entries(Entries::new(SaveDir::Perm(dir)))
     }
 
     /// Commence the save operation using the existing `Entries` instance.
@@ -284,7 +284,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
     ///
     /// Note that `PartialReason::CountLimit` will still be returned if the number of fields
     /// reaches `u32::MAX`, but this would be an extremely degenerate case.
-    pub fn with_entries(mut self, mut entries: Entries) -> EntriesSaveResult<M> {
+    pub fn with_entries(self, mut entries: Entries) -> EntriesSaveResult<M> {
         let SaveBuilder {
             savable, open_opts, count_limit, size_limit,
             memory_threshold, text_policy
@@ -458,10 +458,12 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
             match str::from_utf8(buf) {
                 Ok(s) => { string.push_str(s); Full(buf.len()) },
                 // buffer should always be bigger
-                Err(e) => if buf.len() < 4 { return Partial(0, e.into())} else {
-                    string.push_str(str::from_utf8(&buf[..e.valid_up_to()]).unwrap());
-                    Full(e.valid_up_to())
-                }
+                Err(e) => if buf.len() < 4 {
+                        Partial(0, e.into())
+                    } else {
+                        string.push_str(str::from_utf8(&buf[..e.valid_up_to()]).unwrap());
+                        Full(e.valid_up_to())
+                    }
             }
         }, 0);
 
@@ -884,7 +886,7 @@ pub enum SaveResult<Success, Partial> {
 }
 
 /// Shorthand result for methods that return `Entries`
-pub type EntriesSaveResult<M: ReadEntry> = SaveResult<Entries, PartialEntries<M>>;
+pub type EntriesSaveResult<M> = SaveResult<Entries, PartialEntries<M>>;
 
 /// Shorthand result for methods that return `FieldData`s.
 ///
@@ -966,7 +968,7 @@ fn create_dir_all(path: &Path) -> io::Result<()> {
     }
 }
 
-fn try_copy_limited<R: BufRead, Wb: FnMut(&[u8]) -> SaveResult<usize, usize>>(mut src: R, mut with_buf: Wb, limit: u64) -> SaveResult<u64, u64> {
+fn try_copy_limited<R: BufRead, Wb: FnMut(&[u8]) -> SaveResult<usize, usize>>(src: R, mut with_buf: Wb, limit: u64) -> SaveResult<u64, u64> {
     let mut copied = 0u64;
     try_read_buf(src, |buf| {
         let new_copied = copied.saturating_add(buf.len() as u64);

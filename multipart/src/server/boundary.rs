@@ -92,7 +92,7 @@ impl<R> BoundaryReader<R> where R: Read {
             trace!("Two bytes before: {:?} ({:?}) (\"\\r\\n\": {:?})",
                    String::from_utf8_lossy(two_bytes_before), two_bytes_before, b"\r\n");
 
-            if two_bytes_before == &*b"\r\n" {
+            if two_bytes_before == *b"\r\n" {
                 debug!("Subtract two!");
                 buf_len -= 2;
             }
@@ -246,7 +246,7 @@ mod test {
         
     #[test]
     fn test_boundary() {
-        ::mock::log_on_panic();
+        let _logger = ::mock::log_on_panic();
 
         debug!("Testing boundary (no split)");
 

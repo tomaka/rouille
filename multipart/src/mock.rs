@@ -7,7 +7,6 @@
 //! Mocked types for client-side and server-side APIs.
 use std::cell::{Cell, RefCell};
 use std::io::{self, Read, Write};
-use std::sync::{Once, ONCE_INIT};
 use std::{fmt, thread};
 
 use log::{Metadata, Record};
@@ -67,9 +66,9 @@ impl HttpBuffer {
     /// Wrap the given buffer with the given boundary and optional content-length.
     pub fn with_buf(buf: Vec<u8>, boundary: String, content_len: Option<u64>) -> Self {
         HttpBuffer {
-            buf: buf,
-            boundary: boundary,
-            content_len: content_len,
+            buf,
+            boundary,
+            content_len,
             rng: rand::thread_rng()
         }
     }
@@ -144,8 +143,8 @@ impl<'a> ServerRequest<'a> {
     /// Assumes `content_len: None`
     pub fn new(data: &'a [u8], boundary: &'a str) -> Self {
         ServerRequest {
-            data: data,
-            boundary: boundary,
+            data,
+            boundary,
             content_len: None,
             rng: rand::thread_rng(),
         }
@@ -195,12 +194,12 @@ impl<'s, W> StdoutTee<'s, W> {
 
 impl<'s, W: Write> Write for StdoutTee<'s, W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.write(buf)?;
+        self.inner.write_all(buf)?;
         self.stdout.write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush();
+        self.inner.flush()?;
         self.stdout.flush()
     }
 }
@@ -249,8 +248,6 @@ impl Drop for PanicLogger {
     }
 }
 
-static INIT_PANIC_LOGGER: Once = ONCE_INIT;
-
 thread_local! {
     static LOG: RefCell<String> = RefCell::new(String::new());
     static LOG_ENABLED: Cell<bool> = Cell::new(false);
@@ -261,7 +258,7 @@ static LOGGER: ThreadLocalLogger = ThreadLocalLogger;
 struct ThreadLocalLogger;
 
 impl ::log::Log for ThreadLocalLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
+    fn enabled(&self, _: &Metadata) -> bool {
         LOG_ENABLED.with(Cell::get)
     }
 

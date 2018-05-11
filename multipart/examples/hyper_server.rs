@@ -19,7 +19,7 @@ impl Handler for NonMultipart {
 
 struct EchoMultipart;
 impl MultipartHandler for EchoMultipart {
-    fn handle_multipart(&self, mut multipart: Multipart<HyperRequest>, mut res: HyperResponse) {
+    fn handle_multipart(&self, mut multipart: Multipart<HyperRequest>, res: HyperResponse) {
         match multipart.save().temp() {
             SaveResult::Full(entries) => process_entries(res, entries).unwrap(),
             SaveResult::Partial(entries, error) => {

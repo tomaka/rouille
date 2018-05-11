@@ -40,7 +40,7 @@ fn process_entries<'mw>(res: Response<'mw>, entries: Entries) -> MiddlewareResul
     let stdout = io::stdout();
     let mut res = res.start()?;
     if let Err(e) = entries.write_debug(StdoutTee::new(&mut res, &stdout)) {
-        writeln!(res, "Error while reading entries: {}", e);
+        writeln!(res, "Error while reading entries: {}", e).expect("writeln");
     }
 
     Ok(Action::Halt(res))

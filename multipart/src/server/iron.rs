@@ -57,7 +57,7 @@ pub const DEFAULT_FILE_COUNT_LIMIT: u32 = 16;
 /// fn main() {
 ///     let mut chain = Chain::new(|req: &mut Request| if let Some(entries) =
 ///         req.extensions.get::<Entries>() {
-///         
+///
 ///         Ok(Response::with(format!("{:?}", entries)))
 ///     } else {
 ///         Ok(Response::with("Not a multipart request"))
@@ -74,14 +74,14 @@ pub const DEFAULT_FILE_COUNT_LIMIT: u32 = 16;
 pub struct Intercept {
     /// The parent directory for all temporary directories created by this middleware.
     /// Will be created if it doesn't exist (lazy).
-    /// 
+    ///
     /// If omitted, uses the OS temporary directory.
     ///
     /// Default value: `None`.
     pub temp_dir_path: Option<PathBuf>,
     /// The size limit of uploaded files, in bytes.
     ///
-    /// Files which exceed this size will be rejected. 
+    /// Files which exceed this size will be rejected.
     /// See the `limit_behavior` field for more info.
     ///
     /// Default value: [`DEFAULT_FILE_SIZE_LIMIT`](constant.default_file_size_limit.html)
@@ -97,7 +97,7 @@ pub struct Intercept {
     pub limit_behavior: LimitBehavior,
 }
 
-impl Intercept { 
+impl Intercept {
     /// Set the `temp_dir_path` for this middleware.
     pub fn temp_dir_path<P: Into<PathBuf>>(self, path: P) -> Self {
         Intercept { temp_dir_path: Some(path.into()), .. self }
@@ -182,8 +182,8 @@ impl Intercept {
 
 type IronMultipart<'r, 'a, 'b> = Multipart<&'r mut IronBody<'a, 'b>>;
 
-const EXPECT_PARTIAL_FILE: &'static str = "File size limit hit but the offending \
-                                           file was not available; this is a bug.";
+const EXPECT_PARTIAL_FILE: &str = "File size limit hit but the offending \
+                                   file was not available; this is a bug.";
 
 impl Default for Intercept {
     fn default() -> Self {

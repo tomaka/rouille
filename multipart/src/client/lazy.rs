@@ -265,7 +265,7 @@ impl<'d> PreparedFields<'d> {
                     use_len = false;
 
                     streams.push(
-                        PreparedField::from_stream(&field.name, &boundary, stream.content_type,
+                        PreparedField::from_stream(&field.name, &boundary, &stream.content_type,
                                                    stream.filename.as_ref().map(|f| &**f),
                                                    stream.stream));
                 },
@@ -283,7 +283,7 @@ impl<'d> PreparedFields<'d> {
 
         Ok(PreparedFields {
             text_data: Cursor::new(text_data),
-            streams: streams,
+            streams,
             end_boundary: Cursor::new(boundary),
             content_len: if use_len { Some(content_len) } else { None } ,
         })
@@ -347,14 +347,14 @@ impl<'d> PreparedField<'d> {
         let file = try_lazy!(name, File::open(path));
         let content_len = try_lazy!(name, file.metadata()).len();
 
-        let stream = Self::from_stream(&name, boundary, content_type, filename, Box::new(file));
+        let stream = Self::from_stream(&name, boundary, &content_type, filename, Box::new(file));
 
         let content_len = content_len + (stream.header.get_ref().len() as u64);
 
         Ok((stream, content_len))
     }
 
-    fn from_stream(name: &str, boundary: &str, content_type: Mime, filename: Option<&str>, stream: Box<Read + 'd>) -> Self {
+    fn from_stream(name: &str, boundary: &str, content_type: &Mime, filename: Option<&str>, stream: Box<Read + 'd>) -> Self {
         let mut header = Vec::new();
 
         write!(header, "{}\r\nContent-Disposition: form-data; name=\"{}\"",
@@ -368,7 +368,7 @@ impl<'d> PreparedField<'d> {
 
         PreparedField {
             header: Cursor::new(header),
-            stream: stream
+            stream,
         }
     }
 }
@@ -391,14 +391,6 @@ impl<'d> fmt::Debug for PreparedField<'d> {
             .field("header", &self.header)
             .field("stream", &"Box<Read>")
             .finish()
-    }
-}
-
-struct CowStrAsRef<'d>(Cow<'d, str>);
-
-impl<'d> AsRef<[u8]> for CowStrAsRef<'d> {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
     }
 }
 

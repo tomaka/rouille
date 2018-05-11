@@ -36,10 +36,7 @@ impl<H, M> Switch<H, M> where H: Handler, M: MultipartHandler {
     /// Create a new `Switch` instance where
     /// `normal` handles normal Hyper requests and `multipart` handles Multipart requests
     pub fn new(normal: H, multipart: M) -> Switch<H, M> {
-        Switch {
-            normal: normal,
-            multipart: multipart,
-        }
+        Switch { normal, multipart }
     }
 }
 
