@@ -1,9 +1,8 @@
 extern crate multipart;
 extern crate nickel;
 
-use std::fs::File;
-use std::io::{self, Read, Write};
-use nickel::{Action, HttpRouter, MiddlewareResult, Nickel, NickelError, Request, Response};
+use std::io::{self, Write};
+use nickel::{Action, HttpRouter, MiddlewareResult, Nickel, Request, Response};
 use nickel::status::StatusCode;
 
 use multipart::server::nickel::MultipartBody;

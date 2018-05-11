@@ -242,7 +242,6 @@ mod test {
 
     use std::io;
     use std::io::prelude::*;
-    use std::slice;
 
     const BOUNDARY: &'static str = "boundary";
     const TEST_VAL: &'static str = "--boundary\r\n\

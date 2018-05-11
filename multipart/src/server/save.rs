@@ -6,8 +6,6 @@
 // copied, modified, or distributed except according to those terms.
 //! Utilities for saving request entries to the filesystem.
 
-use mime::Mime;
-
 pub use server::buf_redux::BufReader;
 
 pub use tempdir::TempDir;

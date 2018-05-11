@@ -6,7 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 use mock::{ClientRequest, HttpBuffer};
 
-use server::{MultipartField, MultipartData, ReadEntry, FieldHeaders};
+use server::{MultipartField, ReadEntry, FieldHeaders};
 
 use mime::{self, Mime};
 

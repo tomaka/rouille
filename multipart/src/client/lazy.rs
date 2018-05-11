@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 
 use std::io::prelude::*;
 use std::io::Cursor;
-use std::{fmt, io, mem};
+use std::{fmt, io};
 
-use super::{HttpRequest, HttpStream, MultipartWriter};
+use super::{HttpRequest, HttpStream};
 
 macro_rules! try_lazy (
     ($field:expr, $try:expr) => (

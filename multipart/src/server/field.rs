@@ -11,10 +11,8 @@ use mime::{self, Mime, FromStrError as MimeParseErr};
 use quick_error::ResultExt;
 
 use std::error::Error;
-use std::io::{self, Read, BufRead, Write};
-use std::ops::Deref;
-use std::path::{Path, PathBuf};
-use std::{str, fmt, error};
+use std::io::{self, Read, BufRead};
+use std::{str, fmt};
 
 use std::ascii::AsciiExt;
 
@@ -22,7 +20,7 @@ use super::httparse::{self, EMPTY_HEADER, Header, Status, Error as HttparseError
 
 use self::ReadEntryResult::*;
 
-use super::save::{SaveBuilder, SavedField};
+use super::save::SaveBuilder;
 
 use super::ArcStr;
 

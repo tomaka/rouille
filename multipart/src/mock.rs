@@ -8,7 +8,7 @@
 use std::cell::{Cell, RefCell};
 use std::io::{self, Read, Write};
 use std::sync::{Once, ONCE_INIT};
-use std::{fmt, ptr, thread};
+use std::{fmt, thread};
 
 use log::{Metadata, Record};
 
