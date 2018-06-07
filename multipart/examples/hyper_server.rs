@@ -1,13 +1,12 @@
 extern crate hyper;
 extern crate multipart;
 
-use std::fs::File;
-use std::io::{self, Read};
+use std::io;
 use hyper::server::{Handler, Server, Request, Response};
 use hyper::status::StatusCode;
 use hyper::server::response::Response as HyperResponse;
 use multipart::server::hyper::{Switch, MultipartHandler, HyperRequest};
-use multipart::server::{Multipart, Entries, SaveResult, SavedField};
+use multipart::server::{Multipart, Entries, SaveResult};
 use multipart::mock::StdoutTee;
 
 struct NonMultipart;
@@ -20,7 +19,7 @@ impl Handler for NonMultipart {
 
 struct EchoMultipart;
 impl MultipartHandler for EchoMultipart {
-    fn handle_multipart(&self, mut multipart: Multipart<HyperRequest>, mut res: HyperResponse) {
+    fn handle_multipart(&self, mut multipart: Multipart<HyperRequest>, res: HyperResponse) {
         match multipart.save().temp() {
             SaveResult::Full(entries) => process_entries(res, entries).unwrap(),
             SaveResult::Partial(entries, error) => {

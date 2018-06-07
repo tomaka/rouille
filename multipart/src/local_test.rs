@@ -6,7 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 use mock::{ClientRequest, HttpBuffer};
 
-use server::{MultipartField, MultipartData, ReadEntry, FieldHeaders};
+use server::{MultipartField, ReadEntry, FieldHeaders};
 
 use mime::{self, Mime};
 
@@ -329,7 +329,7 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
         |(name, files)| files.iter().map(move |file| (name, file))
     );
 
-    let mut test_texts = test_fields.texts.iter().flat_map(
+    let test_texts = test_fields.texts.iter().flat_map(
         |(name, texts)| texts.iter().map(move |text| (name, text))
     );
 
@@ -363,7 +363,7 @@ fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
         |(name, files)| files.iter().map(move |file| (name, file))
     );
 
-    let mut test_texts = test_fields.texts.iter().flat_map(
+    let test_texts = test_fields.texts.iter().flat_map(
         |(name, texts)| texts.iter().map(move |text| (name, text))
     );
 
@@ -405,7 +405,7 @@ fn test_server(buf: HttpBuffer, fields: &mut TestFields) {
     let mut multipart = Multipart::from_request(server_buf)
         .unwrap_or_else(|_| panic!("Buffer should be multipart!"));
 
-    while let Some(mut field) = multipart.read_entry_mut().unwrap_opt() {
+    while let Some(field) = multipart.read_entry_mut().unwrap_opt() {
         fields.check_field(field);
     }
 }

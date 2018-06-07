@@ -5,14 +5,13 @@ branches:
   except:
   - fuzzing
 rust:
-  - 1.17.0
+  - 1.22.1
   - stable
   - beta
   - nightly
 os:
   - linux
-  # openssl is broken on OS X again
-  # - osx
+  - osx
 env:
   global:
    - RUST_LOG=multipart=trace RUST_BACKTRACE=1 ARGS=

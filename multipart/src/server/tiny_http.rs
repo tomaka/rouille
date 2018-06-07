@@ -14,7 +14,7 @@ impl<'r> HttpRequest for &'r mut TinyHttpRequest {
     type Body = &'r mut Read;
     
     fn multipart_boundary(&self) -> Option<&str> {
-        const BOUNDARY: &'static str = "boundary=";
+        const BOUNDARY: &str = "boundary=";
 
         let content_type = try_opt!(self.headers().iter().find(|header| header.field.equiv("Content-Type"))).value.as_str();
         let start = try_opt!(content_type.find(BOUNDARY)) + BOUNDARY.len();

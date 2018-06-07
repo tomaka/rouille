@@ -9,8 +9,8 @@
 
 use ::safemem;
 
-use super::buf_redux;
-use super::buf_redux::strategy::{LessThan, AtEndLessThan};
+use super::buf_redux::BufReader;
+use super::buf_redux::policy::MinBuffered;
 use super::twoway;
 
 use std::cmp;
@@ -23,8 +23,6 @@ use self::State::*;
 
 pub const MIN_BUF_SIZE: usize = 1024;
 
-type BufReader<R> = buf_redux::BufReader<R, LessThan, AtEndLessThan>;
-
 #[derive(Debug, PartialEq, Eq)]
 enum State {
     Searching,
@@ -35,7 +33,7 @@ enum State {
 /// A struct implementing `Read` and `BufRead` that will yield bytes until it sees a given sequence.
 #[derive(Debug)]
 pub struct BoundaryReader<R> {
-    source: BufReader<R>,
+    source: BufReader<R, MinBuffered>,
     boundary: Vec<u8>,
     search_idx: usize,
     state: State,
@@ -46,13 +44,10 @@ impl<R> BoundaryReader<R> where R: Read {
     pub fn from_reader<B: Into<Vec<u8>>>(reader: R, boundary: B) -> BoundaryReader<R> {
         let mut boundary = boundary.into();
         safemem::prepend(b"--", &mut boundary);
+        let source = BufReader::new(reader).set_policy(MinBuffered(MIN_BUF_SIZE));
 
         BoundaryReader {
-            source: BufReader::with_strategies(
-                reader,
-                LessThan(MIN_BUF_SIZE),
-                AtEndLessThan(MIN_BUF_SIZE),
-            ),
+            source,
             boundary,
             search_idx: 0,
             state: Searching,
@@ -97,7 +92,7 @@ impl<R> BoundaryReader<R> where R: Read {
             trace!("Two bytes before: {:?} ({:?}) (\"\\r\\n\": {:?})",
                    String::from_utf8_lossy(two_bytes_before), two_bytes_before, b"\r\n");
 
-            if two_bytes_before == &*b"\r\n" {
+            if two_bytes_before == *b"\r\n" {
                 debug!("Subtract two!");
                 buf_len -= 2;
             }
@@ -114,8 +109,7 @@ impl<R> BoundaryReader<R> where R: Read {
         // ensure the minimum buf size is at least enough to find a boundary with some extra
         let min_buf_size = cmp::max(self.boundary.len() * 2, min_buf_size);
 
-        self.source.read_strategy_mut().0 = min_buf_size;
-        self.source.move_strategy_mut().0 = min_buf_size;
+        self.source.policy_mut().0 = min_buf_size;
     }
 
     #[doc(hidden)]
@@ -163,13 +157,13 @@ impl<R> BoundaryReader<R> where R: Read {
 
         trace!("Consuming {} bytes, remaining buf: {:?}",
                consume_amt,
-               String::from_utf8_lossy(self.source.get_buf()));
+               String::from_utf8_lossy(self.source.buffer()));
 
         self.source.consume(consume_amt);
         self.search_idx = 0;
 
         trace!("Consumed boundary (state: {:?}), remaining buf: {:?}", self.state,
-               String::from_utf8_lossy(self.source.get_buf()));
+               String::from_utf8_lossy(self.source.buffer()));
 
         Ok(self.state == AtEnd)
     }
@@ -242,7 +236,6 @@ mod test {
 
     use std::io;
     use std::io::prelude::*;
-    use std::slice;
 
     const BOUNDARY: &'static str = "boundary";
     const TEST_VAL: &'static str = "--boundary\r\n\
@@ -253,7 +246,7 @@ mod test {
         
     #[test]
     fn test_boundary() {
-        ::mock::log_on_panic();
+        let _logger = ::mock::log_on_panic();
 
         debug!("Testing boundary (no split)");
 

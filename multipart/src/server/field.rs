@@ -11,18 +11,19 @@ use mime::{self, Mime, FromStrError as MimeParseErr};
 use quick_error::ResultExt;
 
 use std::error::Error;
-use std::io::{self, Read, BufRead, Write};
-use std::ops::Deref;
-use std::path::{Path, PathBuf};
-use std::{str, fmt, error};
+use std::io::{self, Read, BufRead};
+use std::{str, fmt};
 
+// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
+// be removed when supporting older Rust is no longer needed.
+#[allow(deprecated, unused_imports)]
 use std::ascii::AsciiExt;
 
 use super::httparse::{self, EMPTY_HEADER, Header, Status, Error as HttparseError};
 
 use self::ReadEntryResult::*;
 
-use super::save::{SaveBuilder, SavedField};
+use super::save::SaveBuilder;
 
 use super::ArcStr;
 
@@ -57,8 +58,6 @@ impl <'s, 'a: 's> fmt::Display for  DisplayHeaders<'s, 'a> {
         Ok(())
     }
 }
-
-const MAX_ATTEMPTS: usize = 30;
 
 fn with_headers<R, F, Ret>(r: &mut R, closure: F) -> Result<Ret, ParseHeaderError>
 where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
@@ -271,11 +270,11 @@ pub struct MultipartData<M> {
     inner: Option<M>,
 }
 
-const DATA_INNER_ERR: &'static str = "MultipartFile::inner taken and not replaced; this is likely \
-                                      caused by a logic error in `multipart` or by resuming after \
-                                      a previously caught panic.\nPlease open an issue with the \
-                                      relevant backtrace and debug logs at \
-                                      https://github.com/abonander/multipart";
+const DATA_INNER_ERR: &str = "MultipartFile::inner taken and not replaced; this is likely \
+                              caused by a logic error in `multipart` or by resuming after \
+                              a previously caught panic.\nPlease open an issue with the \
+                              relevant backtrace and debug logs at \
+                              https://github.com/abonander/multipart";
 
 impl<M> MultipartData<M> where M: ReadEntry {
     /// Get a builder type which can save the field with or without a size limit.
@@ -370,15 +369,17 @@ pub trait ReadEntry: PrivReadEntry + Sized {
 
         let field_headers: FieldHeaders = try_read_entry!(self; self.read_headers());
 
-        field_headers.content_type.as_ref().map(|ct| if ct.type_() == mime::MULTIPART {
-            // fields of this type are sent by (supposedly) no known clients
-            // (https://tools.ietf.org/html/rfc7578#appendix-A) so I'd be fascinated
-            // to hear about any in the wild
-            info!("Found nested multipart field: {:?}:\r\n\
-                   Please report this client's User-Agent and any other available details \
-                   at https://github.com/abonander/multipart/issues/56",
-                   field_headers);
-        });
+        if let Some(ct) = field_headers.content_type.as_ref() {
+            if ct.type_() == mime::MULTIPART {
+                // fields of this type are sent by (supposedly) no known clients
+                // (https://tools.ietf.org/html/rfc7578#appendix-A) so I'd be fascinated
+                // to hear about any in the wild
+                info!("Found nested multipart field: {:?}:\r\n\
+                       Please report this client's User-Agent and any other available details \
+                       at https://github.com/abonander/multipart/issues/56",
+                       field_headers);
+            }
+        }
 
         Entry(
             MultipartField {
@@ -503,16 +504,9 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
             Error(_, err) => panic!("{}: {:?}", msg, err),
         }
     }
-
-    fn invalid_data(multipart: M, msg: String) -> Self {
-        ReadEntryResult::Error (
-            multipart,
-            io::Error::new(io::ErrorKind::InvalidData, msg),
-        )
-    }
 }
 
-const GENERIC_PARSE_ERR: &'static str = "an error occurred while parsing field headers";
+const GENERIC_PARSE_ERR: &str = "an error occurred while parsing field headers";
 
 quick_error! {
     #[derive(Debug)]

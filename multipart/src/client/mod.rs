@@ -198,7 +198,7 @@ struct MultipartWriter<'a, W> {
 impl<'a, W: Write> MultipartWriter<'a, W> {
     fn new<B: Into<Cow<'a, str>>>(inner: W, boundary: B) -> Self {
         MultipartWriter {
-            inner: inner,
+            inner,
             boundary: boundary.into(),
             data_written: false,
         }
@@ -249,10 +249,6 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
                 .unwrap_or(Ok(())),
             self.inner.write_all(b"\r\n\r\n")
         }
-    }
-
-    fn inner_mut(&mut self) -> &mut W {
-        &mut self.inner
     }
 
     fn finish(mut self) -> io::Result<W> {

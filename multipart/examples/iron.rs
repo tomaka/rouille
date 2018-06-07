@@ -3,15 +3,14 @@ extern crate iron;
 
 extern crate env_logger;
 
-use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use multipart::mock::StdoutTee;
-use multipart::server::{Multipart, Entries, SaveResult, SavedField};
+use multipart::server::{Multipart, Entries, SaveResult};
 use iron::prelude::*;
 use iron::status;
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::init();
 
     Iron::new(process_request).http("localhost:80").expect("Could not bind localhost:80");
 }

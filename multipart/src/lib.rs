@@ -45,9 +45,7 @@
 #[macro_use]
 extern crate log;
 
-#[cfg_attr(test, macro_use)]
 extern crate mime;
-
 extern crate mime_guess;
 extern crate rand;
 extern crate tempdir;

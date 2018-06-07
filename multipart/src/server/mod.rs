@@ -17,11 +17,8 @@ extern crate twoway;
 
 use std::borrow::Borrow;
 use std::io::prelude::*;
-use std::path::Path;
 use std::sync::Arc;
 use std::io;
-
-use tempdir::TempDir;
 
 use self::boundary::BoundaryReader;
 
@@ -32,8 +29,6 @@ pub use self::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry, Re
 use self::save::SaveBuilder;
 
 pub use self::save::{Entries, SaveResult, SavedField};
-
-use self::save::EntriesSaveResult;
 
 /// Default typedef for shared strings.
 ///

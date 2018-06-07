@@ -1,9 +1,8 @@
 extern crate tiny_http;
 extern crate multipart;
 
-use std::fs::File;
-use std::io::{self, Cursor, Read, Write};
-use multipart::server::{Multipart, Entries, SaveResult, SavedField};
+use std::io::{self, Cursor, Write};
+use multipart::server::{Multipart, Entries, SaveResult};
 use multipart::mock::StdoutTee;
 use tiny_http::{Response, StatusCode, Request};
 fn main() {

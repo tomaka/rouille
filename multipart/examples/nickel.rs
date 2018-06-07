@@ -1,9 +1,8 @@
 extern crate multipart;
 extern crate nickel;
 
-use std::fs::File;
-use std::io::{self, Read, Write};
-use nickel::{Action, HttpRouter, MiddlewareResult, Nickel, NickelError, Request, Response};
+use std::io::{self, Write};
+use nickel::{Action, HttpRouter, MiddlewareResult, Nickel, Request, Response};
 use nickel::status::StatusCode;
 
 use multipart::server::nickel::MultipartBody;
@@ -41,7 +40,7 @@ fn process_entries<'mw>(res: Response<'mw>, entries: Entries) -> MiddlewareResul
     let stdout = io::stdout();
     let mut res = res.start()?;
     if let Err(e) = entries.write_debug(StdoutTee::new(&mut res, &stdout)) {
-        writeln!(res, "Error while reading entries: {}", e);
+        writeln!(res, "Error while reading entries: {}", e).expect("writeln");
     }
 
     Ok(Action::Halt(res))
