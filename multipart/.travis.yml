@@ -1,6 +1,5 @@
 language: rust
 cache: cargo
-sudo: false
 branches:
   except:
   - fuzzing
@@ -22,10 +21,10 @@ env:
    - ARGS+='--features "use-arc-str"'
 script:
   - if [ ${TRAVIS_RUST_VERSION} = "nightly" ]; then
-       cargo build --verbose $ARGS --features "nightly";
-       # test Rocket example as well
-       cargo test --verbose $ARGS --features "nightly,rocket,rocket_codegen" -- --test-threads=1;
-       cargo doc --verbose $ARGS --features "nightly";
+    cargo build --verbose $ARGS --features "nightly";
+    # test Rocket example as well
+    cargo test --verbose $ARGS --features "nightly,rocket,rocket_codegen" -- --test-threads=1;
+    cargo doc --verbose $ARGS --features "nightly";
     fi
   - cargo build --verbose $ARGS;
   - cargo test --verbose $ARGS -- --test-threads=1;
