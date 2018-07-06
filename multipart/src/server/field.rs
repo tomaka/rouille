@@ -6,7 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 //! `multipart` field header parsing.
-use mime::{self, Mime, FromStrError as MimeParseErr};
+use mime::{Mime, TopLevel, SubLevel};
 
 use quick_error::ResultExt;
 
@@ -199,7 +199,8 @@ fn parse_content_type(headers: &[StrHeader]) -> Result<Option<Mime>, ParseHeader
     if let Some(header) = find_header(headers, "Content-Type") {
         // Boundary parameter will be parsed into the `Mime`
         debug!("Found Content-Type: {:?}", header.val);
-        Ok(Some(header.val.parse::<Mime>().context(header.val)?))
+        Ok(Some(header.val.parse::<Mime>()
+            .map_err(|_| ParseHeaderError::MimeError(header.val.into()))?))
     } else {
         Ok(None)
     }
@@ -230,7 +231,7 @@ impl<M: ReadEntry> MultipartField<M> {
     ///
     /// Detecting character encodings by any means is (currently) beyond the scope of this crate.
     pub fn is_text(&self) -> bool {
-        self.headers.content_type.as_ref().map_or(true, |ct| ct.type_() == mime::TEXT)
+        self.headers.content_type.as_ref().map_or(true, |ct| ct.0 == TopLevel::Text)
     }
 
     /// Read the next entry in the request.
@@ -370,7 +371,7 @@ pub trait ReadEntry: PrivReadEntry + Sized {
         let field_headers: FieldHeaders = try_read_entry!(self; self.read_headers());
 
         if let Some(ct) = field_headers.content_type.as_ref() {
-            if ct.type_() == mime::MULTIPART {
+            if ct.0 == TopLevel::Multipart {
                 // fields of this type are sent by (supposedly) no known clients
                 // (https://tools.ietf.org/html/rfc7578#appendix-A) so I'd be fascinated
                 // to hear about any in the wild
@@ -527,12 +528,9 @@ quick_error! {
             cause(err)
             from()
         }
-        MimeError(err: MimeParseErr, cont_type: String) {
-            description(err.description())
-            display("{}\nwhile parsing Content-Type value: {}", err.description(), cont_type)
-            cause(err)
-            context(cont_type: &'a str, err: MimeParseErr) ->
-                (err, cont_type.to_string())
+        MimeError(cont_type: String) {
+            description("Failed to parse Content-Type")
+            display(this) -> ("{}: {}", this.description(), cont_type)
         }
         TooLarge {
             description("field headers section ridiculously long or missing trailing CRLF-CRLF")
