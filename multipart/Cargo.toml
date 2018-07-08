@@ -19,8 +19,8 @@ readme = "README.md"
 
 [dependencies]
 log = "0.4"
-mime = "0.3"
-mime_guess = "2.0.0-alpha.4"
+mime = "0.2"
+mime_guess = "1.8"
 rand = "0.4"
 safemem = { version = "0.3", optional = true }
 tempdir = "0.3"
