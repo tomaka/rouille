@@ -473,7 +473,7 @@ pub struct Request {
     url: String,
     headers: Vec<(String, String)>,
     https: bool,
-    data: Arc<Mutex<Option<Box<Read>>>>,
+    data: Arc<Mutex<Option<Box<Read + Send>>>>,
     remote_addr: SocketAddr,
 }
 
@@ -824,7 +824,7 @@ impl<'a> ExactSizeIterator for HeadersIter<'a> {
 ///
 /// In order to obtain this object, call `request.data()`.
 pub struct RequestBody<'a> {
-    body: Box<Read>,
+    body: Box<Read + Send>,
     marker: PhantomData<&'a ()>,
 }
 
