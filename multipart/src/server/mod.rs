@@ -212,3 +212,30 @@ pub trait HttpRequest {
     /// Return the request body for reading.
     fn body(self) -> Self::Body;
 }
+
+#[test]
+fn issue_104() {
+    let logger = ::mock::log_on_panic();
+
+    use std::io::Cursor;
+
+    let body = "\
+    POST /test.html HTTP/1.1\r\n\
+    Host: example.org\r\n\
+    Content-Type: multipart/form-data;boundary=\"boundary\"\r\n\r\n\
+    Content-Disposition: form-data; name=\"field1\"\r\n\r\n\
+    value1\r\n\
+    Content-Disposition: form-data; name=\"field2\"; filename=\"example.txt\"\r\n\r\n\
+    value2 ";
+
+    let request = Cursor::new(body);
+
+    let mut multipart = Multipart::with_body(request, "boundary");
+    let multipart_result = multipart.foreach_entry(|_field| {
+        // Do nothing
+    });
+
+    println!("{:?}", multipart_result);
+
+    logger.clear();
+}
