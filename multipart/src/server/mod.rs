@@ -215,7 +215,7 @@ pub trait HttpRequest {
 
 #[test]
 fn issue_104() {
-    let logger = ::mock::log_on_panic();
+    ::init_log();
 
     use std::io::Cursor;
 
@@ -236,6 +236,4 @@ fn issue_104() {
     });
 
     println!("{:?}", multipart_result);
-
-    logger.clear();
 }

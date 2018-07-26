@@ -240,7 +240,7 @@ mod test {
         
     #[test]
     fn test_boundary() {
-        let _logger = ::mock::log_on_panic();
+        ::init_log();
 
         debug!("Testing boundary (no split)");
 
@@ -286,7 +286,7 @@ mod test {
 
     #[test]
     fn test_split_boundary() {
-        let logger = ::mock::log_on_panic();
+        ::init_log();
 
         debug!("Testing boundary (split)");
 
@@ -300,8 +300,6 @@ mod test {
             let mut reader = BoundaryReader::from_reader(src, BOUNDARY);
             test_boundary_reader(&mut reader, &mut buf);
         }
-
-        logger.clear();
     }
 
     fn test_boundary_reader<R: Read>(reader: &mut BoundaryReader<R>, buf: &mut String) {
@@ -338,8 +336,6 @@ mod test {
 
     #[test]
     fn test_leading_crlf() {
-        let logger = ::mock::log_on_panic();
-
         let mut body: &[u8] = b"\r\n\r\n--boundary\r\n\
                          asdf1234\
                          \r\n\r\n--boundary--";
@@ -362,13 +358,11 @@ mod test {
         debug!("Read 2 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
         assert_eq!(buf, "");
-
-        logger.clear()
     }
 
     #[test]
     fn test_trailing_crlf() {
-        let logger = ::mock::log_on_panic();
+        ::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
@@ -407,14 +401,12 @@ mod test {
         debug!("Read 3 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
         assert_eq!(buf, "");
-
-        logger.clear();
     }
 
     // https://github.com/abonander/multipart/issues/93#issuecomment-343610587
     #[test]
     fn test_trailing_lflf() {
-        let logger = ::mock::log_on_panic();
+        ::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
@@ -452,14 +444,12 @@ mod test {
         debug!("Read 3 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
         assert_eq!(buf, "");
-
-        logger.clear();
     }
 
     // https://github.com/abonander/multipart/issues/104
     #[test]
     fn test_unterminated_body() {
-        let logger = ::mock::log_on_panic();
+        ::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
@@ -488,8 +478,6 @@ mod test {
 
         debug!("Read 2");
         let _ = reader.read_to_string(buf).unwrap_err();
-
-        logger.clear();
     }
 
     #[cfg(feature = "bench")]
