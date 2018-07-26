@@ -55,7 +55,14 @@ impl<R> BoundaryReader<R> where R: Read {
     }
 
     fn read_to_boundary(&mut self) -> io::Result<&[u8]> {
-        let buf = fill_buf_min(&mut self.source, self.search_idx + self.boundary.len())?;
+        if self.state == AtEnd { return Ok(&[])}
+
+        let buf = self.source.fill_buf()?;
+
+        if self.search_idx == 0 && buf.len() < self.boundary.len() {
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
+                                      "unexpected end of request body"));
+        }
 
         trace!("Buf: {:?}", String::from_utf8_lossy(buf));
 
@@ -131,7 +138,7 @@ impl<R> BoundaryReader<R> where R: Read {
         let consume_amt = {
             let min_len = self.boundary.len() + 4;
 
-            let buf = fill_buf_min(&mut self.source, min_len)?;
+            let buf = self.source.fill_buf()?;
 
             if buf.len() < min_len {
                 return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
@@ -215,19 +222,6 @@ impl<R> BufRead for BoundaryReader<R> where R: Read {
         self.source.consume(true_amt);
         self.search_idx -= true_amt;
     }
-}
-
-fn fill_buf_min<R: BufRead>(rdr: &mut R, min: usize) -> io::Result<&[u8]> {
-    let mut last_len = 0;
-
-    while {
-        let buf = rdr.fill_buf()?;
-        let cont = buf.len() > last_len && buf.len() < min;
-        last_len = buf.len();
-        cont
-    } { /* nop */ }
-
-    rdr.fill_buf()
 }
 
 #[cfg(test)]
@@ -344,6 +338,8 @@ mod test {
 
     #[test]
     fn test_leading_crlf() {
+        let logger = ::mock::log_on_panic();
+
         let mut body: &[u8] = b"\r\n\r\n--boundary\r\n\
                          asdf1234\
                          \r\n\r\n--boundary--";
@@ -366,10 +362,14 @@ mod test {
         debug!("Read 2 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
         assert_eq!(buf, "");
+
+        logger.clear()
     }
 
     #[test]
     fn test_trailing_crlf() {
+        let logger = ::mock::log_on_panic();
+
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
                          \r\n\r\n--boundary\r\n\
@@ -407,11 +407,15 @@ mod test {
         debug!("Read 3 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
         assert_eq!(buf, "");
+
+        logger.clear();
     }
 
     // https://github.com/abonander/multipart/issues/93#issuecomment-343610587
     #[test]
     fn test_trailing_lflf() {
+        let logger = ::mock::log_on_panic();
+
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
                          \n\n\r\n--boundary\r\n\
@@ -448,6 +452,44 @@ mod test {
         debug!("Read 3 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
         assert_eq!(buf, "");
+
+        logger.clear();
+    }
+
+    // https://github.com/abonander/multipart/issues/104
+    #[test]
+    fn test_unterminated_body() {
+        let logger = ::mock::log_on_panic();
+
+        let mut body: &[u8] = b"--boundary\r\n\
+                         asdf1234\
+                         \n\n\r\n--boundary\r\n\
+                         hjkl5678";
+
+        let ref mut buf = String::new();
+        let mut reader = BoundaryReader::from_reader(&mut body, BOUNDARY);
+
+        debug!("Consume 1");
+        reader.consume_boundary().unwrap();
+
+        debug!("Read 1");
+
+        // same as above
+        let buf1 = reader.read_to_boundary().unwrap().to_owned();
+        let buf2 = reader.read_to_boundary().unwrap().to_owned();
+        assert_eq!(buf1, buf2);
+
+        let _ = reader.read_to_string(buf).unwrap();
+        assert_eq!(buf, "asdf1234\n\n");
+        buf.clear();
+
+        debug!("Consume 2");
+        reader.consume_boundary().unwrap();
+
+        debug!("Read 2");
+        let _ = reader.read_to_string(buf).unwrap_err();
+
+        logger.clear();
     }
 
     #[cfg(feature = "bench")]
