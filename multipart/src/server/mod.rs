@@ -123,7 +123,7 @@ impl<R: Read> Multipart<R> {
     pub fn with_body<Bnd: Into<String>>(body: R, boundary: Bnd) -> Self {
         let boundary = boundary.into();
 
-        info!("Multipart::with_boundary(_, {:?}", boundary);
+        info!("Multipart::with_boundary(_, {:?})", boundary);
 
         Multipart { 
             reader: BoundaryReader::from_reader(body, boundary),
@@ -231,9 +231,5 @@ fn issue_104() {
     let request = Cursor::new(body);
 
     let mut multipart = Multipart::with_body(request, "boundary");
-    let multipart_result = multipart.foreach_entry(|_field| {
-        // Do nothing
-    });
-
-    println!("{:?}", multipart_result);
+    multipart.foreach_entry(|_field| {/* Do nothing */}).unwrap_err();
 }
