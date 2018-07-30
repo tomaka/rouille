@@ -9,8 +9,6 @@ use std::cell::{Cell, RefCell};
 use std::io::{self, Read, Write};
 use std::{fmt, thread};
 
-use log::{Metadata, Record};
-
 use rand::{self, Rng, ThreadRng};
 
 /// A mock implementation of `client::HttpRequest` which can spawn an `HttpBuffer`.
@@ -202,76 +200,4 @@ impl<'s, W: Write> Write for StdoutTee<'s, W> {
         self.inner.flush()?;
         self.stdout.flush()
     }
-}
-
-/// Capture all logging on this thread during `PanicLogger`'s lifetime.
-///
-/// When `PanicLogger` is dropped: if the thread is panicking, all captured logs are printed
-/// to stdout, otherwise the captured logs are deleted.
-///
-/// RFC: break this functionality out into its own crate? Could also support nested invocations
-/// (where each instance of `PanicLogger` only prints the logs captured during its lifetime)
-/// but that's currently unused here.
-pub fn log_on_panic() -> PanicLogger {
-    ::log::set_max_level(::log::LevelFilter::Trace);
-
-    if ::log::logger() as *const ::log::Log != &LOGGER as *const ::log::Log {
-        ::log::set_logger(&LOGGER).expect("failed to set logger for `log_on_panic()`");
-    }
-
-    LOG_ENABLED.with(|flag| flag.set(true));
-
-    PanicLogger(())
-}
-
-/// Struct that logs if the thread panics before it is dropped.
-#[must_use]
-pub struct PanicLogger(());
-
-impl PanicLogger {
-    /// Clear the buffered logs
-    pub fn clear(self) {
-        drop(self);
-    }
-}
-
-impl Drop for PanicLogger {
-    fn drop(&mut self) {
-        LOG_ENABLED.with(|flag| flag.set(false));
-        LOG.with(|log| {
-            let mut log = log.borrow_mut();
-            if thread::panicking() {
-                println!("captured logs before panic:\n{}", *log);
-            }
-            log.clear();
-        });
-    }
-}
-
-thread_local! {
-    static LOG: RefCell<String> = RefCell::new(String::new());
-    static LOG_ENABLED: Cell<bool> = Cell::new(false);
-}
-
-static LOGGER: ThreadLocalLogger = ThreadLocalLogger;
-
-struct ThreadLocalLogger;
-
-impl ::log::Log for ThreadLocalLogger {
-    fn enabled(&self, _: &Metadata) -> bool {
-        LOG_ENABLED.with(Cell::get)
-    }
-
-    fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            LOG.with(|log| {
-                // format the message before pushing it to `ptr` since the fmt
-                // impls of the record arguments could try to log as well
-                let msg = format!("{}:{}: {}\n", record.level(), record.target(), record.args());
-                log.borrow_mut().push_str(&msg);
-            });
-        }
-    }
-
-    fn flush(&self) {}
 }

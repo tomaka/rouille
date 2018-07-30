@@ -123,7 +123,7 @@ impl<R: Read> Multipart<R> {
     pub fn with_body<Bnd: Into<String>>(body: R, boundary: Bnd) -> Self {
         let boundary = boundary.into();
 
-        info!("Multipart::with_boundary(_, {:?}", boundary);
+        info!("Multipart::with_boundary(_, {:?})", boundary);
 
         Multipart { 
             reader: BoundaryReader::from_reader(body, boundary),
@@ -211,4 +211,25 @@ pub trait HttpRequest {
 
     /// Return the request body for reading.
     fn body(self) -> Self::Body;
+}
+
+#[test]
+fn issue_104() {
+    ::init_log();
+
+    use std::io::Cursor;
+
+    let body = "\
+    POST /test.html HTTP/1.1\r\n\
+    Host: example.org\r\n\
+    Content-Type: multipart/form-data;boundary=\"boundary\"\r\n\r\n\
+    Content-Disposition: form-data; name=\"field1\"\r\n\r\n\
+    value1\r\n\
+    Content-Disposition: form-data; name=\"field2\"; filename=\"example.txt\"\r\n\r\n\
+    value2 ";
+
+    let request = Cursor::new(body);
+
+    let mut multipart = Multipart::with_body(request, "boundary");
+    multipart.foreach_entry(|_field| {/* Do nothing */}).unwrap_err();
 }

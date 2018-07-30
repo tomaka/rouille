@@ -205,7 +205,7 @@ impl fmt::Debug for PrintHex {
 
 macro_rules! do_test (
     ($client_test:ident, $server_test:ident) => (
-        let panic_logger = ::mock::log_on_panic();
+        ::init_log();
 
         info!("Client Test: {:?} Server Test: {:?}", stringify!($client_test),
               stringify!($server_test));
@@ -224,8 +224,6 @@ macro_rules! do_test (
         $server_test(buf, &mut test_fields);
 
         test_fields.assert_is_empty();
-
-        panic_logger.clear();
     );
 );
 

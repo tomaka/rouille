@@ -67,6 +67,9 @@ extern crate iron;
 #[cfg(feature = "tiny_http")]
 extern crate tiny_http;
 
+#[cfg(test)]
+extern crate env_logger;
+
 #[cfg(any(feature = "mock", test))]
 pub mod mock;
 
@@ -117,4 +120,9 @@ mod local_test;
 
 fn random_alphanumeric(len: usize) -> String {
     rand::thread_rng().gen_ascii_chars().take(len).collect()
+}
+
+#[cfg(test)]
+fn init_log() {
+    let _ = env_logger::try_init();
 }

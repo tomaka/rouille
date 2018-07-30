@@ -55,57 +55,49 @@ impl<R> BoundaryReader<R> where R: Read {
     }
 
     fn read_to_boundary(&mut self) -> io::Result<&[u8]> {
-        if self.state == AtEnd { return Ok(&[])}
-
         let buf = self.source.fill_buf()?;
-
-        if self.search_idx == 0 && buf.len() < self.boundary.len() {
-            return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
-                                      "unexpected end of request body"));
-        }
 
         trace!("Buf: {:?}", String::from_utf8_lossy(buf));
 
-        debug!("Before-loop Buf len: {} Search idx: {} State: {:?}",
+        debug!("Before search Buf len: {} Search idx: {} State: {:?}",
                buf.len(), self.search_idx, self.state);
+
+        if self.state == BoundaryRead || self.state == AtEnd {
+            return Ok(&buf[..self.search_idx])
+        }
 
         if self.state == Searching && self.search_idx < buf.len() {
             let lookahead = &buf[self.search_idx..];
 
-            debug!("Find boundary loop! Lookahead len: {}", lookahead.len());
-
             // Look for the boundary, or if it isn't found, stop near the end.
-            match twoway::find_bytes(lookahead, &self.boundary) {
-                Some(found_idx) => {
+            match find_boundary(lookahead, &self.boundary) {
+                Ok(found_idx) => {
                     self.search_idx += found_idx;
                     self.state = BoundaryRead;
                 },
-                None => {
-                    self.search_idx += lookahead.len().saturating_sub(self.boundary.len() + 2);
+                Err(yield_len) => {
+                    self.search_idx += yield_len;
                 }
             }
         }        
         
-        debug!("After-loop Buf len: {} Search idx: {} State: {:?}",
+        debug!("After search Buf len: {} Search idx: {} State: {:?}",
                buf.len(), self.search_idx, self.state);
 
-        // don't modify search_idx so it always points to the start of the boundary
-        let mut buf_len = self.search_idx;
-
-        // back up the cursor to before the boundary's preceding CRLF
-        if self.state != Searching && buf_len >= 2 {
-            let two_bytes_before = &buf[buf_len - 2 .. buf_len];
+        // back up the cursor to before the boundary's preceding CRLF if we haven't already
+        if self.search_idx >= 2 && !buf[self.search_idx..].starts_with(b"\r\n") {
+            let two_bytes_before = &buf[self.search_idx - 2 .. self.search_idx];
 
             trace!("Two bytes before: {:?} ({:?}) (\"\\r\\n\": {:?})",
                    String::from_utf8_lossy(two_bytes_before), two_bytes_before, b"\r\n");
 
             if two_bytes_before == *b"\r\n" {
                 debug!("Subtract two!");
-                buf_len -= 2;
+                self.search_idx -= 2;
             }
         }
 
-        let ret_buf = &buf[..buf_len];
+        let ret_buf = &buf[..self.search_idx];
 
         trace!("Returning buf: {:?}", String::from_utf8_lossy(ret_buf));
 
@@ -130,17 +122,24 @@ impl<R> BoundaryReader<R> where R: Read {
 
             let buf_len = self.read_to_boundary()?.len();
 
+            if buf_len == 0 && self.state == Searching {
+                return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
+                                          "unexpected end of request body"));
+            }
+
             debug!("Discarding {} bytes", buf_len);
 
             self.consume(buf_len);
         }
 
         let consume_amt = {
-            let min_len = self.boundary.len() + 4;
-
             let buf = self.source.fill_buf()?;
 
-            if buf.len() < min_len {
+            // consume everything up to and including the boundary leading CR-LF and
+            // trailing two bytes
+            let mut consume_amt = self.search_idx + self.boundary.len() + 4;
+
+            if buf.len() < consume_amt {
                 return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
                                           "not enough bytes to verify boundary"));
             }
@@ -148,15 +147,17 @@ impl<R> BoundaryReader<R> where R: Read {
             // we have enough bytes to verify
             self.state = Searching;
 
-            let mut consume_amt = self.search_idx + self.boundary.len();
-
-            let last_two = &buf[consume_amt .. consume_amt + 2];
+            let last_two = &buf[consume_amt - 2 .. consume_amt];
 
             match last_two {
-                b"\r\n" => consume_amt += 2,
-                b"--" => { consume_amt += 2; self.state = AtEnd },
-                _ => debug!("Unexpected bytes following boundary: {:?}",
-                            String::from_utf8_lossy(&last_two)),
+                b"\r\n" => (),
+                b"--" => self.state = AtEnd,
+                _ => {
+                    // don't consume unexpected bytes
+                    consume_amt -= 2;
+                    warn!("Unexpected bytes following boundary: {:X} {:X}",
+                           last_two[0], last_two[1]);
+                },
             }
 
             consume_amt
@@ -174,6 +175,24 @@ impl<R> BoundaryReader<R> where R: Read {
 
         Ok(self.state == AtEnd)
     }
+}
+
+/// Find the boundary occurrence or the highest length to safely yield
+fn find_boundary(buf: &[u8], boundary: &[u8]) -> Result<usize, usize> {
+    if let Some(idx) = twoway::find_bytes(buf, boundary) {
+        return Ok(idx);
+    }
+
+    let search_start = buf.len().saturating_sub(boundary.len());
+
+    // search for just the boundary fragment
+    for i in search_start .. buf.len() {
+        if boundary.starts_with(&buf[i..]) {
+            return Err(i);
+        }
+    }
+
+    Err(buf.len())
 }
 
 #[cfg(feature = "bench")]
@@ -240,7 +259,7 @@ mod test {
         
     #[test]
     fn test_boundary() {
-        let _logger = ::mock::log_on_panic();
+        ::init_log();
 
         debug!("Testing boundary (no split)");
 
@@ -286,7 +305,7 @@ mod test {
 
     #[test]
     fn test_split_boundary() {
-        let logger = ::mock::log_on_panic();
+        ::init_log();
 
         debug!("Testing boundary (split)");
 
@@ -300,8 +319,6 @@ mod test {
             let mut reader = BoundaryReader::from_reader(src, BOUNDARY);
             test_boundary_reader(&mut reader, &mut buf);
         }
-
-        logger.clear();
     }
 
     fn test_boundary_reader<R: Read>(reader: &mut BoundaryReader<R>, buf: &mut String) {
@@ -338,8 +355,6 @@ mod test {
 
     #[test]
     fn test_leading_crlf() {
-        let logger = ::mock::log_on_panic();
-
         let mut body: &[u8] = b"\r\n\r\n--boundary\r\n\
                          asdf1234\
                          \r\n\r\n--boundary--";
@@ -362,13 +377,11 @@ mod test {
         debug!("Read 2 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
         assert_eq!(buf, "");
-
-        logger.clear()
     }
 
     #[test]
     fn test_trailing_crlf() {
-        let logger = ::mock::log_on_panic();
+        ::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
@@ -407,14 +420,12 @@ mod test {
         debug!("Read 3 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
         assert_eq!(buf, "");
-
-        logger.clear();
     }
 
     // https://github.com/abonander/multipart/issues/93#issuecomment-343610587
     #[test]
     fn test_trailing_lflf() {
-        let logger = ::mock::log_on_panic();
+        ::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
@@ -452,19 +463,17 @@ mod test {
         debug!("Read 3 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
         assert_eq!(buf, "");
-
-        logger.clear();
     }
 
     // https://github.com/abonander/multipart/issues/104
     #[test]
     fn test_unterminated_body() {
-        let logger = ::mock::log_on_panic();
+        ::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
                          \n\n\r\n--boundary\r\n\
-                         hjkl5678";
+                         hjkl5678  ";
 
         let ref mut buf = String::new();
         let mut reader = BoundaryReader::from_reader(&mut body, BOUNDARY);
@@ -487,9 +496,12 @@ mod test {
         reader.consume_boundary().unwrap();
 
         debug!("Read 2");
-        let _ = reader.read_to_string(buf).unwrap_err();
+        let _ = reader.read_to_string(buf).unwrap();
+        assert_eq!(buf, "hjkl5678  ");
+        buf.clear();
 
-        logger.clear();
+        debug!("Consume 3 - expecting error");
+        reader.consume_boundary().unwrap_err();
     }
 
     #[cfg(feature = "bench")]
