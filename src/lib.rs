@@ -49,6 +49,10 @@
 //!
 //! In order to serve static files, take a look at
 //! [the `match_assets` function](fn.match_assets.html).
+//!
+//! In order to apply content encodings (including compression such as gzip or deflate), see
+//! the [content_encoding module](content_encoding/index.html), and specifically the
+//! [content_encoding::apply](content_encoding/fn.apply.html) function.
 
 #![deny(unsafe_code)]
 
