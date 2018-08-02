@@ -7,6 +7,29 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+//! Apply content encodings (such as gzip compression) to the response.
+//!
+//! This module provides access to the content encodings supported by a request as well as
+//! a function to automatically apply common content encodings to a response.
+//! # Basic example
+//!
+//! Here is a basic example showing how to use content encodings:
+//!
+//! ```
+//! use rouille::Request;
+//! use rouille::Response;
+//! use rouille::content_encoding;
+//!
+//! fn handle_request(request: &Request) -> Response {
+//!     let text = String::new();
+//!     for encoding in content_encoding::accepted_content_encodings(request) {
+//!         text.push_str(encoding);
+//!         text.push('\n');
+//!     }
+//!     let response = Response::text(&text);
+//!     content_encoding::apply(response)
+//! }
+//! ```
 use std::str;
 use Request;
 use Response;
