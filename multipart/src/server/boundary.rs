@@ -354,6 +354,27 @@ mod test {
     }
 
     #[test]
+    fn test_empty_body() {
+        // empty body contains closing boundary only
+        let mut body: &[u8] = b"--boundary--";
+
+        let ref mut buf = String::new();
+        let mut reader = BoundaryReader::from_reader(&mut body, BOUNDARY);
+
+        debug!("Consume 1");
+        let ret = reader.consume_boundary().unwrap();
+        assert_eq!(ret, false);
+
+        debug!("Read 1");
+        let _ = reader.read_to_string(buf).unwrap();
+        assert_eq!(buf, "");
+        buf.clear();
+
+        debug!("Consume 2");
+        assert!(reader.consume_boundary().is_err());
+    }
+
+    #[test]
     fn test_leading_crlf() {
         let mut body: &[u8] = b"\r\n\r\n--boundary\r\n\
                          asdf1234\

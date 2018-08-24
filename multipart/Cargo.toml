@@ -89,3 +89,7 @@ required-features = ["mock", "tiny_http", "server"]
 [[example]]
 name = "rocket"
 required-features = ["mock", "rocket", "rocket_codegen", "server"]
+
+[[bin]]
+name = "form_test"
+required-features = ["mock", "hyper", "server"]
