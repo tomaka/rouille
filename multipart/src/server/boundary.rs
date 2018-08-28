@@ -111,10 +111,9 @@ impl<R> BoundaryReader<R> where R: Read {
         self.source.policy_mut().0 = min_buf_size;
     }
 
-    #[doc(hidden)]
     pub fn consume_boundary(&mut self) -> io::Result<bool> {
         if self.state == AtEnd {
-            return Ok(true);
+            return Ok(false);
         }
 
         while self.state == Searching {
@@ -135,9 +134,13 @@ impl<R> BoundaryReader<R> where R: Read {
         let consume_amt = {
             let buf = self.source.fill_buf()?;
 
-            // consume everything up to and including the boundary leading CR-LF and
-            // trailing two bytes
-            let mut consume_amt = self.search_idx + self.boundary.len() + 4;
+            // consume everything up to and including the boundary and trailing CRLF/`--`
+            let mut consume_amt = self.search_idx + self.boundary.len() + 2;
+
+            // if our cursor stopped on the preceding CRLF, include it in the consume
+            if buf.starts_with(b"\r\n") {
+                consume_amt += 2;
+            }
 
             if buf.len() < consume_amt {
                 return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
@@ -173,7 +176,7 @@ impl<R> BoundaryReader<R> where R: Read {
         trace!("Consumed boundary (state: {:?}), remaining buf: {:?}", self.state,
                String::from_utf8_lossy(self.source.buffer()));
 
-        Ok(self.state == AtEnd)
+        Ok(self.state != AtEnd)
     }
 }
 
@@ -355,6 +358,8 @@ mod test {
 
     #[test]
     fn test_empty_body() {
+        ::init_log();
+
         // empty body contains closing boundary only
         let mut body: &[u8] = b"--boundary--";
 
@@ -362,8 +367,7 @@ mod test {
         let mut reader = BoundaryReader::from_reader(&mut body, BOUNDARY);
 
         debug!("Consume 1");
-        let ret = reader.consume_boundary().unwrap();
-        assert_eq!(ret, false);
+        assert_eq!(reader.consume_boundary().unwrap(), false);
 
         debug!("Read 1");
         let _ = reader.read_to_string(buf).unwrap();
@@ -371,11 +375,13 @@ mod test {
         buf.clear();
 
         debug!("Consume 2");
-        assert!(reader.consume_boundary().is_err());
+        assert_eq!(reader.consume_boundary().unwrap(), false);
     }
 
     #[test]
     fn test_leading_crlf() {
+        ::init_log();
+
         let mut body: &[u8] = b"\r\n\r\n--boundary\r\n\
                          asdf1234\
                          \r\n\r\n--boundary--";
@@ -385,7 +391,7 @@ mod test {
 
 
         debug!("Consume 1");
-        reader.consume_boundary().unwrap();
+        assert_eq!(reader.consume_boundary().unwrap(), true);
 
         debug!("Read 1");
         let _ = reader.read_to_string(buf).unwrap();
@@ -393,7 +399,7 @@ mod test {
         buf.clear();
 
         debug!("Consume 2");
-        reader.consume_boundary().unwrap();
+        assert_eq!(reader.consume_boundary().unwrap(), false);
 
         debug!("Read 2 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
@@ -413,7 +419,7 @@ mod test {
         let mut reader = BoundaryReader::from_reader(&mut body, BOUNDARY);
 
         debug!("Consume 1");
-        reader.consume_boundary().unwrap();
+        assert_eq!(reader.consume_boundary().unwrap(), true);
 
         debug!("Read 1");
 
@@ -428,7 +434,7 @@ mod test {
         buf.clear();
 
         debug!("Consume 2");
-        reader.consume_boundary().unwrap();
+        assert_eq!(reader.consume_boundary().unwrap(), true);
 
         debug!("Read 2");
         let _ = reader.read_to_string(buf).unwrap();
@@ -436,7 +442,7 @@ mod test {
         buf.clear();
 
         debug!("Consume 3");
-        reader.consume_boundary().unwrap();
+        assert_eq!(reader.consume_boundary().unwrap(), false);
 
         debug!("Read 3 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
@@ -457,7 +463,7 @@ mod test {
         let mut reader = BoundaryReader::from_reader(&mut body, BOUNDARY);
 
         debug!("Consume 1");
-        reader.consume_boundary().unwrap();
+        assert_eq!(reader.consume_boundary().unwrap(), true);
 
         debug!("Read 1");
 
@@ -471,7 +477,7 @@ mod test {
         buf.clear();
 
         debug!("Consume 2");
-        reader.consume_boundary().unwrap();
+        assert_eq!(reader.consume_boundary().unwrap(), true);
 
         debug!("Read 2");
         let _ = reader.read_to_string(buf).unwrap();
@@ -479,7 +485,7 @@ mod test {
         buf.clear();
 
         debug!("Consume 3");
-        reader.consume_boundary().unwrap();
+        assert_eq!(reader.consume_boundary().unwrap(), false);
 
         debug!("Read 3 (empty)");
         let _ = reader.read_to_string(buf).unwrap();
@@ -500,7 +506,7 @@ mod test {
         let mut reader = BoundaryReader::from_reader(&mut body, BOUNDARY);
 
         debug!("Consume 1");
-        reader.consume_boundary().unwrap();
+        assert_eq!(reader.consume_boundary().unwrap(), true);
 
         debug!("Read 1");
 
@@ -514,7 +520,7 @@ mod test {
         buf.clear();
 
         debug!("Consume 2");
-        reader.consume_boundary().unwrap();
+        assert_eq!(reader.consume_boundary().unwrap(), true);
 
         debug!("Read 2");
         let _ = reader.read_to_string(buf).unwrap();

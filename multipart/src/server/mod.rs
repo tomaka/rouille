@@ -188,7 +188,7 @@ impl<R: Read> PrivReadEntry for Multipart<R> {
     }
 
     /// Consume the next boundary.
-    /// Returns `true` if the last boundary was read, `false` otherwise.
+    /// Returns `true` if a field should follow this boundary, `false` otherwise.
     fn consume_boundary(&mut self) -> io::Result<bool> {
         debug!("Consume boundary!");
         self.reader.consume_boundary()

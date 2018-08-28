@@ -364,7 +364,7 @@ pub trait ReadEntry: PrivReadEntry + Sized {
 
         debug!("ReadEntry::read_entry()");
 
-        if try_read_entry!(self; self.consume_boundary()) {
+        if !try_read_entry!(self; self.consume_boundary()) {
             return End(self);
         }
 
@@ -409,7 +409,7 @@ pub trait PrivReadEntry {
     fn set_min_buf_size(&mut self, min_buf_size: usize);
 
     /// Consume the next boundary.
-    /// Returns `true` if the last boundary was read, `false` otherwise.
+    /// Returns `true` if a field should follow, `false` otherwise.
     fn consume_boundary(&mut self) -> io::Result<bool>;
 
     fn read_headers(&mut self) -> Result<FieldHeaders, io::Error> {
