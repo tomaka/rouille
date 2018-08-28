@@ -10,8 +10,10 @@ use std::fs::File;
 use std::io;
 
 fn main() {
-    let _ = Server::http("127.0.0.1:8080").expect("failed to bind socket")
+    let listening = Server::http("127.0.0.1:0").expect("failed to bind socket")
         .handle(read_multipart).expect("failed to handle request");
+
+    println!("bound socket to: {}", listening.socket);
 }
 
 fn read_multipart(req: Request, mut resp: Response) {
