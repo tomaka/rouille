@@ -253,10 +253,11 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
 
     fn finish(mut self) -> io::Result<W> {
         if self.data_written {
-            // Write two hyphens after the last boundary occurrence.
-            write!(self.inner, "\r\n--{}--", self.boundary)?;
+            self.inner.write_all(b"\r\n")?;
         }
 
+        // always write the closing boundary, even for empty bodies
+        write!(self.inner, "--{}--", self.boundary)?;
         Ok(self.inner)
     }
 }
