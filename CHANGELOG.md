@@ -2,6 +2,12 @@
 
 ## Version [Unreleased]
 
+## Version 2.2.0
+
+- Bump minimum supported Rust version to 1.20.0.
+- Expose that the `Request` body (accessible with `request.data()`)
+  has a `Send` bound.
+
 ## Version 2.1.0
 
 - Replace `flate2` with `deflate`
