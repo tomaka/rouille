@@ -5,7 +5,7 @@ These example files show how to use `multipart` with the various crates it integ
 
 These files carry the same licenses as [`multipart` itself](https://github.com/abonander/multipart#license), though this may be lightened to a copyright-free license in the near future.
 
-##Client
+## Client
 
 Examples for the client-side integrations of `multipart`'s API.
 
@@ -30,7 +30,7 @@ via the lazy-writing capabilities of `multipart::client::lazy`.
 $ cargo run --example hyper_reqbuilder
 ```
 
-##Server
+## Server
 
 [`hyper_server`](hyper_server.rs)
 ---------------------------------
