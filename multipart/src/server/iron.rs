@@ -11,6 +11,7 @@ use iron::{BeforeMiddleware, IronError, IronResult};
 
 use std::path::PathBuf;
 use std::{error, fmt, io};
+use tempfile;
 
 use super::{FieldHeaders, HttpRequest, Multipart};
 use super::save::{Entries, PartialReason, TempDir};
@@ -126,8 +127,8 @@ impl Intercept {
 
         let tempdir = self.temp_dir_path.as_ref()
                 .map_or_else(
-                    || TempDir::new("multipart-iron"),
-                    |path| TempDir::new_in(path, "multipart-iron")
+                    || tempfile::Builder::new().prefix("multipart-iron").tempdir(),
+                    |path| tempfile::Builder::new().prefix("multipart-iron").tempdir_in(path)
                 )
                 .map_err(|e| io_to_iron(e, "Error opening temporary directory for request."))?;
 
