@@ -115,9 +115,7 @@ impl<'r> Session<'r> {
 /// that could need to be escaped.
 pub fn generate_session_id() -> String {
     // 5e+114 possibilities is reasonable.
-    rand::OsRng::new().expect("Failed to initialize OsRng")     // TODO: <- handle that?
-                      .sample_iter(&Alphanumeric)
-                      .filter(|&c| (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                                   (c >= '0' && c <= '9'))
-                      .take(64).collect::<String>()
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(64).collect::<String>()
 }
