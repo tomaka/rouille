@@ -257,7 +257,7 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
         }
 
         // always write the closing boundary, even for empty bodies
-        write!(self.inner, "--{}--", self.boundary)?;
+        write!(self.inner, "--{}--\r\n", self.boundary)?;
         Ok(self.inner)
     }
 }
