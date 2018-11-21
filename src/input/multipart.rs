@@ -23,7 +23,6 @@ use multipart::server::Multipart as InnerMultipart;
 // TODO: provide wrappers around these
 pub use multipart::server::MultipartField;
 pub use multipart::server::MultipartData;
-pub use multipart::server::MultipartFile;
 
 /// Error that can happen when decoding multipart data.
 #[derive(Clone, Debug)]

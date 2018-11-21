@@ -573,52 +573,52 @@ macro_rules! post_input {
                     },
                 };
 
-                while let Some(multipart_entry) = multipart.next() {
+                while let Some(mut multipart_entry) = multipart.next() {
                     $(
-                        if multipart_entry.name == stringify!($field) {
+                        if multipart_entry.headers.name.as_ref() == stringify!($field) {
                             let config = ();
                             $(
                                 let config = $config;
                             )* 
 
-                            match multipart_entry.data {
-                                multipart::MultipartData::Text(txt) => {
-                                    let decoded = match DecodePostField::from_field(config, &txt.text) {
-                                        Ok(d) => d,
-                                        Err(err) => return Err(PostError::Field {
-                                            field: stringify!($field).into(),
-                                            error: err,
-                                        }),
-                                    };
-                                    match merge(&mut $field, decoded) {
-                                        Ok(d) => d,
-                                        Err(err) => return Err(PostError::Field {
-                                            field: stringify!($field).into(),
-                                            error: err,
-                                        }),
-                                    };
-                                },
-                                multipart::MultipartData::File(f) => {
-                                    let name = f.filename.as_ref().map(|n| n.to_owned());
-                                    let name = name.as_ref().map(|n| &n[..]);
-                                    let mime = f.content_type.to_string();
-                                    let decoded = match DecodePostField::from_file(config, f, name, &mime) {
-                                        Ok(d) => d,
-                                        Err(err) => return Err(PostError::Field {
-                                            field: stringify!($field).into(),
-                                            error: err,
-                                        }),
-                                    };
-                                    match merge(&mut $field, decoded) {
-                                        Ok(d) => d,
-                                        Err(err) => return Err(PostError::Field {
-                                            field: stringify!($field).into(),
-                                            error: err,
-                                        }),
-                                    };
-                                },
+                            if multipart_entry.is_text() {
+                                let mut text = String::new();
+                                multipart_entry.data.read_to_string(&mut text)?;
+                                let decoded = match DecodePostField::from_field(config, &text) {
+                                    Ok(d) => d,
+                                    Err(err) => return Err(PostError::Field {
+                                        field: stringify!($field).into(),
+                                        error: err,
+                                    }),
+                                };
+                                match merge(&mut $field, decoded) {
+                                    Ok(d) => d,
+                                    Err(err) => return Err(PostError::Field {
+                                        field: stringify!($field).into(),
+                                        error: err,
+                                    }),
+                                };
+                            } else {
+                                let name = multipart_entry.headers.filename.as_ref().map(|n| n.to_owned());
+                                let name = name.as_ref().map(|n| &n[..]);
+                                let mime = multipart_entry.headers.content_type
+                                    .map(|m| m.to_string())
+                                    .unwrap_or_else(String::new);
+                                let decoded = match DecodePostField::from_file(config, multipart_entry.data, name, &mime) {
+                                    Ok(d) => d,
+                                    Err(err) => return Err(PostError::Field {
+                                        field: stringify!($field).into(),
+                                        error: err,
+                                    }),
+                                };
+                                match merge(&mut $field, decoded) {
+                                    Ok(d) => d,
+                                    Err(err) => return Err(PostError::Field {
+                                        field: stringify!($field).into(),
+                                        error: err,
+                                    }),
+                                };
                             }
-
                             continue;
                         }
                     )*
