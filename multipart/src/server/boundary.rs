@@ -40,7 +40,7 @@ pub struct BoundaryReader<R> {
 }
 
 impl<R> BoundaryReader<R> where R: Read {
-    #[doc(hidden)]
+    /// Internal API
     pub fn from_reader<B: Into<Vec<u8>>>(reader: R, boundary: B) -> BoundaryReader<R> {
         let mut boundary = boundary.into();
         safemem::prepend(b"--", &mut boundary);
@@ -140,6 +140,10 @@ impl<R> BoundaryReader<R> where R: Read {
             // if our cursor stopped on the preceding CRLF, include it in the consume
             if buf.starts_with(b"\r\n") {
                 consume_amt += 2;
+
+                debug_assert_eq!(*self.boundary, buf[2..2 + self.boundary.len()]);
+            } else {
+                debug_assert_eq!(*self.boundary, buf[..self.boundary.len()]);
             }
 
             if buf.len() < consume_amt {
@@ -156,6 +160,11 @@ impl<R> BoundaryReader<R> where R: Read {
                 b"\r\n" => (),
                 b"--" => self.state = AtEnd,
                 _ => {
+                    if cfg!(debug_assertions) {
+                        panic!("Unexpected bytes following boundary: {:X} {:X}",
+                               last_two[0], last_two[1]);
+                    }
+
                     // don't consume unexpected bytes
                     consume_amt -= 2;
                     warn!("Unexpected bytes following boundary: {:X} {:X}",
@@ -171,6 +180,11 @@ impl<R> BoundaryReader<R> where R: Read {
                String::from_utf8_lossy(self.source.buffer()));
 
         self.source.consume(consume_amt);
+
+        if cfg!(debug_assertions) {
+
+        }
+
         self.search_idx = 0;
 
         trace!("Consumed boundary (state: {:?}), remaining buf: {:?}", self.state,

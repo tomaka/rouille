@@ -233,3 +233,75 @@ fn issue_104() {
     let mut multipart = Multipart::with_body(request, "boundary");
     multipart.foreach_entry(|_field| {/* Do nothing */}).unwrap_err();
 }
+
+#[test]
+fn issue_114() {
+    ::init_log();
+
+    fn consume_all<R: BufRead>(mut rdr: R) {
+        let mut consume = 0;
+
+        loop {
+            let consume = rdr.fill_buf().unwrap().len();
+            if consume == 0 { return; }
+            rdr.consume(consume);
+        }
+    }
+
+    use std::io::Cursor;
+
+    let body = "\
+    --------------------------c616e5fded96a3c7\r\n\
+    Content-Disposition: form-data; name=\"key1\"\r\n\r\n\
+    v1,\r\n\
+    --------------------------c616e5fded96a3c7\r\n\
+    Content-Disposition: form-data; name=\"key2\"\r\n\r\n\
+    v2,\r\n\
+    --------------------------c616e5fded96a3c7\r\n\
+    Content-Disposition: form-data; name=\"key3\"\r\n\r\n\
+    v3\r\n\
+    --------------------------c616e5fded96a3c7--\r\n";
+
+    let request = Cursor::new(body);
+    let mut multipart = Multipart::with_body(request, "------------------------c616e5fded96a3c7");
+
+    // one error if you do nothing
+    multipart.foreach_entry(|_entry| { /* do nothing */}).unwrap();
+
+    // a different error if you skip the first field
+    multipart.foreach_entry(|mut entry| if *entry.headers.name != "key1" { consume_all(entry.data); })
+        .unwrap();
+
+
+    multipart.foreach_entry(|mut entry| () /* match entry.headers.name.as_str() {
+        "file" => {
+            let mut vec = Vec::new();
+            entry.data.read_to_end(&mut vec).expect("can't read");
+            // message.file = String::from_utf8(vec).ok();
+            println!("key file got");
+        }
+
+        "key1" => {
+            let mut vec = Vec::new();
+            entry.data.read_to_end(&mut vec).expect("can't read");
+            // message.key1 = String::from_utf8(vec).ok();
+            println!("key1 got");
+        }
+
+        "key2" => {
+            let mut vec = Vec::new();
+            entry.data.read_to_end(&mut vec).expect("can't read");
+            // message.key2 = String::from_utf8(vec).ok();
+            println!("key2 got");
+        }
+
+        _ => {
+            // as multipart has a bug https://github.com/abonander/multipart/issues/114
+            // we manually do read_to_end here
+            //let mut _vec = Vec::new();
+            //entry.data.read_to_end(&mut _vec).expect("can't read");
+            println!("key neglected");
+        }
+    }*/)
+    .expect("Unable to iterate multipart?")
+}
