@@ -134,17 +134,25 @@ impl<R> BoundaryReader<R> where R: Read {
         let consume_amt = {
             let buf = self.source.fill_buf()?;
 
-            // consume everything up to and including the boundary and trailing CRLF/`--`
-            let mut consume_amt = self.search_idx + self.boundary.len() + 2;
+            // if the boundary is found we should have at least this much in-buffer
+            let mut consume_amt = self.search_idx + self.boundary.len();
 
-            // if our cursor stopped on the preceding CRLF, include it in the consume
-            if buf.starts_with(b"\r\n") {
+            // we don't care about data before the cursor
+            let bnd_segment = &buf[self.search_idx..];
+
+            if bnd_segment.starts_with(b"\r\n") {
+                // preceding CRLF needs to be consumed as well
                 consume_amt += 2;
 
-                debug_assert_eq!(*self.boundary, buf[2..2 + self.boundary.len()]);
+                // assert that we've found the boundary after the CRLF
+                debug_assert_eq!(*self.boundary, bnd_segment[2 .. self.boundary.len() + 2]);
             } else {
-                debug_assert_eq!(*self.boundary, buf[..self.boundary.len()]);
+                // assert that we've found the boundary
+                debug_assert_eq!(*self.boundary, bnd_segment[..self.boundary.len()]);
             }
+
+            // include the trailing CRLF or --
+            consume_amt += 2;
 
             if buf.len() < consume_amt {
                 return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
@@ -157,19 +165,13 @@ impl<R> BoundaryReader<R> where R: Read {
             let last_two = &buf[consume_amt - 2 .. consume_amt];
 
             match last_two {
-                b"\r\n" => (),
+                b"\r\n" => self.state = Searching,
                 b"--" => self.state = AtEnd,
-                _ => {
-                    if cfg!(debug_assertions) {
-                        panic!("Unexpected bytes following boundary: {:X} {:X}",
-                               last_two[0], last_two[1]);
-                    }
-
-                    // don't consume unexpected bytes
-                    consume_amt -= 2;
-                    warn!("Unexpected bytes following boundary: {:X} {:X}",
-                           last_two[0], last_two[1]);
-                },
+                _ => return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("unexpected bytes following multipart boundary: {:X} {:X}",
+                            last_two[0], last_two[1])
+                )),
             }
 
             consume_amt
@@ -543,6 +545,36 @@ mod test {
 
         debug!("Consume 3 - expecting error");
         reader.consume_boundary().unwrap_err();
+    }
+
+    #[test]
+    fn test_lone_boundary() {
+        let mut body: &[u8] = b"--boundary";
+        let mut reader = BoundaryReader::from_reader(&mut body, "boundary");
+        reader.consume_boundary().unwrap_err();
+    }
+
+    #[test]
+    fn test_invalid_boundary() {
+        let mut body: &[u8] = b"--boundary\x00\x00";
+        let mut reader = BoundaryReader::from_reader(&mut body, "boundary");
+        reader.consume_boundary().unwrap_err();
+    }
+
+    #[test]
+    fn test_skip_field() {
+        let mut body: &[u8] = b"--boundary\r\nfield1\r\n--boundary\r\nfield2\r\n--boundary--";
+        let mut reader = BoundaryReader::from_reader(&mut body, "boundary");
+
+        assert_eq!(reader.consume_boundary().unwrap(), true);
+        // skip `field1`
+        assert_eq!(reader.consume_boundary().unwrap(), true);
+
+        let mut buf = String::new();
+        reader.read_to_string(&mut buf).unwrap();
+        assert_eq!(buf, "field2");
+
+        assert_eq!(reader.consume_boundary().unwrap(), false);
     }
 
     #[cfg(feature = "bench")]
