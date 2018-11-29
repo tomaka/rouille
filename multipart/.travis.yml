@@ -19,6 +19,9 @@ env:
    # ensure nickel works without hyper
    - ARGS+='--no-default-features --features "nickel"'
    - ARGS+='--features "use-arc-str"'
+matrix:
+  include:
+    - rust: 1.22.1
 script:
   - |
     if [ ${TRAVIS_RUST_VERSION} = "nightly" ]; then
@@ -26,6 +29,12 @@ script:
         # test Rocket example as well
         cargo test --verbose $ARGS --features "nightly,rocket,rocket_codegen" -- --test-threads=1;
         cargo doc --verbose $ARGS --features "nightly";
+    fi
+  - |
+    if [ ${TRAVIS_RUST_VERSION} = "1.22.1" ]; then
+        # we can't test because `env_logger` uses `lazy_static 1.2.0` which needs Rust 1.26
+        cargo build --no-default-features --features "mock,client,server";
+        exit 0;
     fi
   - cargo build --verbose $ARGS;
   - cargo test --verbose $ARGS -- --test-threads=1;
