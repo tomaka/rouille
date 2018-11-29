@@ -3,9 +3,9 @@
 Client- and server-side abstractions for HTTP file uploads (POST requests with  `Content-Type: multipart/form-data`).
 
 Supports several different (**sync**hronous API) HTTP crates. 
-**Async**hronous API support will be provided by [multipart-async].
+**Async**hronous (i.e. `futures`-based) API support will be provided by [multipart-async].
 
-Minimum supported Rust version: 1.22.1
+Minimum supported Rust version: 1.26.1
 
 ### [Documentation](http://docs.rs/multipart/)
 
