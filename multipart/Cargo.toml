@@ -27,7 +27,7 @@ tempdir = "0.3"
 clippy = { version = ">=0.0, <0.1", optional = true}
 
 #Server Dependencies
-buf_redux = { version = "0.7", optional = true, default-features = false }
+buf_redux = { version = "0.8", optional = true, default-features = false }
 httparse = { version = "1.2", optional = true }
 twoway = { version = "0.1", optional = true }
 quick-error = { version = "1.2", optional = true }
