@@ -27,8 +27,7 @@ script:
   - |
     if [ ${TRAVIS_RUST_VERSION} = "1.22.1" ]; then
         # we can't test because `env_logger` uses `lazy_static 1.2.0` which needs Rust 1.26
-        cargo build --no-default-features --features "mock,client,server";
-        exit 0;
+        cargo build --no-default-features --features "mock,client,server" && exit 0;
     fi
   - cargo build --verbose $ARGS;
   - cargo test --verbose $ARGS -- --test-threads=1;
