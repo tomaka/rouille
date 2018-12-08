@@ -39,8 +39,7 @@ tiny_http = { version = "0.6", optional = true }
 nickel = { version = ">=0.10.1", optional = true }
 
 # Only for Rocket example but dev-dependencies can't be optional
-rocket = { version = "0.3", optional = true }
-rocket_codegen = { version = "0.3", optional = true }
+rocket = { version = "0.4", optional = true }
 
 [dev-dependencies]
 env_logger = "0.5"
@@ -88,7 +87,7 @@ required-features = ["mock", "tiny_http", "server"]
 
 [[example]]
 name = "rocket"
-required-features = ["mock", "rocket", "rocket_codegen", "server"]
+required-features = ["mock", "rocket", "server"]
 
 [[bin]]
 name = "form_test"

@@ -2,10 +2,11 @@
 //
 // Direct integration is not provided at this time as it appears the Rocket folks would prefer
 // to handle multipart requests behind the scenes.
-#![feature(plugin)]
-#![plugin(rocket_codegen)]
+#![feature(proc_macro_hygiene, decl_macro)]
+#![feature(plugin, custom_attribute)]
 
 extern crate multipart;
+#[macro_use]
 extern crate rocket;
 
 use multipart::mock::StdoutTee;
