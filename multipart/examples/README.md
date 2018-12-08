@@ -105,7 +105,7 @@ explicit support (the Rocket folks seem to want to handle `multipart/form-data` 
 but haven't gotten around to implementing it yet; this would supercede any integration from `multipart`). 
 
 ```
-$ cargo run --example rocket --features "rocket,rocket_codegen"
+$ cargo run --example rocket --features "rocket"
 ```
 
 [iamsebastian]: https://github.com/iamsebastian

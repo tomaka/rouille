@@ -22,7 +22,7 @@ matrix:
     - rust: stable
       env: ARGS+=--features "use_arc_str"
     - rust: nightly
-      env: ARGS+=--features "nightly,rocket,rocket_codegen"
+      env: ARGS+=--features "nightly,rocket"
 script:
   - |
     if [ ${TRAVIS_RUST_VERSION} = "1.22.1" ]; then
