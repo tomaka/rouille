@@ -299,7 +299,7 @@ impl Response {
     pub fn html<D>(content: D) -> Response where D: Into<String> {
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".into(), "text/html; charset=utf8".into())],
+            headers: vec![("Content-Type".into(), "text/html; charset=utf-8".into())],
             data: ResponseBody::from_string(content),
             upgrade: None,
         }
@@ -317,7 +317,7 @@ impl Response {
     pub fn svg<D>(content: D) -> Response where D: Into<String> {
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".into(), "image/svg+xml; charset=utf8".into())],
+            headers: vec![("Content-Type".into(), "image/svg+xml; charset=utf-8".into())],
             data: ResponseBody::from_string(content),
             upgrade: None,
         }
@@ -335,7 +335,7 @@ impl Response {
     pub fn text<S>(text: S) -> Response where S: Into<String> {
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".into(), "text/plain; charset=utf8".into())],
+            headers: vec![("Content-Type".into(), "text/plain; charset=utf-8".into())],
             data: ResponseBody::from_string(text),
             upgrade: None,
         }
