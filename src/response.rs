@@ -368,7 +368,7 @@ impl Response {
 
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".into(), "application/json".into())],
+            headers: vec![("Content-Type".into(), "application/json; charset=utf-8".into())],
             data: ResponseBody::from_data(data),
             upgrade: None,
         }
