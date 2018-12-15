@@ -4,7 +4,7 @@ branches:
   except:
   - fuzzing
 rust:
-  - 1.26.1
+  - 1.22.1
   - stable
   - beta
   - nightly
@@ -16,7 +16,6 @@ env:
    - RUST_LOG=multipart=trace RUST_BACKTRACE=1 ARGS=
 matrix:
   include:
-    - rust: 1.22.1
     - rust: stable
       env: ARGS+=--no-default-features --features "nickel"
     - rust: stable
@@ -24,11 +23,6 @@ matrix:
     - rust: nightly
       env: ARGS+=--features "nightly,rocket"
 script:
-  - |
-    if [ ${TRAVIS_RUST_VERSION} = "1.22.1" ]; then
-        # we can't test because `env_logger` uses `lazy_static 1.2.0` which needs Rust 1.26
-        cargo build --no-default-features --features "mock,client,server" && exit 0;
-    fi
   - cargo build --verbose $ARGS;
   - cargo test --verbose $ARGS -- --test-threads=1;
   - cargo doc --verbose $ARGS;
