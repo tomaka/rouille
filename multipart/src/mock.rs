@@ -9,7 +9,8 @@ use std::cell::{Cell, RefCell};
 use std::io::{self, Read, Write};
 use std::{fmt, thread};
 
-use rand::{self, Rng, ThreadRng};
+use rand::{self, Rng};
+use rand::prelude::ThreadRng;
 
 /// A mock implementation of `client::HttpRequest` which can spawn an `HttpBuffer`.
 ///
