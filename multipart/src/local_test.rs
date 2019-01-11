@@ -301,6 +301,8 @@ fn gen_bool() -> bool {
 }
 
 fn gen_string() -> String {
+    use rand::distributions::Alphanumeric;
+
     let mut rng_1 = rand::thread_rng();
     let mut rng_2 = rand::thread_rng();
 
@@ -308,9 +310,9 @@ fn gen_string() -> String {
     let str_len_2 = rng_2.gen_range(MIN_LEN, MAX_LEN + 1);
     let num_dashes = rng_1.gen_range(0, MAX_DASHES + 1);
 
-    rng_1.gen_ascii_chars().take(str_len_1)
+    rng_1.sample_iter(&Alphanumeric).take(str_len_1)
         .chain(iter::repeat('-').take(num_dashes))
-        .chain(rng_2.gen_ascii_chars().take(str_len_2))
+        .chain(rng_2.sample_iter(&Alphanumeric).take(str_len_2))
         .collect()
 }
 

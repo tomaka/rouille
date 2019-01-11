@@ -119,7 +119,7 @@ pub mod server;
 mod local_test;
 
 fn random_alphanumeric(len: usize) -> String {
-    rand::thread_rng().gen_ascii_chars().take(len).collect()
+    rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(len).collect()
 }
 
 #[cfg(test)]
