@@ -18,8 +18,7 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 
 [dependencies]
-# lazy-static (pulled in by e.g. nickel, regex) is incompatible with 1.22.1
-lazy_static = { version = ">=1.0,<1.2.0", optional = true }
+lazy_static = { version = "1.2.0", optional = true }
 log = "0.4"
 mime = "0.2"
 mime_guess = "1.8"
@@ -55,7 +54,7 @@ nightly = []
 bench = []
 # Use this to enable SSE4.2 instructions in boundary finding
 # TODO: Benchmark this
-sse4 = ["nightly", "twoway/pcmp"]
+sse4 = ["nightly"]
 # switch uses of `Arc<String>` for `Arc<str>` (`From<String>` impl only stabilized in 1.21)
 use_arc_str = []
 
