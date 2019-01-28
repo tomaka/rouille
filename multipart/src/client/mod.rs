@@ -257,6 +257,8 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
         }
 
         // always write the closing boundary, even for empty bodies
+        // trailing CRLF is optional but Actix requires it due to a naive implementation:
+        // https://github.com/actix/actix-web/issues/598
         write!(self.inner, "--{}--\r\n", self.boundary)?;
         Ok(self.inner)
     }
