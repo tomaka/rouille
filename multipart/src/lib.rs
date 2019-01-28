@@ -49,7 +49,7 @@ extern crate log;
 extern crate mime;
 extern crate mime_guess;
 extern crate rand;
-extern crate tempdir;
+extern crate tempfile;
 
 #[cfg(feature = "quick-error")]
 #[macro_use]

@@ -24,7 +24,7 @@ mime = "0.2"
 mime_guess = "1.8"
 rand = "0.6"
 safemem = { version = "0.3", optional = true }
-tempdir = "0.3"
+tempfile = "3"
 clippy = { version = ">=0.0, <0.1", optional = true}
 
 #Server Dependencies

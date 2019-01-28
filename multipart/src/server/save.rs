@@ -8,13 +8,14 @@
 
 pub use server::buf_redux::BufReader;
 
-pub use tempdir::TempDir;
+pub use tempfile::TempDir;
 
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::{cmp, env, io, mem, str, u32, u64};
+use tempfile;
 
 use server::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry, ReadEntryResult};
 use server::ArcStr;
@@ -247,7 +248,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
     /// ### Note: Temporary
     /// See `SaveDir` for more info (the type of `Entries::save_dir`).
     pub fn temp_with_prefix(self, prefix: &str) -> EntriesSaveResult<M> {
-        match TempDir::new(prefix) {
+        match tempfile::Builder::new().prefix(prefix).tempdir() {
             Ok(tempdir) => self.with_temp_dir(tempdir),
             Err(e) => SaveResult::Error(e),
         }
