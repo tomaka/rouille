@@ -114,7 +114,7 @@ fn copy_headers<'h, 'b: 'h>(raw: &[Header<'b>], headers: &'h mut [StrHeader<'b>]
 #[derive(Clone, Debug)]
 pub struct FieldHeaders {
     /// The field's name from the form.
-    pub name: ArcStr,
+    pub name: Arc<str>,
 
     /// The filename of this entry, if supplied. This is not guaranteed to match the original file
     /// or even to be a valid filename for the current platform.

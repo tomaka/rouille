@@ -30,20 +30,6 @@ use self::save::SaveBuilder;
 
 pub use self::save::{Entries, SaveResult, SavedField};
 
-/// Default typedef for shared strings.
-///
-/// Enable the `use_arc_str` feature to use `Arc<str>` instead, which saves an indirection but
-/// cannot be constructed in Rust versions older than 1.21 (the `From<String>` impl was stabilized
-/// in that release).
-#[cfg(not(feature = "use_arc_str"))]
-pub type ArcStr = Arc<String>;
-
-/// Optimized typedef for shared strings, replacing `Arc<String>`.
-///
-/// Enabled with the `use_arc_str` feature.
-#[cfg(feature = "use_arc_str")]
-pub type ArcStr = Arc<str>;
-
 macro_rules! try_opt (
     ($expr:expr) => (
         match $expr {

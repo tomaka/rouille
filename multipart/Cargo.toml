@@ -52,11 +52,6 @@ server = ["buf_redux", "httparse", "quick-error", "safemem", "twoway"]
 mock = []
 nightly = []
 bench = []
-# Use this to enable SSE4.2 instructions in boundary finding
-# TODO: Benchmark this
-sse4 = ["nightly"]
-# switch uses of `Arc<String>` for `Arc<str>` (`From<String>` impl only stabilized in 1.21)
-use_arc_str = []
 
 [[example]]
 name = "hyper_client"
