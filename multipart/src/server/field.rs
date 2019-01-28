@@ -6,18 +6,13 @@
 // copied, modified, or distributed except according to those terms.
 
 //! `multipart` field header parsing.
-use mime::{Mime, TopLevel, SubLevel};
-
-use quick_error::ResultExt;
+use mime::{Mime, TopLevel};
 
 use std::error::Error;
 use std::io::{self, Read, BufRead};
 use std::{str, fmt};
 
-// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
-// be removed when supporting older Rust is no longer needed.
-#[allow(deprecated, unused_imports)]
-use std::ascii::AsciiExt;
+use std::sync::Arc;
 
 use super::httparse::{self, EMPTY_HEADER, Header, Status, Error as HttparseError};
 
@@ -25,7 +20,6 @@ use self::ReadEntryResult::*;
 
 use super::save::SaveBuilder;
 
-use super::ArcStr;
 
 const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader {
     name: "",

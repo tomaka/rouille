@@ -18,8 +18,9 @@ fn main() {
 
 fn read_multipart(req: Request, mut resp: Response) {
     if let Ok(mut multipart) = Multipart::from_request(req) {
-        multipart.foreach_entry(|_| {})
-            .map_err(|e| println!("error handling field: {}", e));
+        if let Err(e) = multipart.foreach_entry(|_| {}) {
+            println!("error handling field: {}", e);
+        }
     }
 
     let mut file = File::open("src/bin/test_form.html")

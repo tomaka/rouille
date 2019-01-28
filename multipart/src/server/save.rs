@@ -14,11 +14,11 @@ use std::collections::HashMap;
 use std::io::prelude::*;
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::{cmp, env, io, mem, str, u32, u64};
 use tempfile;
 
 use server::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry, ReadEntryResult};
-use server::ArcStr;
 
 use self::SaveResult::*;
 use self::TextPolicy::*;
@@ -616,7 +616,7 @@ pub struct Entries {
     /// Each vector is guaranteed not to be empty unless externally modified.
     // Even though individual fields might only have one entry, it's better to limit the
     // size of a value type in `HashMap` to improve cache efficiency in lookups.
-    pub fields: HashMap<ArcStr, Vec<SavedField>>,
+        pub fields: HashMap<Arc<str>, Vec<SavedField>>,
     /// The directory that the entries in `fields` were saved into.
     pub save_dir: SaveDir,
     fields_count: u32,

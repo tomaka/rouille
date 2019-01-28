@@ -8,9 +8,10 @@ use mock::{ClientRequest, HttpBuffer};
 
 use server::{MultipartField, ReadEntry, FieldHeaders};
 
-use mime::{self, Mime};
+use mime::Mime;
 
 use rand::{self, Rng};
+use rand::seq::SliceRandom;
 
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::{Entry, OccupiedEntry};
@@ -431,11 +432,11 @@ fn test_server_entry_api(buf: HttpBuffer, fields: &mut TestFields) {
 }
 
 fn rand_mime() -> Mime {
-    rand::thread_rng().choose(&[
+    [
         // TODO: fill this out, preferably with variants that may be hard to parse
         // i.e. containing hyphens, mainly
         mime!(Application/OctetStream),
         mime!(Text/Plain),
         mime!(Image/Png),
-    ]).unwrap().clone()
+    ].choose(&mut rand::thread_rng()).unwrap().clone()
 }

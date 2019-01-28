@@ -17,7 +17,6 @@ extern crate twoway;
 
 use std::borrow::Borrow;
 use std::io::prelude::*;
-use std::sync::Arc;
 use std::io;
 
 use self::boundary::BoundaryReader;
@@ -225,8 +224,6 @@ fn issue_114() {
     ::init_log();
 
     fn consume_all<R: BufRead>(mut rdr: R) {
-        let mut consume = 0;
-
         loop {
             let consume = rdr.fill_buf().unwrap().len();
             if consume == 0 { return; }
@@ -255,11 +252,11 @@ fn issue_114() {
     multipart.foreach_entry(|_entry| { /* do nothing */}).unwrap();
 
     // a different error if you skip the first field
-    multipart.foreach_entry(|mut entry| if *entry.headers.name != "key1" { consume_all(entry.data); })
+    multipart.foreach_entry(|entry| if *entry.headers.name != *"key1" { consume_all(entry.data); })
         .unwrap();
 
 
-    multipart.foreach_entry(|mut entry| () /* match entry.headers.name.as_str() {
+    multipart.foreach_entry(|_entry| () /* match entry.headers.name.as_str() {
         "file" => {
             let mut vec = Vec::new();
             entry.data.read_to_end(&mut vec).expect("can't read");

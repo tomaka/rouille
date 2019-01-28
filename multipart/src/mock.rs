@@ -5,9 +5,8 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 //! Mocked types for client-side and server-side APIs.
-use std::cell::{Cell, RefCell};
 use std::io::{self, Read, Write};
-use std::{fmt, thread};
+use std::fmt;
 
 use rand::{self, Rng};
 use rand::prelude::ThreadRng;
