@@ -90,6 +90,7 @@ use std::panic::AssertUnwindSafe;
 use std::slice::Iter as SliceIter;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::mpsc;
 use std::thread;
 use std::fmt;
 
@@ -359,6 +360,46 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         while let Ok(Some(request)) = self.server.try_recv() {
             self.process(request);
         }
+    }
+
+    /// Creates a new thread for the server that can be gracefully stopped later.
+    /// 
+    /// This function returns a tuple of a `JoinHandle` and a `Sender`.
+    /// You must call `JoinHandle::join()` otherwise the server will not run until completion.
+    /// The server can be stopped at will by sending it an empty `()` message from another thread.
+    /// 
+    /// ```no_run
+    /// use std::thread;
+    /// use std::time::Duration;
+    /// use rouille::Server;
+    /// use rouille::Response;
+    ///
+    /// let server = Server::new("localhost:0", |request| {
+    ///     Response::text("hello world")
+    /// }).unwrap();
+    /// println!("Listening on {:?}", server.server_addr());
+    /// let (handle, sender) = server.stoppable();
+    /// 
+    /// // Stop the server in 3 seconds
+    /// thread::spawn(move || {
+    ///     thread::sleep(Duration::from_secs(3));
+    ///     sender.send(()).unwrap();
+    /// });
+    /// 
+    /// // Block the main thread until the server is stopped
+    /// handle.join().unwrap();
+    /// ```
+    #[inline]
+    pub fn stoppable(self) -> (thread::JoinHandle<()>, mpsc::Sender<()>) {
+        let (tx, rx) = mpsc::channel();
+
+        let handle = thread::spawn(move || {
+            while let Err(_) = rx.try_recv() {
+                self.poll();
+            }
+        });
+
+        (handle, tx)
     }
 
     // Internal function, called when we got a request from tiny-http that needs to be processed.
