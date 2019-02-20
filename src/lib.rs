@@ -78,6 +78,7 @@ pub use log::{log, log_custom};
 pub use response::{Response, ResponseBody};
 pub use tiny_http::ReadWrite;
 
+use std::time::Duration;
 use std::error::Error;
 use std::io::Cursor;
 use std::io::Result as IoResult;
@@ -367,6 +368,8 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     /// This function returns a tuple of a `JoinHandle` and a `Sender`.
     /// You must call `JoinHandle::join()` otherwise the server will not run until completion.
     /// The server can be stopped at will by sending it an empty `()` message from another thread.
+    /// There may be a maximum of a 1 second delay between sending the stop message and the server
+    /// stopping. This delay may be shortened in future.
     /// 
     /// ```no_run
     /// use std::thread;
@@ -392,10 +395,12 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     #[inline]
     pub fn stoppable(self) -> (thread::JoinHandle<()>, mpsc::Sender<()>) {
         let (tx, rx) = mpsc::channel();
-
         let handle = thread::spawn(move || {
             while let Err(_) = rx.try_recv() {
-                self.poll();
+                // In order to reduce CPU load wait 1s for a recv before looping again
+                while let Ok(Some(request)) = self.server.recv_timeout(Duration::from_secs(1)) {
+                    self.process(request);
+                }
             }
         });
 
