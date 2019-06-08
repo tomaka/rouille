@@ -144,6 +144,11 @@ impl Iterator for Websocket {
             // Read `n` bytes in `buf`.
             let mut buf = [0; 256];
             let n = match self.socket.as_mut().unwrap().read(&mut buf) {
+                Ok(n) if n == 0 => {
+                    // Read returning zero means EOF
+                    self.socket = None;
+                    return None;
+                }
                 Ok(n) => n,
                 Err(ref err) if err.kind() == io::ErrorKind::Interrupted => 0,
                 Err(_) => {

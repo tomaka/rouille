@@ -406,6 +406,26 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
 
         (handle, tx)
     }
+  
+    /// Same as `poll()` but blocks for at most `duration` before returning.
+    ///
+    /// This function can be used implement a custom server loop in a more CPU-efficient manner
+    /// than calling `poll`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// let mut run = true;
+    /// while run {
+    ///     server.poll_timeout(std::time::Duration::from_millis(100));
+    /// }
+    /// ```
+    #[inline]
+    pub fn poll_timeout(&self, dur: std::time::Duration) {
+        while let Ok(Some(request)) = self.server.recv_timeout(dur) {
+            self.process(request);
+        }
+    }
 
     // Internal function, called when we got a request from tiny-http that needs to be processed.
     fn process(&self, request: tiny_http::Request) {
