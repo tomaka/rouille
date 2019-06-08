@@ -78,6 +78,7 @@ pub use log::{log, log_custom};
 pub use response::{Response, ResponseBody};
 pub use tiny_http::ReadWrite;
 
+use std::time::Duration;
 use std::error::Error;
 use std::io::Cursor;
 use std::io::Result as IoResult;
@@ -90,6 +91,7 @@ use std::panic::AssertUnwindSafe;
 use std::slice::Iter as SliceIter;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::mpsc;
 use std::thread;
 use std::fmt;
 
@@ -361,6 +363,50 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         }
     }
 
+    /// Creates a new thread for the server that can be gracefully stopped later.
+    /// 
+    /// This function returns a tuple of a `JoinHandle` and a `Sender`.
+    /// You must call `JoinHandle::join()` otherwise the server will not run until completion.
+    /// The server can be stopped at will by sending it an empty `()` message from another thread.
+    /// There may be a maximum of a 1 second delay between sending the stop message and the server
+    /// stopping. This delay may be shortened in future.
+    /// 
+    /// ```no_run
+    /// use std::thread;
+    /// use std::time::Duration;
+    /// use rouille::Server;
+    /// use rouille::Response;
+    ///
+    /// let server = Server::new("localhost:0", |request| {
+    ///     Response::text("hello world")
+    /// }).unwrap();
+    /// println!("Listening on {:?}", server.server_addr());
+    /// let (handle, sender) = server.stoppable();
+    /// 
+    /// // Stop the server in 3 seconds
+    /// thread::spawn(move || {
+    ///     thread::sleep(Duration::from_secs(3));
+    ///     sender.send(()).unwrap();
+    /// });
+    /// 
+    /// // Block the main thread until the server is stopped
+    /// handle.join().unwrap();
+    /// ```
+    #[inline]
+    pub fn stoppable(self) -> (thread::JoinHandle<()>, mpsc::Sender<()>) {
+        let (tx, rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            while let Err(_) = rx.try_recv() {
+                // In order to reduce CPU load wait 1s for a recv before looping again
+                while let Ok(Some(request)) = self.server.recv_timeout(Duration::from_secs(1)) {
+                    self.process(request);
+                }
+            }
+        });
+
+        (handle, tx)
+    }
+  
     /// Same as `poll()` but blocks for at most `duration` before returning.
     ///
     /// This function can be used implement a custom server loop in a more CPU-efficient manner
@@ -375,12 +421,12 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     /// let server = Server::new("localhost:0", |request| {
     ///     Response::text("hello world")
     /// }).unwrap();
-    /// let mut run = true;
-    /// while run {
+    /// println!("Listening on {:?}", server.server_addr());
+    ///
+    /// loop {
     ///     server.poll_timeout(std::time::Duration::from_millis(100));
     /// }
     /// ```
-
     #[inline]
     pub fn poll_timeout(&self, dur: std::time::Duration) {
         while let Ok(Some(request)) = self.server.recv_timeout(dur) {
