@@ -415,8 +415,15 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     /// # Example
     ///
     /// ```no_run
-    /// let mut run = true;
-    /// while run {
+    /// use rouille::Server;
+    /// use rouille::Response;
+    ///
+    /// let server = Server::new("localhost:0", |request| {
+    ///     Response::text("hello world")
+    /// }).unwrap();
+    /// println!("Listening on {:?}", server.server_addr());
+    ///
+    /// loop {
     ///     server.poll_timeout(std::time::Duration::from_millis(100));
     /// }
     /// ```
