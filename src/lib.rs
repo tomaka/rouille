@@ -101,10 +101,6 @@ use std::sync::mpsc;
 use std::thread;
 use std::fmt;
 
-// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
-// be removed when supporting older Rust is no longer needed.
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 
 pub mod cgi;
 pub mod content_encoding;

@@ -45,7 +45,7 @@
 //!   have to enumerate the protocols with `requested_protocols()` and choose one.
 //!
 //! # Example
-//! 
+//!
 //! ```
 //! # #[macro_use] extern crate rouille;
 //! use std::sync::Mutex;
@@ -76,11 +76,6 @@ use std::fmt;
 use std::sync::mpsc;
 use std::vec::IntoIter as VecIntoIter;
 use sha1::Sha1;
-
-// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
-// be removed when supporting older Rust is no longer needed.
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 
 use Request;
 use Response;
@@ -194,7 +189,7 @@ pub fn start<S>(request: &Request, subprotocol: Option<S>)
 ///
 /// ```
 /// use rouille::websocket;
-/// 
+///
 /// # let request: rouille::Request = return;
 /// for protocol in websocket::requested_protocols(&request) {
 ///     // ...

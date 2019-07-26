@@ -19,11 +19,6 @@ use percent_encoding;
 use Request;
 use Upgrade;
 
-// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
-// be removed when supporting older Rust is no longer needed.
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
-
 /// Contains a prototype of a response.
 ///
 /// The response is only sent to the client when you return the `Response` object from your
