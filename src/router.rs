@@ -155,7 +155,7 @@ macro_rules! router {
     (__check_parse_pattern $request_url_str:ident, $url_pattern:expr => $handle:expr ; $($param:ident: $param_type:ty),*) => {
         {
             let request_url = $request_url_str.split("/")
-                .map(|s| $crate::url::percent_encoding::percent_decode(s.as_bytes()).decode_utf8_lossy().into_owned())
+                .map(|s| $crate::percent_encoding::percent_decode(s.as_bytes()).decode_utf8_lossy().into_owned())
                 .collect::<Vec<_>>();
             let url_pattern = $url_pattern.split("/").collect::<Vec<_>>();
             if request_url.len() != url_pattern.len() {
@@ -299,7 +299,7 @@ macro_rules! router {
             let pat_end = url.find('/').unwrap_or(url.len());
             let rest_url = &url[pat_end..];
 
-            if let Ok($p) = $crate::url::percent_encoding::percent_decode(url[0 .. pat_end].as_bytes())
+            if let Ok($p) = $crate::percent_encoding::percent_decode(url[0 .. pat_end].as_bytes())
                 .decode_utf8_lossy().parse() {
                 let $p: $t = $p;
                 router!(__check_pattern rest_url $value $($rest)*)
@@ -575,7 +575,7 @@ mod tests {
     fn encoded() {
         let request = Request::fake_http("GET", "/hello/%3Fa/test", vec![], vec![]);
 
-        assert_eq!("?a", router!(request, 
+        assert_eq!("?a", router!(request,
            (GET) ["/hello/{val}/test", val: String] => { val },
            _ => String::from("")));
     }
@@ -584,7 +584,7 @@ mod tests {
     fn encoded_old() {
         let request = Request::fake_http("GET", "/hello/%3Fa/test", vec![], vec![]);
 
-        assert_eq!("?a", router!(request, 
+        assert_eq!("?a", router!(request,
            (GET) (/hello/{val: String}/test) => { val },
            _ => String::from("")));
     }

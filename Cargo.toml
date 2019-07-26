@@ -22,7 +22,8 @@ brotli2 = { version = "0.3.2", optional = true }
 chrono = "0.4.0"
 filetime = "0.2.0"
 deflate = { version = "0.7", optional = true, features = ["gzip"] }
-multipart = { version = "0.15", default-features = false, features = ["server"] }
+multipart = { version = "0.16", default-features = false, features = ["server"] }
+percent-encoding = "2"
 rand = "0.5"
 serde = "1"
 serde_derive = "1"
@@ -31,7 +32,7 @@ sha1 = "0.6.0"
 term = "0.5.1"
 time = "0.1.31"
 tiny_http = "0.6.0"
-url = "1.2"
+url = "2"
 threadpool = "1"
 num_cpus = "1"
 
