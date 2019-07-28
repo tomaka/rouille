@@ -69,8 +69,14 @@ extern crate sha1;
 extern crate time;
 extern crate tiny_http;
 pub extern crate url;
+pub extern crate percent_encoding;
 extern crate threadpool;
 extern crate num_cpus;
+
+// https://github.com/servo/rust-url/blob/e121d8d0aafd50247de5f5310a227ecb1efe6ffe/percent_encoding/lib.rs#L126
+pub const DEFAULT_ENCODE_SET: &percent_encoding::AsciiSet = &percent_encoding::CONTROLS
+    .add(b' ').add(b'"').add(b'#').add(b'<').add(b'>')
+    .add(b'`').add(b'?').add(b'{').add(b'}');
 
 pub use assets::extension_to_mime;
 pub use assets::match_assets;
@@ -95,10 +101,6 @@ use std::sync::mpsc;
 use std::thread;
 use std::fmt;
 
-// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
-// be removed when supporting older Rust is no longer needed.
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 
 pub mod cgi;
 pub mod content_encoding;
@@ -364,13 +366,13 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     }
 
     /// Creates a new thread for the server that can be gracefully stopped later.
-    /// 
+    ///
     /// This function returns a tuple of a `JoinHandle` and a `Sender`.
     /// You must call `JoinHandle::join()` otherwise the server will not run until completion.
     /// The server can be stopped at will by sending it an empty `()` message from another thread.
     /// There may be a maximum of a 1 second delay between sending the stop message and the server
     /// stopping. This delay may be shortened in future.
-    /// 
+    ///
     /// ```no_run
     /// use std::thread;
     /// use std::time::Duration;
@@ -382,13 +384,13 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     /// }).unwrap();
     /// println!("Listening on {:?}", server.server_addr());
     /// let (handle, sender) = server.stoppable();
-    /// 
+    ///
     /// // Stop the server in 3 seconds
     /// thread::spawn(move || {
     ///     thread::sleep(Duration::from_secs(3));
     ///     sender.send(()).unwrap();
     /// });
-    /// 
+    ///
     /// // Block the main thread until the server is stopped
     /// handle.join().unwrap();
     /// ```
@@ -406,7 +408,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
 
         (handle, tx)
     }
-  
+
     /// Same as `poll()` but blocks for at most `duration` before returning.
     ///
     /// This function can be used implement a custom server loop in a more CPU-efficient manner
@@ -756,7 +758,7 @@ impl Request {
             url
         };
 
-        url::percent_encoding::percent_decode(url).decode_utf8_lossy().into_owned()
+        percent_encoding::percent_decode(url).decode_utf8_lossy().into_owned()
     }
 
     /// Returns the value of a GET parameter.
@@ -776,7 +778,7 @@ impl Request {
             Some(e) => &get_params[param .. e + param],
         };
 
-        Some(url::percent_encoding::percent_decode(value.replace("+", " ").as_bytes()).decode_utf8_lossy().into_owned())
+        Some(percent_encoding::percent_decode(value.replace("+", " ").as_bytes()).decode_utf8_lossy().into_owned())
     }
 
     /// Returns the value of a header of the request.

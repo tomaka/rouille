@@ -1,6 +1,8 @@
 # Changelog
 
 ## Version [Unreleased]
+- Bump minimum supported Rust version to 1.34.2
+- embedded, exposed `url` version increased to 2.0
 
 ## Version 2.2.0
 

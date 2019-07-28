@@ -15,14 +15,9 @@ use std::fs::File;
 use std::fmt;
 use serde;
 use serde_json;
-use url::percent_encoding;
+use percent_encoding;
 use Request;
 use Upgrade;
-
-// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
-// be removed when supporting older Rust is no longer needed.
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 
 /// Contains a prototype of a response.
 ///
@@ -617,7 +612,7 @@ impl Response {
     pub fn with_content_disposition_attachment(mut self, filename: &str) -> Response {
         // The name must be percent-encoded.
         let name = percent_encoding::percent_encode(filename.as_bytes(),
-                                                    percent_encoding::DEFAULT_ENCODE_SET);
+                                                    super::DEFAULT_ENCODE_SET);
 
         // If you find a more elegant way to do the thing below, don't hesitate to open a PR
 
