@@ -101,24 +101,21 @@ pub enum WebsocketError {
     WrongSubprotocol,
 }
 
-impl error::Error for WebsocketError {
+impl error::Error for WebsocketError {}
+
+impl fmt::Display for WebsocketError {
     #[inline]
-    fn description(&self) -> &str {
-        match *self {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let description = match *self {
             WebsocketError::InvalidWebsocketRequest => {
                 "the request does not match a websocket request"
             },
             WebsocketError::WrongSubprotocol => {
                 "the subprotocol passed to the function was not requested by the client"
             },
-        }
-    }
-}
+        };
 
-impl fmt::Display for WebsocketError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        write!(fmt, "{}", description)
     }
 }
 

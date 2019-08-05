@@ -146,8 +146,19 @@ impl From<IoError> for PostError {
 
 impl error::Error for PostError {
     #[inline]
-    fn description(&self) -> &str {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
+            PostError::IoError(ref e) => Some(e),
+            PostError::Field { ref error, .. } => Some(error),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for PostError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let description = match *self {
             PostError::BodyAlreadyExtracted => {
                 "the body of the request was already extracted"
             },
@@ -163,23 +174,9 @@ impl error::Error for PostError {
             PostError::Field { .. } => {
                 "failed to parse a requested field"
             },
-        }
-    }
+        };
 
-    #[inline]
-    fn cause(&self) -> Option<&error::Error> {
-        match *self {
-            PostError::IoError(ref e) => Some(e),
-            PostError::Field { ref error, .. } => Some(error),
-            _ => None
-        }
-    }
-}
-
-impl fmt::Display for PostError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        write!(fmt, "{}", description)
     }
 }
 
@@ -228,8 +225,20 @@ impl From<num::ParseFloatError> for PostFieldError {
 
 impl error::Error for PostFieldError {
     #[inline]
-    fn description(&self) -> &str {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
+            PostFieldError::IoError(ref e) => Some(e),
+            PostFieldError::WrongDataTypeInt(ref e) => Some(e),
+            PostFieldError::WrongDataTypeFloat(ref e) => Some(e),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for PostFieldError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let description = match *self {
             PostFieldError::IoError(_) => {
                 "could not read the body from the request, or could not execute the CGI program"
             },
@@ -248,24 +257,9 @@ impl error::Error for PostFieldError {
             PostFieldError::WrongDataTypeFloat(_) => {
                 "failed to parse a floating-point field"
             },
-        }
-    }
+        };
 
-    #[inline]
-    fn cause(&self) -> Option<&error::Error> {
-        match *self {
-            PostFieldError::IoError(ref e) => Some(e),
-            PostFieldError::WrongDataTypeInt(ref e) => Some(e),
-            PostFieldError::WrongDataTypeFloat(ref e) => Some(e),
-            _ => None
-        }
-    }
-}
-
-impl fmt::Display for PostFieldError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        write!(fmt, "{}", description)
     }
 }
 

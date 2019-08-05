@@ -68,19 +68,7 @@ impl From<IoError> for CgiError {
 
 impl error::Error for CgiError {
     #[inline]
-    fn description(&self) -> &str {
-        match *self {
-            CgiError::BodyAlreadyExtracted => {
-                "the body of the request was already extracted"
-            },
-            CgiError::IoError(_) => {
-                "could not read the body from the request, or could not execute the CGI program"
-            },
-        }
-    }
-
-    #[inline]
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             CgiError::IoError(ref e) => Some(e),
             _ => None
@@ -91,7 +79,16 @@ impl error::Error for CgiError {
 impl fmt::Display for CgiError {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        let description = match *self {
+            CgiError::BodyAlreadyExtracted => {
+                "the body of the request was already extracted"
+            },
+            CgiError::IoError(_) => {
+                "could not read the body from the request, or could not execute the CGI program"
+            },
+        };
+
+        write!(fmt, "{}", description)
     }
 }
 

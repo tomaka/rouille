@@ -48,14 +48,14 @@ macro_rules! try_or_400 {
 }
 
 #[derive(Serialize)]
-pub struct ErrJson<'a> {
-    description: &'a str,
-    cause: Option<Box<ErrJson<'a>>>,
+pub struct ErrJson {
+    description: String,
+    cause: Option<Box<ErrJson>>,
 }
 
-impl<'a> ErrJson<'a> {
-    pub fn from_err<E: ?Sized + Error>(err: &'a E) -> ErrJson<'a> {
+impl ErrJson {
+    pub fn from_err<E: ?Sized + Error>(err: &E) -> ErrJson {
         let cause = err.source().map(ErrJson::from_err).map(Box::new);
-        ErrJson { description: err.description(), cause }
+        ErrJson { description: err.to_string(), cause }
     }
 }

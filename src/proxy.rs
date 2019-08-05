@@ -96,23 +96,7 @@ impl From<IoError> for ProxyError {
 
 impl error::Error for ProxyError {
     #[inline]
-    fn description(&self) -> &str {
-        match *self {
-            ProxyError::BodyAlreadyExtracted => {
-                "the body of the request was already extracted"
-            },
-            ProxyError::IoError(_) => {
-                "could not read the body from the request, or could not connect to the remote \
-                 server, or the connection to the remote server closed unexpectedly"
-            },
-            ProxyError::HttpParseError => {
-                "the destination server didn't produce compliant HTTP"
-            },
-        }
-    }
-
-    #[inline]
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             ProxyError::IoError(ref e) => Some(e),
             _ => None
@@ -123,7 +107,20 @@ impl error::Error for ProxyError {
 impl fmt::Display for ProxyError {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        let description = match *self {
+            ProxyError::BodyAlreadyExtracted => {
+                "the body of the request was already extracted"
+            },
+            ProxyError::IoError(_) => {
+                "could not read the body from the request, or could not connect to the remote \
+                 server, or the connection to the remote server closed unexpectedly"
+            },
+            ProxyError::HttpParseError => {
+                "the destination server didn't produce compliant HTTP"
+            },
+        };
+
+        write!(fmt, "{}", description)
     }
 }
 
@@ -236,21 +233,18 @@ pub enum FullProxyError {
     BodyAlreadyExtracted,
 }
 
-impl error::Error for FullProxyError {
-    #[inline]
-    fn description(&self) -> &str {
-        match *self {
-            FullProxyError::BodyAlreadyExtracted => {
-                "the body of the request was already extracted"
-            },
-        }
-    }
-}
+impl error::Error for FullProxyError {}
 
 impl fmt::Display for FullProxyError {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        let description = match *self {
+            FullProxyError::BodyAlreadyExtracted => {
+                "the body of the request was already extracted"
+            }
+        };
+
+        write!(fmt, "{}", description)
     }
 }
 
