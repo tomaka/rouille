@@ -484,7 +484,6 @@ impl DecodePostField<()> for BufferedFile {
 macro_rules! post_input {
     ($request:expr, {$($field:ident: $ty:ty $({$config:expr})*),*$(,)*}) => ({
         use std::io::Read;
-        use std::mem;
         use std::result::Result;
         use $crate::Request;
         use $crate::input::post::DecodePostField;
@@ -505,7 +504,7 @@ macro_rules! post_input {
         {
             match existing {
                 a @ &mut Some(_) => {
-                    let extracted = mem::replace(a, None).unwrap();
+                    let extracted = a.take().unwrap();
                     let merged = try!(extracted.merge_multiple(new));
                     *a = Some(merged);
                 },
