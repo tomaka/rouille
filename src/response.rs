@@ -59,7 +59,7 @@ pub struct Response {
     /// In all circumstances, the value of the `Connection` header is managed by the framework and
     /// cannot be customized. If this value is set, the response will automatically contain
     /// `Connection: Upgrade`.
-    pub upgrade: Option<Box<Upgrade + Send>>,
+    pub upgrade: Option<Box<dyn Upgrade + Send>>,
 }
 
 impl fmt::Debug for Response {
@@ -684,7 +684,7 @@ impl Response {
 /// let body = ResponseBody::from_string("hello world");
 /// ```
 pub struct ResponseBody {
-    data: Box<Read + Send>,
+    data: Box<dyn Read + Send>,
     data_length: Option<usize>,
 }
 
@@ -785,7 +785,7 @@ impl ResponseBody {
     /// Returns the size of the body and the body itself. If the size is `None`, then it is
     /// unknown.
     #[inline]
-    pub fn into_reader_and_size(self) -> (Box<Read + Send>, Option<usize>) {
+    pub fn into_reader_and_size(self) -> (Box<dyn Read + Send>, Option<usize>) {
         (self.data, self.data_length)
     }
 }

@@ -295,7 +295,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     ///
     /// Returns an error if there was an error while creating the listening socket, for example if
     /// the port is already in use.
-    pub fn new<A>(addr: A, handler: F) -> Result<Server<F>, Box<Error + Send + Sync>>
+    pub fn new<A>(addr: A, handler: F) -> Result<Server<F>, Box<dyn Error + Send + Sync>>
         where A: ToSocketAddrs
     {
         let server = try!(tiny_http::Server::http(addr));
@@ -318,7 +318,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         handler: F,
         certificate: Vec<u8>,
         private_key: Vec<u8>,
-    ) -> Result<Server<F>, Box<Error + Send + Sync>> where A: ToSocketAddrs {
+    ) -> Result<Server<F>, Box<dyn Error + Send + Sync>> where A: ToSocketAddrs {
         let ssl_config = tiny_http::SslConfig {
             certificate,
             private_key,
@@ -536,7 +536,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
 /// The purpose of this trait is to be used with the `Connection: Upgrade` header, hence its name.
 pub trait Upgrade {
     /// Initializes the object with the given socket.
-    fn build(&mut self, socket: Box<ReadWrite + Send>);
+    fn build(&mut self, socket: Box<dyn ReadWrite + Send>);
 }
 
 /// Represents a request that your handler must answer to.
@@ -548,7 +548,7 @@ pub struct Request {
     url: String,
     headers: Vec<(String, String)>,
     https: bool,
-    data: Arc<Mutex<Option<Box<Read + Send>>>>,
+    data: Arc<Mutex<Option<Box<dyn Read + Send>>>>,
     remote_addr: SocketAddr,
 }
 
@@ -899,7 +899,7 @@ impl<'a> ExactSizeIterator for HeadersIter<'a> {
 ///
 /// In order to obtain this object, call `request.data()`.
 pub struct RequestBody<'a> {
-    body: Box<Read + Send>,
+    body: Box<dyn Read + Send>,
     marker: PhantomData<&'a ()>,
 }
 
