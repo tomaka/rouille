@@ -40,8 +40,18 @@ impl From<IoError> for PlainTextError {
 
 impl error::Error for PlainTextError {
     #[inline]
-    fn description(&self) -> &str {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
+            PlainTextError::IoError(ref e) => Some(e),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for PlainTextError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let description = match *self {
             PlainTextError::BodyAlreadyExtracted => {
                 "the body of the request was already extracted"
             },
@@ -57,22 +67,9 @@ impl error::Error for PlainTextError {
             PlainTextError::NotUtf8 => {
                 "the content-type encoding is not ASCII or UTF-8, or the body is not valid UTF-8"
             },
-        }
-    }
+        };
 
-    #[inline]
-    fn cause(&self) -> Option<&error::Error> {
-        match *self {
-            PlainTextError::IoError(ref e) => Some(e),
-            _ => None
-        }
-    }
-}
-
-impl fmt::Display for PlainTextError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        write!(fmt, "{}", description)
     }
 }
 
