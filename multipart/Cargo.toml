@@ -20,8 +20,8 @@ readme = "README.md"
 [dependencies]
 lazy_static = { version = "1.2.0", optional = true }
 log = "0.4"
-mime = "0.2"
-mime_guess = "1.8"
+mime = "0.3.14"
+mime_guess = "2.0.1"
 rand = "0.6"
 safemem = { version = "0.3", optional = true }
 tempfile = "3"

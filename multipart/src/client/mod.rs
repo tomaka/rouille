@@ -28,12 +28,12 @@ pub use self::sized::SizedRequest;
 const BOUNDARY_LEN: usize = 16;
 
 macro_rules! map_self {
-    ($selff:expr, $try:expr) => (
+    ($selff:expr, $try:expr) => {
         match $try {
             Ok(_) => Ok($selff),
             Err(err) => Err(err.into()),
         }
-    )
+    };
 }
 
 /// The entry point of the client-side multipart API.
@@ -59,20 +59,24 @@ impl Multipart<()> {
     }
 }
 
-impl<S: HttpStream> Multipart<S> { 
+impl<S: HttpStream> Multipart<S> {
     /// Write a text field to this multipart request.
     /// `name` and `val` can be either owned `String` or `&str`.
     ///
     /// ## Errors
     /// If something went wrong with the HTTP stream.
-    pub fn write_text<N: AsRef<str>, V: AsRef<str>>(&mut self, name: N, val: V) -> Result<&mut Self, S::Error> {
+    pub fn write_text<N: AsRef<str>, V: AsRef<str>>(
+        &mut self,
+        name: N,
+        val: V,
+    ) -> Result<&mut Self, S::Error> {
         map_self!(self, self.writer.write_text(name.as_ref(), val.as_ref()))
     }
-    
-    /// Open a file pointed to by `path` and write its contents to the multipart request, 
+
+    /// Open a file pointed to by `path` and write its contents to the multipart request,
     /// supplying its filename and guessing its `Content-Type` from its extension.
     ///
-    /// If you want to set these values manually, or use another type that implements `Read`, 
+    /// If you want to set these values manually, or use another type that implements `Read`,
     /// use `.write_stream()`.
     ///
     /// `name` can be either `String` or `&str`, and `path` can be `PathBuf` or `&Path`.
@@ -80,7 +84,11 @@ impl<S: HttpStream> Multipart<S> {
     /// ## Errors
     /// If there was a problem opening the file (was a directory or didn't exist),
     /// or if something went wrong with the HTTP stream.
-    pub fn write_file<N: AsRef<str>, P: AsRef<Path>>(&mut self, name: N, path: P) -> Result<&mut Self, S::Error> {
+    pub fn write_file<N: AsRef<str>, P: AsRef<Path>>(
+        &mut self,
+        name: N,
+        path: P,
+    ) -> Result<&mut Self, S::Error> {
         let name = name.as_ref();
         let path = path.as_ref();
 
@@ -95,34 +103,47 @@ impl<S: HttpStream> Multipart<S> {
     ///
     /// ## Warning
     /// The given `Read` **must** be able to read to EOF (end of file/no more data), meaning
-    /// `Read::read()` returns `Ok(0)`. If it never returns EOF it will be read to infinity 
+    /// `Read::read()` returns `Ok(0)`. If it never returns EOF it will be read to infinity
     /// and the request will never be completed.
     ///
     /// When using `SizedRequest` this also can cause out-of-control memory usage as the
     /// multipart data has to be written to an in-memory buffer so its size can be calculated.
     ///
-    /// Use `Read::take()` if you wish to send data from a `Read` 
+    /// Use `Read::take()` if you wish to send data from a `Read`
     /// that will never return EOF otherwise.
     ///
     /// ## Errors
     /// If the reader returned an error, or if something went wrong with the HTTP stream.
     // RFC: How to format this declaration?
     pub fn write_stream<N: AsRef<str>, St: Read>(
-        &mut self, name: N, stream: &mut St, filename: Option<&str>, content_type: Option<Mime>
+        &mut self,
+        name: N,
+        stream: &mut St,
+        filename: Option<&str>,
+        content_type: Option<Mime>,
     ) -> Result<&mut Self, S::Error> {
         let name = name.as_ref();
 
-        map_self!(self, self.writer.write_stream(stream, name, filename, content_type))
-    } 
+        map_self!(
+            self,
+            self.writer
+                .write_stream(stream, name, filename, content_type)
+        )
+    }
 
     /// Finalize the request and return the response from the server, or the last error if set.
     pub fn send(self) -> Result<S::Response, S::Error> {
-        self.writer.finish().map_err(io::Error::into).and_then(|body| body.finish())
-    }    
+        self.writer
+            .finish()
+            .map_err(io::Error::into)
+            .and_then(|body| body.finish())
+    }
 }
 
 impl<R: HttpRequest> Multipart<SizedRequest<R>>
-where <R::Stream as HttpStream>::Error: From<R::Error> {
+where
+    <R::Stream as HttpStream>::Error: From<R::Error>,
+{
     /// Create a new `Multipart` using the `SizedRequest` wrapper around `req`.
     pub fn from_request_sized(req: R) -> Result<Self, R::Error> {
         Multipart::from_request(SizedRequest::from_request(req))
@@ -134,18 +155,18 @@ pub trait HttpRequest {
     /// The HTTP stream type that can be opend by this request, to which the multipart data will be
     /// written.
     type Stream: HttpStream;
-    /// The error type for this request. 
+    /// The error type for this request.
     /// Must be compatible with `io::Error` as well as `Self::HttpStream::Error`
     type Error: From<io::Error> + Into<<Self::Stream as HttpStream>::Error>;
 
     /// Set the `Content-Type` header to `multipart/form-data` and supply the `boundary` value.
     /// If `content_len` is given, set the `Content-Length` header to its value.
-    /// 
-    /// Return `true` if any and all sanity checks passed and the stream is ready to be opened, 
+    ///
+    /// Return `true` if any and all sanity checks passed and the stream is ready to be opened,
     /// or `false` otherwise.
     fn apply_headers(&mut self, boundary: &str, content_len: Option<u64>) -> bool;
 
-    /// Open the request stream and return it or any error otherwise. 
+    /// Open the request stream and return it or any error otherwise.
     fn open_stream(self) -> Result<Self::Stream, Self::Error>;
 }
 
@@ -157,7 +178,7 @@ pub trait HttpStream: Write {
     type Response;
     /// The error type for this stream.
     /// Must be compatible with `io::Error` as well as `Self::Request::Error`.
-    type Error: From<io::Error> + From<<Self::Request as HttpRequest>::Error>; 
+    type Error: From<io::Error> + From<<Self::Request as HttpRequest>::Error>;
 
     /// Finalize and close the stream and return the response object, or any error otherwise.
     fn finish(self) -> Result<Self::Response, Self::Error>;
@@ -167,8 +188,12 @@ impl HttpRequest for () {
     type Stream = io::Sink;
     type Error = io::Error;
 
-    fn apply_headers(&mut self, _: &str, _: Option<u64>) -> bool { true }
-    fn open_stream(self) -> Result<Self::Stream, Self::Error> { Ok(io::sink()) }
+    fn apply_headers(&mut self, _: &str, _: Option<u64>) -> bool {
+        true
+    }
+    fn open_stream(self) -> Result<Self::Stream, Self::Error> {
+        Ok(io::sink())
+    }
 }
 
 impl HttpStream for io::Sink {
@@ -176,14 +201,19 @@ impl HttpStream for io::Sink {
     type Response = ();
     type Error = io::Error;
 
-    fn finish(self) -> Result<Self::Response, Self::Error> { Ok(()) }
+    fn finish(self) -> Result<Self::Response, Self::Error> {
+        Ok(())
+    }
 }
 
 fn gen_boundary() -> String {
     ::random_alphanumeric(BOUNDARY_LEN)
 }
 
-fn open_stream<R: HttpRequest>(mut req: R, content_len: Option<u64>) -> Result<(String, R::Stream), R::Error> {
+fn open_stream<R: HttpRequest>(
+    mut req: R,
+    content_len: Option<u64>,
+) -> Result<(String, R::Stream), R::Error> {
     let boundary = gen_boundary();
     req.apply_headers(&boundary, content_len);
     req.open_stream().map(|stream| (boundary, stream))
@@ -225,19 +255,29 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
         self.write_stream(&mut file, name, filename, Some(content_type))
     }
 
-    fn write_stream<S: Read>(&mut self, stream: &mut S, name: &str, filename: Option<&str>, content_type: Option<Mime>) -> io::Result<()> {
+    fn write_stream<S: Read>(
+        &mut self,
+        stream: &mut S,
+        name: &str,
+        filename: Option<&str>,
+        content_type: Option<Mime>,
+    ) -> io::Result<()> {
         // This is necessary to make sure it is interpreted as a file on the server end.
-        let content_type = Some(content_type.unwrap_or_else(::mime_guess::octet_stream));
+        let content_type = Some(content_type.unwrap_or(mime::APPLICATION_OCTET_STREAM));
 
         chain_result! {
             self.write_field_headers(name, filename, content_type),
             io::copy(stream, &mut self.inner),
-            Ok(()) 
+            Ok(())
         }
     }
 
-    fn write_field_headers(&mut self, name: &str, filename: Option<&str>, content_type: Option<Mime>) 
-    -> io::Result<()> {
+    fn write_field_headers(
+        &mut self,
+        name: &str,
+        filename: Option<&str>,
+        content_type: Option<Mime>,
+    ) -> io::Result<()> {
         chain_result! {
             // Write the first boundary, or the boundary for the previous field.
             self.write_boundary(),
@@ -265,9 +305,9 @@ impl<'a, W: Write> MultipartWriter<'a, W> {
 }
 
 fn mime_filename(path: &Path) -> (Mime, Option<&str>) {
-    let content_type = ::mime_guess::guess_mime_type(path);
+    let content_type = ::mime_guess::from_path(path);
     let filename = opt_filename(path);
-    (content_type, filename)
+    (content_type.first_or_octet_stream(), filename)
 }
 
 fn opt_filename(path: &Path) -> Option<&str> {

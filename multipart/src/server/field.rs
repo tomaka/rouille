@@ -6,32 +6,29 @@
 // copied, modified, or distributed except according to those terms.
 
 //! `multipart` field header parsing.
-use mime::{Mime, TopLevel};
+use mime::Mime;
 
 use std::error::Error;
-use std::io::{self, Read, BufRead};
-use std::{str, fmt};
+use std::io::{self, BufRead, Read};
+use std::{fmt, str};
 
 use std::sync::Arc;
 
-use super::httparse::{self, EMPTY_HEADER, Header, Status, Error as HttparseError};
+use super::httparse::{self, Error as HttparseError, Header, Status, EMPTY_HEADER};
 
 use self::ReadEntryResult::*;
 
 use super::save::SaveBuilder;
 
-
-const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader {
-    name: "",
-    val: "",
-};
+const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader { name: "", val: "" };
 
 macro_rules! invalid_cont_disp {
     ($reason: expr, $cause: expr) => {
-        return Err(
-            ParseHeaderError::InvalidContDisp($reason, $cause.to_string())
-        );
-    }
+        return Err(ParseHeaderError::InvalidContDisp(
+            $reason,
+            $cause.to_string(),
+        ));
+    };
 }
 
 /// Not exposed
@@ -43,7 +40,7 @@ pub struct StrHeader<'a> {
 
 struct DisplayHeaders<'s, 'a: 's>(&'s [StrHeader<'a>]);
 
-impl <'s, 'a: 's> fmt::Display for  DisplayHeaders<'s, 'a> {
+impl<'s, 'a: 's> fmt::Display for DisplayHeaders<'s, 'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for hdr in self.0 {
             writeln!(f, "{}: {}", hdr.name, hdr.val)?;
@@ -54,7 +51,10 @@ impl <'s, 'a: 's> fmt::Display for  DisplayHeaders<'s, 'a> {
 }
 
 fn with_headers<R, F, Ret>(r: &mut R, closure: F) -> Result<Ret, ParseHeaderError>
-where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
+where
+    R: BufRead,
+    F: FnOnce(&[StrHeader]) -> Ret,
+{
     const HEADER_LEN: usize = 4;
 
     let consume;
@@ -83,7 +83,7 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
                 consume = consume_;
                 ret = closure(headers);
                 break;
-            },
+            }
         }
     }
 
@@ -91,7 +91,10 @@ where R: BufRead, F: FnOnce(&[StrHeader]) -> Ret {
     Ok(ret)
 }
 
-fn copy_headers<'h, 'b: 'h>(raw: &[Header<'b>], headers: &'h mut [StrHeader<'b>]) -> io::Result<&'h [StrHeader<'b>]> {
+fn copy_headers<'h, 'b: 'h>(
+    raw: &[Header<'b>],
+    headers: &'h mut [StrHeader<'b>],
+) -> io::Result<&'h [StrHeader<'b>]> {
     for (raw, header) in raw.iter().zip(&mut *headers) {
         header.name = raw.name;
         header.val = io_str_utf8(raw.value)?;
@@ -154,7 +157,7 @@ impl ContentDisp {
             header
         } else {
             return Err(ParseHeaderError::MissingContentDisposition(
-                DisplayHeaders(headers).to_string()
+                DisplayHeaders(headers).to_string(),
             ));
         };
 
@@ -167,25 +170,32 @@ impl ContentDisp {
                     invalid_cont_disp!("unexpected Content-Disposition value", disp_type);
                 }
                 after_disp_type
-            },
-            None => invalid_cont_disp!("expected additional data after Content-Disposition type",
-                                       header.val),
+            }
+            None => invalid_cont_disp!(
+                "expected additional data after Content-Disposition type",
+                header.val
+            ),
         };
 
         // Content-Disposition: form-data; name=?
         let (field_name, filename) = match get_str_after("name=", ';', after_disp_type) {
-            None => invalid_cont_disp!("expected field name and maybe filename, got",
-                                       after_disp_type),
+            None => invalid_cont_disp!(
+                "expected field name and maybe filename, got",
+                after_disp_type
+            ),
             // Content-Disposition: form-data; name={field_name}; filename=?
             Some((field_name, after_field_name)) => {
                 let field_name = trim_quotes(field_name);
                 let filename = get_str_after("filename=", ';', after_field_name)
                     .map(|(filename, _)| trim_quotes(filename).to_owned());
                 (field_name, filename)
-            },
+            }
         };
 
-        Ok(ContentDisp { field_name: field_name.to_owned(), filename })
+        Ok(ContentDisp {
+            field_name: field_name.to_owned(),
+            filename,
+        })
     }
 }
 
@@ -193,8 +203,9 @@ fn parse_content_type(headers: &[StrHeader]) -> Result<Option<Mime>, ParseHeader
     if let Some(header) = find_header(headers, "Content-Type") {
         // Boundary parameter will be parsed into the `Mime`
         debug!("Found Content-Type: {:?}", header.val);
-        Ok(Some(header.val.parse::<Mime>()
-            .map_err(|_| ParseHeaderError::MimeError(header.val.into()))?))
+        Ok(Some(header.val.parse::<Mime>().map_err(|_| {
+            ParseHeaderError::MimeError(header.val.into())
+        })?))
     } else {
         Ok(None)
     }
@@ -225,7 +236,10 @@ impl<M: ReadEntry> MultipartField<M> {
     ///
     /// Detecting character encodings by any means is (currently) beyond the scope of this crate.
     pub fn is_text(&self) -> bool {
-        self.headers.content_type.as_ref().map_or(true, |ct| ct.0 == TopLevel::Text)
+        self.headers
+            .content_type
+            .as_ref()
+            .map_or(true, |ct| ct.type_() == mime::TEXT)
     }
 
     /// Read the next entry in the request.
@@ -237,18 +251,21 @@ impl<M: ReadEntry> MultipartField<M> {
     ///
     /// Returns `Ok(Some(self))` if another entry was read, `Ok(None)` if the end of the body was
     /// reached, and `Err(e)` for any errors that occur.
-    pub fn next_entry_inplace(&mut self) -> io::Result<Option<&mut Self>> where for<'a> &'a mut M: ReadEntry {
+    pub fn next_entry_inplace(&mut self) -> io::Result<Option<&mut Self>>
+    where
+        for<'a> &'a mut M: ReadEntry,
+    {
         let multipart = self.data.take_inner();
 
         match multipart.read_entry() {
             Entry(entry) => {
                 *self = entry;
                 Ok(Some(self))
-            },
+            }
             End(multipart) => {
                 self.data.give_inner(multipart);
                 Ok(None)
-            },
+            }
             Error(multipart, err) => {
                 self.data.give_inner(multipart);
                 Err(err)
@@ -271,7 +288,10 @@ const DATA_INNER_ERR: &str = "MultipartFile::inner taken and not replaced; this 
                               relevant backtrace and debug logs at \
                               https://github.com/abonander/multipart";
 
-impl<M> MultipartData<M> where M: ReadEntry {
+impl<M> MultipartData<M>
+where
+    M: ReadEntry,
+{
     /// Get a builder type which can save the field with or without a size limit.
     pub fn save(&mut self) -> SaveBuilder<&mut Self> {
         SaveBuilder::new(self)
@@ -306,7 +326,7 @@ impl<M> MultipartData<M> where M: ReadEntry {
 }
 
 impl<M: ReadEntry> Read for MultipartData<M> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>{
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner_mut().source_mut().read(buf)
     }
 }
@@ -333,11 +353,19 @@ fn trim_quotes(s: &str) -> &str {
 }
 
 /// Get the string after `needle` in `haystack`, stopping before `end_val_delim`
-fn get_str_after<'a>(needle: &str, end_val_delim: char, haystack: &'a str) -> Option<(&'a str, &'a str)> {
+fn get_str_after<'a>(
+    needle: &str,
+    end_val_delim: char,
+    haystack: &'a str,
+) -> Option<(&'a str, &'a str)> {
     let val_start_idx = try_opt!(haystack.find(needle)) + needle.len();
-    let val_end_idx = haystack[val_start_idx..].find(end_val_delim)
+    let val_end_idx = haystack[val_start_idx..]
+        .find(end_val_delim)
         .map_or(haystack.len(), |end_idx| end_idx + val_start_idx);
-    Some((&haystack[val_start_idx..val_end_idx], &haystack[val_end_idx..]))
+    Some((
+        &haystack[val_start_idx..val_end_idx],
+        &haystack[val_end_idx..],
+    ))
 }
 
 fn io_str_utf8(buf: &[u8]) -> io::Result<&str> {
@@ -347,7 +375,9 @@ fn io_str_utf8(buf: &[u8]) -> io::Result<&str> {
 fn find_header<'a, 'b>(headers: &'a [StrHeader<'b>], name: &str) -> Option<&'a StrHeader<'b>> {
     // Field names are case insensitive and consist of ASCII characters
     // only (see https://tools.ietf.org/html/rfc822#section-3.2).
-    headers.iter().find(|header| header.name.eq_ignore_ascii_case(name))
+    headers
+        .iter()
+        .find(|header| header.name.eq_ignore_ascii_case(name))
 }
 
 /// Common trait for `Multipart` and `&mut Multipart`
@@ -365,25 +395,23 @@ pub trait ReadEntry: PrivReadEntry + Sized {
         let field_headers: FieldHeaders = try_read_entry!(self; self.read_headers());
 
         if let Some(ct) = field_headers.content_type.as_ref() {
-            if ct.0 == TopLevel::Multipart {
+            if ct.type_() == mime::MULTIPART {
                 // fields of this type are sent by (supposedly) no known clients
                 // (https://tools.ietf.org/html/rfc7578#appendix-A) so I'd be fascinated
                 // to hear about any in the wild
-                info!("Found nested multipart field: {:?}:\r\n\
-                       Please report this client's User-Agent and any other available details \
-                       at https://github.com/abonander/multipart/issues/56",
-                       field_headers);
+                info!(
+                    "Found nested multipart field: {:?}:\r\n\
+                     Please report this client's User-Agent and any other available details \
+                     at https://github.com/abonander/multipart/issues/56",
+                    field_headers
+                );
             }
         }
 
-        Entry(
-            MultipartField {
-                headers: field_headers,
-                data: MultipartData {
-                    inner: Some(self),
-                },
-            }
-        )
+        Entry(MultipartField {
+            headers: field_headers,
+            data: MultipartData { inner: Some(self) },
+        })
     }
 
     /// Equivalent to `read_entry()` but takes `&mut self`
@@ -464,8 +492,10 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
 
     /// Attempt to unwrap `Entry`, panicking if this is `End` or `Error`.
     pub fn unwrap(self) -> Entry {
-        self.expect_alt("`ReadEntryResult::unwrap()` called on `End` value",
-                        "`ReadEntryResult::unwrap()` called on `Error` value: {:?}")
+        self.expect_alt(
+            "`ReadEntryResult::unwrap()` called on `End` value",
+            "`ReadEntryResult::unwrap()` called on `Error` value: {:?}",
+        )
     }
 
     /// Attempt to unwrap `Entry`, panicking if this is `End` or `Error`
@@ -542,12 +572,32 @@ quick_error! {
 #[test]
 fn test_find_header() {
     let headers = [
-        StrHeader { name: "Content-Type", val: "text/plain" },
-        StrHeader { name: "Content-disposition", val: "form-data" },
-        StrHeader { name: "content-transfer-encoding", val: "binary" }
+        StrHeader {
+            name: "Content-Type",
+            val: "text/plain",
+        },
+        StrHeader {
+            name: "Content-disposition",
+            val: "form-data",
+        },
+        StrHeader {
+            name: "content-transfer-encoding",
+            val: "binary",
+        },
     ];
 
-    assert_eq!(find_header(&headers, "Content-Type").unwrap().val, "text/plain");
-    assert_eq!(find_header(&headers, "Content-Disposition").unwrap().val, "form-data");
-    assert_eq!(find_header(&headers, "Content-Transfer-Encoding").unwrap().val, "binary");
+    assert_eq!(
+        find_header(&headers, "Content-Type").unwrap().val,
+        "text/plain"
+    );
+    assert_eq!(
+        find_header(&headers, "Content-Disposition").unwrap().val,
+        "form-data"
+    );
+    assert_eq!(
+        find_header(&headers, "Content-Transfer-Encoding")
+            .unwrap()
+            .val,
+        "binary"
+    );
 }

@@ -6,15 +6,15 @@
 // copied, modified, or distributed except according to those terms.
 use mock::{ClientRequest, HttpBuffer};
 
-use server::{MultipartField, ReadEntry, FieldHeaders};
+use server::{FieldHeaders, MultipartField, ReadEntry};
 
 use mime::Mime;
 
-use rand::{self, Rng};
 use rand::seq::SliceRandom;
+use rand::{self, Rng};
 
-use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::{Entry, OccupiedEntry};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io::prelude::*;
 use std::io::Cursor;
@@ -28,8 +28,9 @@ const MAX_LEN: usize = 5;
 const MAX_DASHES: usize = 2;
 
 fn collect_rand<C: FromIterator<T>, T, F: FnMut() -> T>(mut gen: F) -> C {
-    (0 .. rand::thread_rng().gen_range(MIN_FIELDS, MAX_FIELDS))
-        .map(|_| gen()).collect()
+    (0..rand::thread_rng().gen_range(MIN_FIELDS, MAX_FIELDS))
+        .map(|_| gen())
+        .collect()
 }
 
 macro_rules! expect_fmt (
@@ -51,7 +52,10 @@ macro_rules! expect_ok_fmt (
     );
 );
 
-fn get_field<'m, V>(field: &FieldHeaders, fields: &'m mut HashMap<String, V>) -> Option<OccupiedEntry<'m, String, V>> {
+fn get_field<'m, V>(
+    field: &FieldHeaders,
+    fields: &'m mut HashMap<String, V>,
+) -> Option<OccupiedEntry<'m, String, V>> {
     match fields.entry(field.name.to_string()) {
         Entry::Occupied(occupied) => Some(occupied),
         Entry::Vacant(_) => None,
@@ -75,14 +79,17 @@ impl TestFields {
     fn check_field<M: ReadEntry>(&mut self, mut field: MultipartField<M>) -> M {
         // text/plain fields would be considered a file by `TestFields`
         if field.headers.content_type.is_none() {
-            let mut text_entries = expect_fmt!(get_field(&field.headers, &mut self.texts),
-                                        "Got text field that wasn't in original dataset: {:?}",
-                                        field.headers);
+            let mut text_entries = expect_fmt!(
+                get_field(&field.headers, &mut self.texts),
+                "Got text field that wasn't in original dataset: {:?}",
+                field.headers
+            );
 
             let mut text = String::new();
             expect_ok_fmt!(
                 field.data.read_to_string(&mut text),
-                "error failed to read text data to string: {:?}\n{err}", field.headers
+                "error failed to read text data to string: {:?}\n{err}",
+                field.headers
             );
 
             assert!(
@@ -100,10 +107,11 @@ impl TestFields {
             return field.data.into_inner();
         }
 
-
-        let mut file_entries = expect_fmt!(get_field(&field.headers, &mut self.files),
-                                        "Got file field that wasn't in original dataset: {:?}",
-                                        field.headers);
+        let mut file_entries = expect_fmt!(
+            get_field(&field.headers, &mut self.files),
+            "Got file field that wasn't in original dataset: {:?}",
+            field.headers
+        );
 
         let field_name = field.headers.name.clone();
         let (test_entry, inner) = FileEntry::from_field(field);
@@ -124,8 +132,16 @@ impl TestFields {
     }
 
     fn assert_is_empty(&self) {
-        assert!(self.texts.is_empty(), "Text Fields were not exhausted! {:?}", self.texts);
-        assert!(self.files.is_empty(), "File Fields were not exhausted! {:?}", self.files);
+        assert!(
+            self.texts.is_empty(),
+            "Text Fields were not exhausted! {:?}",
+            self.texts
+        );
+        assert!(
+            self.files.is_empty(),
+            "File Fields were not exhausted! {:?}",
+            self.files
+        );
     }
 }
 
@@ -141,16 +157,20 @@ impl FileEntry {
         let mut data = Vec::new();
         expect_ok_fmt!(
             field.data.read_to_end(&mut data),
-            "Error reading file field: {:?}\n{err}", field.headers
+            "Error reading file field: {:?}\n{err}",
+            field.headers
         );
 
         (
             FileEntry {
-                content_type: field.headers.content_type.unwrap_or(mime!(Application/OctetStream)),
+                content_type: field
+                    .headers
+                    .content_type
+                    .unwrap_or(mime::APPLICATION_OCTET_STREAM),
                 filename: field.headers.filename,
                 data: PrintHex(data),
             },
-            field.data.into_inner()
+            field.data.into_inner(),
         )
     }
 
@@ -249,7 +269,7 @@ fn lazy_client_entry_server() {
 }
 
 mod extended {
-    use super::{test_client, test_server, test_server_entry_api, test_client_lazy, TestFields};
+    use super::{test_client, test_client_lazy, test_server, test_server_entry_api, TestFields};
 
     use std::time::Instant;
 
@@ -296,7 +316,6 @@ mod extended {
     }
 }
 
-
 fn gen_bool() -> bool {
     rand::thread_rng().gen()
 }
@@ -311,7 +330,9 @@ fn gen_string() -> String {
     let str_len_2 = rng_2.gen_range(MIN_LEN, MAX_LEN + 1);
     let num_dashes = rng_1.gen_range(0, MAX_DASHES + 1);
 
-    rng_1.sample_iter(&Alphanumeric).take(str_len_1)
+    rng_1
+        .sample_iter(&Alphanumeric)
+        .take(str_len_1)
         .chain(iter::repeat('-').take(num_dashes))
         .chain(rng_2.sample_iter(&Alphanumeric).take(str_len_2))
         .collect()
@@ -326,30 +347,44 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
 
     let request = ClientRequest::default();
 
-    let mut test_files = test_fields.files.iter().flat_map(
-        |(name, files)| files.iter().map(move |file| (name, file))
-    );
+    let mut test_files = test_fields
+        .files
+        .iter()
+        .flat_map(|(name, files)| files.iter().map(move |file| (name, file)));
 
-    let test_texts = test_fields.texts.iter().flat_map(
-        |(name, texts)| texts.iter().map(move |text| (name, text))
-    );
+    let test_texts = test_fields
+        .texts
+        .iter()
+        .flat_map(|(name, texts)| texts.iter().map(move |text| (name, text)));
 
     let mut multipart = Multipart::from_request(request).unwrap();
-   
+
     // Intersperse file fields amongst text fields
     for (name, text) in test_texts {
         if let Some((file_name, file)) = test_files.next() {
-            multipart.write_stream(file_name, &mut &*file.data.0, file.filename(),
-                                   Some(file.content_type.clone())).unwrap();
+            multipart
+                .write_stream(
+                    file_name,
+                    &mut &*file.data.0,
+                    file.filename(),
+                    Some(file.content_type.clone()),
+                )
+                .unwrap();
         }
 
-        multipart.write_text(name, text).unwrap();    
+        multipart.write_text(name, text).unwrap();
     }
 
     // Write remaining files
     for (file_name, file) in test_files {
-        multipart.write_stream(file_name, &mut &*file.data.0, file.filename(),
-                               Some(file.content_type.clone())).unwrap();
+        multipart
+            .write_stream(
+                file_name,
+                &mut &*file.data.0,
+                file.filename(),
+                Some(file.content_type.clone()),
+            )
+            .unwrap();
     }
 
     multipart.send().unwrap()
@@ -360,26 +395,36 @@ fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
 
     let mut multipart = Multipart::new();
 
-    let mut test_files = test_fields.files.iter().flat_map(
-        |(name, files)| files.iter().map(move |file| (name, file))
-    );
+    let mut test_files = test_fields
+        .files
+        .iter()
+        .flat_map(|(name, files)| files.iter().map(move |file| (name, file)));
 
-    let test_texts = test_fields.texts.iter().flat_map(
-        |(name, texts)| texts.iter().map(move |text| (name, text))
-    );
+    let test_texts = test_fields
+        .texts
+        .iter()
+        .flat_map(|(name, texts)| texts.iter().map(move |text| (name, text)));
 
     for (name, text) in test_texts {
         if let Some((file_name, file)) = test_files.next() {
-                multipart.add_stream(&**file_name, Cursor::new(&file.data.0), file.filename(),
-                                     Some(file.content_type.clone()));
+            multipart.add_stream(
+                &**file_name,
+                Cursor::new(&file.data.0),
+                file.filename(),
+                Some(file.content_type.clone()),
+            );
         }
 
         multipart.add_text(&**name, &**text);
     }
 
     for (file_name, file) in test_files {
-        multipart.add_stream(&**file_name, Cursor::new(&file.data.0), file.filename(),
-                             Some(file.content_type.clone()));
+        multipart.add_stream(
+            &**file_name,
+            Cursor::new(&file.data.0),
+            file.filename(),
+            Some(file.content_type.clone()),
+        );
     }
 
     let mut prepared = multipart.prepare().unwrap();
@@ -400,7 +445,10 @@ fn test_server(buf: HttpBuffer, fields: &mut TestFields) {
     let server_buf = buf.for_server();
 
     if let Some(content_len) = server_buf.content_len {
-        assert!(content_len == server_buf.data.len() as u64, "Supplied content_len different from actual");
+        assert!(
+            content_len == server_buf.data.len() as u64,
+            "Supplied content_len different from actual"
+        );
     }
 
     let mut multipart = Multipart::from_request(server_buf)
@@ -417,13 +465,18 @@ fn test_server_entry_api(buf: HttpBuffer, fields: &mut TestFields) {
     let server_buf = buf.for_server();
 
     if let Some(content_len) = server_buf.content_len {
-        assert!(content_len == server_buf.data.len() as u64, "Supplied content_len different from actual");
+        assert!(
+            content_len == server_buf.data.len() as u64,
+            "Supplied content_len different from actual"
+        );
     }
 
     let mut multipart = Multipart::from_request(server_buf)
         .unwrap_or_else(|_| panic!("Buffer should be multipart!"));
 
-    let entry = multipart.into_entry().expect_alt("Expected entry, got none", "Error reading entry");
+    let entry = multipart
+        .into_entry()
+        .expect_alt("Expected entry, got none", "Error reading entry");
     multipart = fields.check_field(entry);
 
     while let Some(entry) = multipart.into_entry().unwrap_opt() {
@@ -433,10 +486,11 @@ fn test_server_entry_api(buf: HttpBuffer, fields: &mut TestFields) {
 
 fn rand_mime() -> Mime {
     [
-        // TODO: fill this out, preferably with variants that may be hard to parse
-        // i.e. containing hyphens, mainly
-        mime!(Application/OctetStream),
-        mime!(Text/Plain),
-        mime!(Image/Png),
-    ].choose(&mut rand::thread_rng()).unwrap().clone()
+        mime::APPLICATION_OCTET_STREAM,
+        mime::TEXT_PLAIN,
+        mime::IMAGE_PNG,
+    ]
+    .choose(&mut rand::thread_rng())
+    .unwrap()
+    .clone()
 }
