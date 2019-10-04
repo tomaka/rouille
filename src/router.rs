@@ -115,7 +115,7 @@ macro_rules! router {
             let mut ret = None;
             $({
                 if ret.is_none() && request.method() == stringify!($method) {
-                    ret = router!(__param_dispatch request_url, $url_pattern => $handle ; $($param: $param_type),*);
+                    ret = $crate::router!(__param_dispatch request_url, $url_pattern => $handle ; $($param: $param_type),*);
                 }
             })+
 
@@ -129,12 +129,12 @@ macro_rules! router {
 
     // No url parameters, just check the url and evaluate the `$handle`
     (__param_dispatch $request_url:ident, $url_pattern:expr => $handle:expr ; ) => {
-        router!(__check_url_match $request_url, $url_pattern => $handle)
+        $crate::router!(__check_url_match $request_url, $url_pattern => $handle)
     };
 
     // Url parameters found, check and parse the url against the provided pattern
     (__param_dispatch $request_url:ident, $url_pattern:expr => $handle:expr ; $($param:ident: $param_type:ty),*) => {
-        router!(__check_parse_pattern $request_url, $url_pattern => $handle ; $($param: $param_type),*)
+        $crate::router!(__check_parse_pattern $request_url, $url_pattern => $handle ; $($param: $param_type),*)
     };
 
     (__check_url_match $request_url:ident, $url_pattern:expr => $handle:expr) => {
@@ -176,7 +176,7 @@ macro_rules! router {
                     for (actual, desired) in request_url.iter().zip(url_pattern.iter()) {
                         if desired.starts_with("{") && desired.ends_with("}") {
                             let key = &desired[1..desired.len()-1];
-                            router!(__insert_param $request_url_str, url_params, key, actual ; $($param: $param_type)*)
+                            $crate::router!(__insert_param $request_url_str, url_params, key, actual ; $($param: $param_type)*)
                         } else if actual != desired {
                             return None
                         }
@@ -184,7 +184,7 @@ macro_rules! router {
                     Some(url_params)
                 })();
                 if let Some(url_params) = url_params {
-                    router!(__build_resp $request_url_str, url_params, $handle ; $($param: $param_type)*)
+                    $crate::router!(__build_resp $request_url_str, url_params, $handle ; $($param: $param_type)*)
                 } else {
                     None
                 }
@@ -203,9 +203,9 @@ macro_rules! router {
     // `$key` (a parameter name in the string-url), then set them in the `$url_params` struct
     (__insert_param $request_url:ident, $url_params:ident, $key:expr, $actual:expr ; $param:tt: $param_type:tt $($params:tt: $param_types:tt)*) => {
         if $key == stringify!($param) {
-            router!(__bind_url_param $url_params, $actual, $param, $param_type)
+            $crate::router!(__bind_url_param $url_params, $actual, $param, $param_type)
         } else {
-            router!(__insert_param $request_url, $url_params, $key, $actual ; $($params: $param_types)*);
+            $crate::router!(__insert_param $request_url, $url_params, $key, $actual ; $($params: $param_types)*);
         }
     };
 
@@ -226,7 +226,7 @@ macro_rules! router {
 
     // There's still some params to bind
     (__build_resp $request_url:ident, $url_params:expr, $handle:expr ; $param:tt: $param_type:tt $($params:tt: $param_types:tt)*) => {
-        router!(__bind_param $request_url, $url_params, $handle, $param: $param_type ; $($params: $param_types)*)
+        $crate::router!(__bind_param $request_url, $url_params, $handle, $param: $param_type ; $($params: $param_types)*)
     };
 
     // Recursively pull out and bind a url param
@@ -240,7 +240,7 @@ macro_rules! router {
                            param_name, param_name, $request_url);
                 }
             };
-            router!(__build_resp $request_url, $url_params, $handle ; $($params: $param_types)*)
+            $crate::router!(__build_resp $request_url, $url_params, $handle ; $($params: $param_types)*)
         }
     };
 
@@ -263,7 +263,7 @@ macro_rules! router {
 
             $({
                 if ret.is_none() && request.method() == stringify!($method) {
-                    ret = router!(__check_pattern request_url $value $($pat)+);
+                    ret = $crate::router!(__check_pattern request_url $value $($pat)+);
                 }
             })+
 
@@ -284,7 +284,7 @@ macro_rules! router {
             let rest_url = &url[pat_end..];
 
             if let Ok($p) = url[0 .. pat_end].parse() {
-                router!(__check_pattern rest_url $value $($rest)*)
+                $crate::router!(__check_pattern rest_url $value $($rest)*)
             } else {
                 None
             }
@@ -302,7 +302,7 @@ macro_rules! router {
             if let Ok($p) = $crate::percent_encoding::percent_decode(url[0 .. pat_end].as_bytes())
                 .decode_utf8_lossy().parse() {
                 let $p: $t = $p;
-                router!(__check_pattern rest_url $value $($rest)*)
+                $crate::router!(__check_pattern rest_url $value $($rest)*)
             } else {
                 None
             }
@@ -314,7 +314,7 @@ macro_rules! router {
             let required = concat!("/", stringify!($p));
             if $url.starts_with(required) {
                 let rest_url = &$url[required.len()..];
-                router!(__check_pattern rest_url $value $($rest)*)
+                $crate::router!(__check_pattern rest_url $value $($rest)*)
             } else {
                 None
             }
@@ -325,7 +325,7 @@ macro_rules! router {
         {
             if $url.starts_with('-') {
                 let rest_url = &$url[1..];
-                router!(__check_pattern rest_url $value $($rest)*)
+                $crate::router!(__check_pattern rest_url $value $($rest)*)
             } else {
                 None
             }
@@ -345,7 +345,7 @@ macro_rules! router {
             let required = stringify!($p);
             if $url.starts_with(required) {
                 let rest_url = &$url[required.len()..];
-                router!(__check_pattern rest_url $value $($rest)*)
+                $crate::router!(__check_pattern rest_url $value $($rest)*)
             } else {
                 None
             }
