@@ -124,7 +124,7 @@ pub fn plain_text_body_with_limit(request: &Request, limit: usize)
     };
 
     let mut out = Vec::new();
-    try!(body.take(limit.saturating_add(1) as u64).read_to_end(&mut out));
+    body.take(limit.saturating_add(1) as u64).read_to_end(&mut out)?;
     if out.len() > limit {
         return Err(PlainTextError::LimitExceeded);
     }
