@@ -298,7 +298,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     pub fn new<A>(addr: A, handler: F) -> Result<Server<F>, Box<dyn Error + Send + Sync>>
         where A: ToSocketAddrs
     {
-        let server = try!(tiny_http::Server::http(addr));
+        let server = tiny_http::Server::http(addr)?;
         Ok(Server {
             server,
             executor: Executor::Threaded,
@@ -323,7 +323,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
             certificate,
             private_key,
         };
-        let server = try!(tiny_http::Server::https(addr, ssl_config));
+        let server = tiny_http::Server::https(addr, ssl_config)?;
         Ok(Server {
             server,
             executor: Executor::Threaded,

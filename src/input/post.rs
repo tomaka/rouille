@@ -410,14 +410,14 @@ impl DecodePostField<()> for bool {
 
 impl<T, C> DecodePostField<C> for Vec<T> where T: DecodePostField<C> {
     fn from_field(config: C, content: &str) -> Result<Self, PostFieldError> {
-        Ok(vec![try!(DecodePostField::from_field(config, content))])
+        Ok(vec![DecodePostField::from_field(config, content)?])
     }
 
     fn from_file<R>(config: C, file: R, filename: Option<&str>, mime: &str)
                     -> Result<Self, PostFieldError>
         where R: BufRead
     {
-        Ok(vec![try!(DecodePostField::from_file(config, file, filename, mime))])
+        Ok(vec![DecodePostField::from_file(config, file, filename, mime)?])
     }
 
     fn merge_multiple(mut self, mut existing: Vec<T>) -> Result<Vec<T>, PostFieldError> {
@@ -462,7 +462,7 @@ impl DecodePostField<()> for BufferedFile {
         where R: BufRead
     {
         let mut out = Vec::new();
-        try!(file.read_to_end(&mut out));
+        file.read_to_end(&mut out)?;
 
         Ok(BufferedFile {
             data: out,
@@ -499,7 +499,7 @@ macro_rules! post_input {
             match existing {
                 a @ &mut Some(_) => {
                     let extracted = a.take().unwrap();
-                    let merged = try!(extracted.merge_multiple(new));
+                    let merged = extracted.merge_multiple(new)?;
                     *a = Some(merged);
                 },
                 a @ &mut None => *a = Some(new),
@@ -520,7 +520,7 @@ macro_rules! post_input {
                     // TODO: DDoSable server if body is too large?
                     let mut out = Vec::new();       // TODO: with_capacity()?
                     if let Some(mut b) = request.data() {
-                        try!(b.read_to_end(&mut out));
+                        b.read_to_end(&mut out)?;
                     } else {
                         return Err(PostError::BodyAlreadyExtracted);
                     }
@@ -660,7 +660,7 @@ pub fn raw_urlencoded_post_input(request: &Request) -> Result<Vec<(String, Strin
         // TODO: DDoSable server if body is too large?
         let mut out = Vec::new();       // TODO: with_capacity()?
         if let Some(mut b) = request.data() {
-            try!(b.read_to_end(&mut out));
+            b.read_to_end(&mut out)?;
         } else {
             return Err(PostError::BodyAlreadyExtracted);
         }

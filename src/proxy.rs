@@ -146,16 +146,16 @@ pub struct ProxyConfig<A> {
 pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, ProxyError>
     where A: ToSocketAddrs
 {
-    let mut socket = try!(TcpStream::connect(config.addr));
-    try!(socket.set_read_timeout(Some(Duration::from_secs(60))));
-    try!(socket.set_write_timeout(Some(Duration::from_secs(60))));
+    let mut socket = TcpStream::connect(config.addr)?;
+    socket.set_read_timeout(Some(Duration::from_secs(60)))?;
+    socket.set_write_timeout(Some(Duration::from_secs(60)))?;
 
     let mut data = match request.data() {
         Some(d) => d,
         None => return Err(ProxyError::BodyAlreadyExtracted),
     };
 
-    try!(socket.write_all(format!("{} {} HTTP/1.1\r\n", request.method(), request.raw_url()).as_bytes()));
+    socket.write_all(format!("{} {} HTTP/1.1\r\n", request.method(), request.raw_url()).as_bytes())?;
     for (header, value) in request.headers() {
         let value = if header == "Host" {
             if let Some(ref replace) = config.replace_host {
@@ -170,10 +170,10 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
             continue;
         }
 
-        try!(socket.write_all(format!("{}: {}\r\n", header, value).as_bytes()));
+        socket.write_all(format!("{}: {}\r\n", header, value).as_bytes())?;
     }
-    try!(socket.write_all(b"Connection: close\r\n\r\n"));
-    try!(io::copy(&mut data, &mut socket));
+    socket.write_all(b"Connection: close\r\n\r\n")?;
+    io::copy(&mut data, &mut socket)?;
 
     let mut socket = io::BufReader::new(socket);
 
@@ -183,10 +183,10 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
         let mut lines = socket.by_ref().lines();
 
         {
-            let line = try!(match lines.next() {
+            let line = match lines.next() {
                 Some(l) => l,
                 None => return Err(ProxyError::HttpParseError),
-            });
+            }?;
             let mut splits = line.splitn(3, ' ');
             let _ = splits.next();
             let status_str = match splits.next() {
@@ -200,7 +200,7 @@ pub fn proxy<A>(request: &Request, config: ProxyConfig<A>) -> Result<Response, P
         }
 
         for header in lines {
-            let header = try!(header);
+            let header = header?;
             if header.is_empty() { break; }
 
             let mut splits = header.splitn(2, ':');
