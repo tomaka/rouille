@@ -79,7 +79,7 @@ impl Websocket {
             None => return Err(SendError::Closed),
         };
 
-        try!(send(data.as_bytes(), Write::by_ref(socket), 0x1));
+        send(data.as_bytes(), Write::by_ref(socket), 0x1)?;
         Ok(())
     }
 
@@ -95,7 +95,7 @@ impl Websocket {
             None => return Err(SendError::Closed),
         };
 
-        try!(send(data, Write::by_ref(socket), 0x2));
+        send(data, Write::by_ref(socket), 0x2)?;
         Ok(())
     }
 
@@ -312,11 +312,11 @@ fn send<W: Write>(data: &[u8], mut dest: W, opcode: u8) -> io::Result<()> {
     // Write the opcode
     assert!(opcode <= 0xf);
     let first_byte = 0x80 | opcode;
-    try!(dest.write_all(&[first_byte]));
+    dest.write_all(&[first_byte])?;
 
     // Write the length
     if data.len() >= 65536 {
-        try!(dest.write_all(&[127u8]));
+        dest.write_all(&[127u8])?;
         let len = data.len() as u64;
         assert!(len < 0x8000_0000_0000_0000);
         let len1 = (len >> 56) as u8;
@@ -327,21 +327,21 @@ fn send<W: Write>(data: &[u8], mut dest: W, opcode: u8) -> io::Result<()> {
         let len6 = (len >> 16) as u8;
         let len7 = (len >> 8) as u8;
         let len8 = (len >> 0) as u8;
-        try!(dest.write_all(&[len1, len2, len3, len4, len5, len6, len7, len8]));
+        dest.write_all(&[len1, len2, len3, len4, len5, len6, len7, len8])?;
 
     } else if data.len() >= 126 {
-        try!(dest.write_all(&[126u8]));
+        dest.write_all(&[126u8])?;
         let len = data.len() as u16;
         let len1 = (len >> 8) as u8;
         let len2 = len as u8;
-        try!(dest.write_all(&[len1, len2]));
+        dest.write_all(&[len1, len2])?;
 
     } else {
-        try!(dest.write_all(&[data.len() as u8]));
+        dest.write_all(&[data.len() as u8])?;
     }
 
     // Write the data
-    try!(dest.write_all(data));
-    try!(dest.flush());
+    dest.write_all(data)?;
+    dest.flush()?;
     Ok(())
 }
