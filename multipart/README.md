@@ -5,7 +5,16 @@ Client- and server-side abstractions for HTTP file uploads (POST requests with  
 Supports several different (**sync**hronous API) HTTP crates. 
 **Async**hronous (i.e. `futures`-based) API support will be provided by [multipart-async].
 
-Minimum supported Rust version: 1.33.0
+##### Minimum supported Rust version: 1.33.0
+
+##### Maintenance Status: Passive
+
+As the web ecosystem in Rust moves towards asynchronous APIs, the need for this crate in synchronous
+API form becomes dubious. This crate in its current form is usable enough, so as of June 2020 it
+is now in passive maintenance mode; bug reports will be addressed as time permits and PRs will be
+accepted but otherwise no new development of the existing API is taking place.
+
+Look for a release of [multipart-async] soon which targets newer releases of Hyper.
 
 ### [Documentation](http://docs.rs/multipart/)
 
