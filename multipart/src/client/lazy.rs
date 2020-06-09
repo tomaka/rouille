@@ -83,7 +83,7 @@ impl<'a, E: Error> Error for LazyError<'a, E> {
         self.error.description()
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         Some(&self.error)
     }
 }
@@ -91,7 +91,10 @@ impl<'a, E: Error> Error for LazyError<'a, E> {
 impl<'a, E: fmt::Debug> fmt::Debug for LazyError<'a, E> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         if let Some(ref field_name) = self.field_name {
-            fmt.write_fmt(format_args!("LazyError (on field {:?}): {:?}", field_name, self.error))
+            fmt.write_fmt(format_args!(
+                "LazyError (on field {:?}): {:?}",
+                field_name, self.error
+            ))
         } else {
             fmt.write_fmt(format_args!("LazyError (misc): {:?}", self.error))
         }
@@ -101,9 +104,15 @@ impl<'a, E: fmt::Debug> fmt::Debug for LazyError<'a, E> {
 impl<'a, E: fmt::Display> fmt::Display for LazyError<'a, E> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         if let Some(ref field_name) = self.field_name {
-            fmt.write_fmt(format_args!("Error writing field {:?}: {}", field_name, self.error))
+            fmt.write_fmt(format_args!(
+                "Error writing field {:?}: {}",
+                field_name, self.error
+            ))
         } else {
-            fmt.write_fmt(format_args!("Error opening or flushing stream: {}", self.error))
+            fmt.write_fmt(format_args!(
+                "Error opening or flushing stream: {}",
+                self.error
+            ))
         }
     }
 }
@@ -121,19 +130,21 @@ pub struct Multipart<'n, 'd> {
 }
 
 impl<'n, 'd> Multipart<'n, 'd> {
-    /// Initialize a new lazy dynamic request. 
+    /// Initialize a new lazy dynamic request.
     pub fn new() -> Self {
         Default::default()
     }
 
-    /// Add a text field to this request. 
-    pub fn add_text<N, T>(&mut self, name: N, text: T) -> &mut Self where N: Into<Cow<'n, str>>, T: Into<Cow<'d, str>> {
-        self.fields.push(
-            Field {
-                name: name.into(),
-                data: Data::Text(text.into())
-            }
-        );
+    /// Add a text field to this request.
+    pub fn add_text<N, T>(&mut self, name: N, text: T) -> &mut Self
+    where
+        N: Into<Cow<'n, str>>,
+        T: Into<Cow<'d, str>>,
+    {
+        self.fields.push(Field {
+            name: name.into(),
+            data: Data::Text(text.into()),
+        });
 
         self
     }
@@ -142,29 +153,40 @@ impl<'n, 'd> Multipart<'n, 'd> {
     ///
     /// ### Note
     /// Does not check if `path` exists.
-    pub fn add_file<N, P>(&mut self, name: N, path: P) -> &mut Self where N: Into<Cow<'n, str>>, P: IntoCowPath<'d> {
-        self.fields.push(
-            Field {
-                name: name.into(),
-                data: Data::File(path.into_cow_path()),
-            }
-        );
+    pub fn add_file<N, P>(&mut self, name: N, path: P) -> &mut Self
+    where
+        N: Into<Cow<'n, str>>,
+        P: IntoCowPath<'d>,
+    {
+        self.fields.push(Field {
+            name: name.into(),
+            data: Data::File(path.into_cow_path()),
+        });
 
         self
     }
 
     /// Add a generic stream field to this request,
-    pub fn add_stream<N, R, F>(&mut self, name: N, stream: R, filename: Option<F>, mime: Option<Mime>) -> &mut Self where N: Into<Cow<'n, str>>, R: Read + 'd, F: Into<Cow<'n, str>> {
-        self.fields.push(
-            Field {
-                name: name.into(),
-                data: Data::Stream(Stream {
-                    content_type: mime.unwrap_or_else(::mime_guess::octet_stream),
-                    filename: filename.map(|f| f.into()),
-                    stream: Box::new(stream)
-                }),
-            }
-        );
+    pub fn add_stream<N, R, F>(
+        &mut self,
+        name: N,
+        stream: R,
+        filename: Option<F>,
+        mime: Option<Mime>,
+    ) -> &mut Self
+    where
+        N: Into<Cow<'n, str>>,
+        R: Read + 'd,
+        F: Into<Cow<'n, str>>,
+    {
+        self.fields.push(Field {
+            name: name.into(),
+            data: Data::Stream(Stream {
+                content_type: mime.unwrap_or(mime::APPLICATION_OCTET_STREAM),
+                filename: filename.map(|f| f.into()),
+                stream: Box::new(stream),
+            }),
+        });
 
         self
     }
@@ -173,7 +195,11 @@ impl<'n, 'd> Multipart<'n, 'd> {
     /// request, returning the response if successful, or the first error encountered.
     ///
     /// If any files were added by path they will now be opened for reading.
-    pub fn send<R: HttpRequest>(&mut self, mut req: R) -> Result<< R::Stream as HttpStream >::Response, LazyError<'n, < R::Stream as HttpStream >::Error>> {
+    pub fn send<R: HttpRequest>(
+        &mut self,
+        mut req: R,
+    ) -> Result<<R::Stream as HttpStream>::Response, LazyError<'n, <R::Stream as HttpStream>::Error>>
+    {
         let mut prepared = self.prepare().map_err(LazyError::transform_err)?;
 
         req.apply_headers(prepared.boundary(), prepared.content_len());
@@ -219,7 +245,7 @@ impl<'n, 'd> fmt::Debug for Data<'n, 'd> {
 struct Stream<'n, 'd> {
     filename: Option<Cow<'n, str>>,
     content_type: Mime,
-    stream: Box<Read + 'd>,
+    stream: Box<dyn Read + 'd>,
 }
 
 /// The result of [`Multipart::prepare()`](struct.Multipart.html#method.prepare).
@@ -253,22 +279,29 @@ impl<'d> PreparedFields<'d> {
 
         for field in fields.drain(..) {
             match field.data {
-                Data::Text(text) => write!(text_data, "{}\r\nContent-Disposition: form-data; \
-                                                       name=\"{}\"\r\n\r\n{}",
-                                           boundary, field.name, text).unwrap(),
+                Data::Text(text) => write!(
+                    text_data,
+                    "{}\r\nContent-Disposition: form-data; \
+                     name=\"{}\"\r\n\r\n{}",
+                    boundary, field.name, text
+                )
+                .unwrap(),
                 Data::File(file) => {
                     let (stream, len) = PreparedField::from_path(field.name, &file, &boundary)?;
                     content_len += len;
                     streams.push(stream);
-                },
+                }
                 Data::Stream(stream) => {
                     use_len = false;
 
-                    streams.push(
-                        PreparedField::from_stream(&field.name, &boundary, &stream.content_type,
-                                                   stream.filename.as_ref().map(|f| &**f),
-                                                   stream.stream));
-                },
+                    streams.push(PreparedField::from_stream(
+                        &field.name,
+                        &boundary,
+                        &stream.content_type,
+                        stream.filename.as_ref().map(|f| &**f),
+                        stream.stream,
+                    ));
+                }
             }
         }
 
@@ -285,7 +318,7 @@ impl<'d> PreparedFields<'d> {
             text_data: Cursor::new(text_data),
             streams,
             end_boundary: Cursor::new(boundary),
-            content_len: if use_len { Some(content_len) } else { None } ,
+            content_len: if use_len { Some(content_len) } else { None },
         })
     }
 
@@ -300,7 +333,7 @@ impl<'d> PreparedFields<'d> {
         let boundary = self.end_boundary.get_ref();
 
         // Get just the bare boundary string
-        &boundary[4 .. boundary.len() - 2]
+        &boundary[4..boundary.len() - 2]
     }
 }
 
@@ -313,7 +346,7 @@ impl<'d> Read for PreparedFields<'d> {
 
         let mut total_read = 0;
 
-        while total_read < buf.len() && !cursor_at_end(&self.end_boundary){
+        while total_read < buf.len() && !cursor_at_end(&self.end_boundary) {
             let buf = &mut buf[total_read..];
 
             total_read += if !cursor_at_end(&self.text_data) {
@@ -324,7 +357,7 @@ impl<'d> Read for PreparedFields<'d> {
                     res => {
                         self.streams.push(field);
                         res
-                    },
+                    }
                 }?
             } else {
                 self.end_boundary.read(buf)?
@@ -337,11 +370,15 @@ impl<'d> Read for PreparedFields<'d> {
 
 struct PreparedField<'d> {
     header: Cursor<Vec<u8>>,
-    stream: Box<Read + 'd>,
+    stream: Box<dyn Read + 'd>,
 }
 
 impl<'d> PreparedField<'d> {
-    fn from_path<'n>(name: Cow<'n, str>, path: &Path, boundary: &str) -> Result<(Self, u64), LazyIoError<'n>> {
+    fn from_path<'n>(
+        name: Cow<'n, str>,
+        path: &Path,
+        boundary: &str,
+    ) -> Result<(Self, u64), LazyIoError<'n>> {
         let (content_type, filename) = super::mime_filename(&path);
 
         let file = try_lazy!(name, File::open(path));
@@ -354,11 +391,21 @@ impl<'d> PreparedField<'d> {
         Ok((stream, content_len))
     }
 
-    fn from_stream(name: &str, boundary: &str, content_type: &Mime, filename: Option<&str>, stream: Box<Read + 'd>) -> Self {
+    fn from_stream(
+        name: &str,
+        boundary: &str,
+        content_type: &Mime,
+        filename: Option<&str>,
+        stream: Box<dyn Read + 'd>,
+    ) -> Self {
         let mut header = Vec::new();
 
-        write!(header, "{}\r\nContent-Disposition: form-data; name=\"{}\"",
-               boundary, name).unwrap();
+        write!(
+            header,
+            "{}\r\nContent-Disposition: form-data; name=\"{}\"",
+            boundary, name
+        )
+        .unwrap();
 
         if let Some(filename) = filename {
             write!(header, "; filename=\"{}\"", filename).unwrap();
@@ -443,10 +490,14 @@ mod hyper {
     impl<'n, 'd> super::Multipart<'n, 'd> {
         /// #### Feature: `hyper`
         /// Complete a POST request with the given `hyper::client::Client` and URL.
-        /// 
+        ///
         /// Supplies the fields in the body, optionally setting the content-length header if
         /// applicable (all added fields were text or files, i.e. no streams).
-        pub fn client_request<U: IntoUrl>(&mut self, client: &Client, url: U) -> HyperResult<Response> {
+        pub fn client_request<U: IntoUrl>(
+            &mut self,
+            client: &Client,
+            url: U,
+        ) -> HyperResult<Response> {
             self.client_request_mut(client, url, |r| r)
         }
 
@@ -456,16 +507,19 @@ mod hyper {
         ///
         /// Note that the body, and the `ContentType` and `ContentLength` headers will be
         /// overwritten, either by this method or by Hyper.
-        pub fn client_request_mut<U: IntoUrl, F: FnOnce(RequestBuilder) -> RequestBuilder>(&mut self, client: &Client, url: U,
-                                                                                           mut_fn: F) -> HyperResult<Response> {
+        pub fn client_request_mut<U: IntoUrl, F: FnOnce(RequestBuilder) -> RequestBuilder>(
+            &mut self,
+            client: &Client,
+            url: U,
+            mut_fn: F,
+        ) -> HyperResult<Response> {
             let mut fields = match self.prepare() {
                 Ok(fields) => fields,
                 Err(err) => {
                     error!("Error preparing request: {}", err);
                     return Err(err.error.into());
-                },
+                }
             };
-
 
             mut_fn(client.post(url))
                 .header(::client::hyper::content_type(fields.boundary()))
@@ -477,8 +531,11 @@ mod hyper {
     impl<'d> super::PreparedFields<'d> {
         /// #### Feature: `hyper`
         /// Convert `self` to `hyper::client::Body`.
-        #[cfg_attr(feature="clippy", warn(wrong_self_convention))]
-        pub fn to_body<'b>(&'b mut self) -> Body<'b> where 'd: 'b {
+        #[cfg_attr(feature = "clippy", warn(wrong_self_convention))]
+        pub fn to_body<'b>(&'b mut self) -> Body<'b>
+        where
+            'd: 'b,
+        {
             if let Some(content_len) = self.content_len {
                 Body::SizedBody(self, content_len)
             } else {

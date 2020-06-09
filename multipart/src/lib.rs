@@ -36,16 +36,15 @@
 //! I have opened an issue as a place to collect responses and discussions for these questions
 //! [on Github](https://github.com/abonander/multipart/issues/96). Please quote the RFC-statement
 //! (and/or link to its source line) and provide your feedback there.
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy))]
+#![cfg_attr(feature = "clippy", feature(plugin))]
+#![cfg_attr(feature = "clippy", plugin(clippy))]
+#![cfg_attr(feature = "clippy", deny(clippy))]
 #![cfg_attr(feature = "bench", feature(test))]
 #![deny(missing_docs)]
 
 #[macro_use]
 extern crate log;
 
-#[cfg_attr(test, macro_use)]
 extern crate mime;
 extern crate mime_guess;
 extern crate rand;
@@ -87,7 +86,7 @@ use rand::Rng;
 ///         Err(val)
 ///     }
 /// }
-/// 
+///
 /// fn main() {
 ///     let res = chain_result! {
 ///         try_add_one(1),
@@ -119,7 +118,10 @@ pub mod server;
 mod local_test;
 
 fn random_alphanumeric(len: usize) -> String {
-    rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(len).collect()
+    rand::thread_rng()
+        .sample_iter(&rand::distributions::Alphanumeric)
+        .take(len)
+        .collect()
 }
 
 #[cfg(test)]
