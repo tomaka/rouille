@@ -72,6 +72,7 @@ pub extern crate url;
 pub extern crate percent_encoding;
 extern crate threadpool;
 extern crate num_cpus;
+extern crate anysocket;
 
 // https://github.com/servo/rust-url/blob/e121d8d0aafd50247de5f5310a227ecb1efe6ffe/percent_encoding/lib.rs#L126
 pub const DEFAULT_ENCODE_SET: &percent_encoding::AsciiSet = &percent_encoding::CONTROLS
@@ -90,8 +91,6 @@ use std::io::Cursor;
 use std::io::Result as IoResult;
 use std::io::Read;
 use std::marker::PhantomData;
-use std::net::SocketAddr;
-use std::net::ToSocketAddrs;
 use std::panic;
 use std::panic::AssertUnwindSafe;
 use std::slice::Iter as SliceIter;
@@ -101,6 +100,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::fmt;
 
+use anysocket::AbstractToSocketAddrs;
+use anysocket::AbstractAddr;
 
 pub mod cgi;
 pub mod content_encoding;
@@ -214,7 +215,7 @@ macro_rules! assert_or_400 {
 ///
 /// If you need to handle these situations, please see `Server`.
 pub fn start_server<A, F>(addr: A, handler: F) -> !
-                          where A: ToSocketAddrs,
+                          where A: AbstractToSocketAddrs,
                                 F: Send + Sync + 'static + Fn(&Request) -> Response
 {
     Server::new(addr, handler).expect("Failed to start server").run();
@@ -227,7 +228,7 @@ pub fn start_server<A, F>(addr: A, handler: F) -> !
 /// When `pool_size` is `None`, the thread pool size will default to `8 * num-cpus`.
 /// `pool_size` must be greater than zero or this function will panic.
 pub fn start_server_with_pool<A, F>(addr: A, pool_size: Option<usize>, handler: F) -> !
-                          where A: ToSocketAddrs,
+                          where A: AbstractToSocketAddrs,
                                 F: Send + Sync + 'static + Fn(&Request) -> Response
 {
     Server::new(addr, handler).expect("Failed to start server")
@@ -296,7 +297,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     /// Returns an error if there was an error while creating the listening socket, for example if
     /// the port is already in use.
     pub fn new<A>(addr: A, handler: F) -> Result<Server<F>, Box<dyn Error + Send + Sync>>
-        where A: ToSocketAddrs
+        where A: AbstractToSocketAddrs
     {
         let server = try!(tiny_http::Server::http(addr));
         Ok(Server {
@@ -318,7 +319,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         handler: F,
         certificate: Vec<u8>,
         private_key: Vec<u8>,
-    ) -> Result<Server<F>, Box<dyn Error + Send + Sync>> where A: ToSocketAddrs {
+    ) -> Result<Server<F>, Box<dyn Error + Send + Sync>> where A: AbstractToSocketAddrs {
         let ssl_config = tiny_http::SslConfig {
             certificate,
             private_key,
@@ -341,7 +342,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
 
     /// Returns the address of the listening socket.
     #[inline]
-    pub fn server_addr(&self) -> SocketAddr {
+    pub fn server_addr(&self) -> AbstractAddr {
         self.server.server_addr()
     }
 
@@ -457,7 +458,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
                 let url = request.url().to_owned();
                 let method = request.method().as_str().to_owned();
                 let headers = request.headers().iter().map(|h| (h.field.to_string(), h.value.clone().into())).collect();
-                let remote_addr = *request.remote_addr();
+                let remote_addr = request.remote_addr().clone();
 
                 tiny_http_request = Arc::new(Mutex::new(Some(request)));
                 let data = Arc::new(Mutex::new(Some(Box::new(RequestRead(tiny_http_request.clone())) as Box<_>)));
@@ -549,7 +550,7 @@ pub struct Request {
     headers: Vec<(String, String)>,
     https: bool,
     data: Arc<Mutex<Option<Box<dyn Read + Send>>>>,
-    remote_addr: SocketAddr,
+    remote_addr: AbstractAddr,
 }
 
 impl fmt::Debug for Request {
@@ -573,7 +574,7 @@ impl Request {
                            -> Request where U: Into<String>, M: Into<String>
     {
         let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
-        let remote_addr = "127.0.0.1:12345".parse().unwrap();
+        let remote_addr = "127.0.0.1:12345".parse::<std::net::SocketAddr>().unwrap().into();
 
         Request {
             url: url.into(),
@@ -586,7 +587,7 @@ impl Request {
     }
 
     /// Builds a fake HTTP request to be used during tests.
-    pub fn fake_http_from<U, M>(from: SocketAddr, method: M, url: U,
+    pub fn fake_http_from<U, M>(from: AbstractAddr, method: M, url: U,
                                 headers: Vec<(String, String)>, data: Vec<u8>)
                                 -> Request where U: Into<String>, M: Into<String>
     {
@@ -610,7 +611,7 @@ impl Request {
                             -> Request where U: Into<String>, M: Into<String>
     {
         let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
-        let remote_addr = "127.0.0.1:12345".parse().unwrap();
+        let remote_addr = "127.0.0.1:12345".parse::<std::net::SocketAddr>().unwrap().into();
 
         Request {
             url: url.into(),
@@ -623,7 +624,7 @@ impl Request {
     }
 
     /// Builds a fake HTTPS request to be used during tests.
-    pub fn fake_https_from<U, M>(from: SocketAddr, method: M, url: U,
+    pub fn fake_https_from<U, M>(from: AbstractAddr, method: M, url: U,
                                  headers: Vec<(String, String)>, data: Vec<u8>)
                                  -> Request where U: Into<String>, M: Into<String>
     {
@@ -669,7 +670,7 @@ impl Request {
             headers: self.headers.clone(),      // TODO: expensive
             https: self.https,
             data: self.data.clone(),
-            remote_addr: self.remote_addr,
+            remote_addr: self.remote_addr.clone(),
         })
     }
 
@@ -867,7 +868,7 @@ impl Request {
     /// }
     /// ```
     #[inline]
-    pub fn remote_addr(&self) -> &SocketAddr {
+    pub fn remote_addr(&self) -> &AbstractAddr {
         &self.remote_addr
     }
 }
