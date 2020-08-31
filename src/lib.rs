@@ -237,7 +237,7 @@ pub fn start_server_with_pool<A, F>(addr: A, pool_size: Option<usize>, handler: 
 }
 
 
-/// Executes a function in either a thread of a thread pool
+/// Executes a function in either a thread or a thread pool
 enum Executor {
     Threaded,
     Pooled {
