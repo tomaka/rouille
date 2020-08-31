@@ -22,7 +22,7 @@ brotli2 = { version = "0.3.2", optional = true }
 chrono = "0.4.0"
 filetime = "0.2.0"
 deflate = { version = "0.8", optional = true, features = ["gzip"] }
-multipart = { version = "0.16", default-features = false, features = ["server"] }
+multipart = { version = "0.17", default-features = false, features = ["server"] }
 percent-encoding = "2"
 rand = "0.7"
 serde = "1"
@@ -36,5 +36,5 @@ threadpool = "1"
 num_cpus = "1"
 
 [dev-dependencies]
-postgres = { version = "0.15.2", default-features = false }
+postgres = { version = "0.17", default-features = false }
 log = "0.4"
