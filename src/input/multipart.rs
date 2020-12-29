@@ -23,7 +23,6 @@ use multipart::server::Multipart as InnerMultipart;
 // TODO: provide wrappers around these
 pub use multipart::server::MultipartField;
 pub use multipart::server::MultipartData;
-pub use multipart::server::MultipartFile;
 
 /// Error that can happen when decoding multipart data.
 #[derive(Clone, Debug)]
@@ -36,10 +35,12 @@ pub enum MultipartError {
     BodyAlreadyExtracted,
 }
 
-impl error::Error for MultipartError {
+impl error::Error for MultipartError {}
+
+impl fmt::Display for MultipartError {
     #[inline]
-    fn description(&self) -> &str {
-        match *self {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let description = match *self {
             MultipartError::WrongContentType => {
                 "the `Content-Type` header of the request indicates that it doesn't contain \
                  multipart data or is invalid"
@@ -47,14 +48,9 @@ impl error::Error for MultipartError {
             MultipartError::BodyAlreadyExtracted => {
                 "can't parse the body of the request because it was already extracted"
             },
-        }
-    }
-}
+        };
 
-impl fmt::Display for MultipartError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        write!(fmt, "{}", description)
     }
 }
 
@@ -103,4 +99,3 @@ fn multipart_boundary(request: &Request) -> Option<String> {
     let end = content_type[start..].find(';').map_or(content_type.len(), |end| start + end);
     Some(content_type[start .. end].to_owned())
 }
-

@@ -15,14 +15,9 @@ use std::fs::File;
 use std::fmt;
 use serde;
 use serde_json;
-use url::percent_encoding;
+use percent_encoding;
 use Request;
 use Upgrade;
-
-// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
-// be removed when supporting older Rust is no longer needed.
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 
 /// Contains a prototype of a response.
 ///
@@ -64,7 +59,7 @@ pub struct Response {
     /// In all circumstances, the value of the `Connection` header is managed by the framework and
     /// cannot be customized. If this value is set, the response will automatically contain
     /// `Connection: Upgrade`.
-    pub upgrade: Option<Box<Upgrade + Send>>,
+    pub upgrade: Option<Box<dyn Upgrade + Send>>,
 }
 
 impl fmt::Debug for Response {
@@ -299,7 +294,7 @@ impl Response {
     pub fn html<D>(content: D) -> Response where D: Into<String> {
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".into(), "text/html; charset=utf8".into())],
+            headers: vec![("Content-Type".into(), "text/html; charset=utf-8".into())],
             data: ResponseBody::from_string(content),
             upgrade: None,
         }
@@ -317,7 +312,7 @@ impl Response {
     pub fn svg<D>(content: D) -> Response where D: Into<String> {
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".into(), "image/svg+xml; charset=utf8".into())],
+            headers: vec![("Content-Type".into(), "image/svg+xml; charset=utf-8".into())],
             data: ResponseBody::from_string(content),
             upgrade: None,
         }
@@ -335,7 +330,7 @@ impl Response {
     pub fn text<S>(text: S) -> Response where S: Into<String> {
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".into(), "text/plain; charset=utf8".into())],
+            headers: vec![("Content-Type".into(), "text/plain; charset=utf-8".into())],
             data: ResponseBody::from_string(text),
             upgrade: None,
         }
@@ -368,7 +363,7 @@ impl Response {
 
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".into(), "application/json".into())],
+            headers: vec![("Content-Type".into(), "application/json; charset=utf-8".into())],
             data: ResponseBody::from_data(data),
             upgrade: None,
         }
@@ -617,7 +612,7 @@ impl Response {
     pub fn with_content_disposition_attachment(mut self, filename: &str) -> Response {
         // The name must be percent-encoded.
         let name = percent_encoding::percent_encode(filename.as_bytes(),
-                                                    percent_encoding::DEFAULT_ENCODE_SET);
+                                                    super::DEFAULT_ENCODE_SET);
 
         // If you find a more elegant way to do the thing below, don't hesitate to open a PR
 
@@ -689,7 +684,7 @@ impl Response {
 /// let body = ResponseBody::from_string("hello world");
 /// ```
 pub struct ResponseBody {
-    data: Box<Read + Send>,
+    data: Box<dyn Read + Send>,
     data_length: Option<usize>,
 }
 
@@ -790,7 +785,7 @@ impl ResponseBody {
     /// Returns the size of the body and the body itself. If the size is `None`, then it is
     /// unknown.
     #[inline]
-    pub fn into_reader_and_size(self) -> (Box<Read + Send>, Option<usize>) {
+    pub fn into_reader_and_size(self) -> (Box<dyn Read + Send>, Option<usize>) {
         (self.data, self.data_length)
     }
 }

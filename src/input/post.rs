@@ -146,8 +146,19 @@ impl From<IoError> for PostError {
 
 impl error::Error for PostError {
     #[inline]
-    fn description(&self) -> &str {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
+            PostError::IoError(ref e) => Some(e),
+            PostError::Field { ref error, .. } => Some(error),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for PostError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let description = match *self {
             PostError::BodyAlreadyExtracted => {
                 "the body of the request was already extracted"
             },
@@ -163,23 +174,9 @@ impl error::Error for PostError {
             PostError::Field { .. } => {
                 "failed to parse a requested field"
             },
-        }
-    }
+        };
 
-    #[inline]
-    fn cause(&self) -> Option<&error::Error> {
-        match *self {
-            PostError::IoError(ref e) => Some(e),
-            PostError::Field { ref error, .. } => Some(error),
-            _ => None
-        }
-    }
-}
-
-impl fmt::Display for PostError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        write!(fmt, "{}", description)
     }
 }
 
@@ -228,8 +225,20 @@ impl From<num::ParseFloatError> for PostFieldError {
 
 impl error::Error for PostFieldError {
     #[inline]
-    fn description(&self) -> &str {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
+            PostFieldError::IoError(ref e) => Some(e),
+            PostFieldError::WrongDataTypeInt(ref e) => Some(e),
+            PostFieldError::WrongDataTypeFloat(ref e) => Some(e),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for PostFieldError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let description = match *self {
             PostFieldError::IoError(_) => {
                 "could not read the body from the request, or could not execute the CGI program"
             },
@@ -248,24 +257,9 @@ impl error::Error for PostFieldError {
             PostFieldError::WrongDataTypeFloat(_) => {
                 "failed to parse a floating-point field"
             },
-        }
-    }
+        };
 
-    #[inline]
-    fn cause(&self) -> Option<&error::Error> {
-        match *self {
-            PostFieldError::IoError(ref e) => Some(e),
-            PostFieldError::WrongDataTypeInt(ref e) => Some(e),
-            PostFieldError::WrongDataTypeFloat(ref e) => Some(e),
-            _ => None
-        }
-    }
-}
-
-impl fmt::Display for PostFieldError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        write!(fmt, "{}", description)
     }
 }
 
@@ -484,7 +478,6 @@ impl DecodePostField<()> for BufferedFile {
 macro_rules! post_input {
     ($request:expr, {$($field:ident: $ty:ty $({$config:expr})*),*$(,)*}) => ({
         use std::io::Read;
-        use std::mem;
         use std::result::Result;
         use $crate::Request;
         use $crate::input::post::DecodePostField;
@@ -505,7 +498,7 @@ macro_rules! post_input {
         {
             match existing {
                 a @ &mut Some(_) => {
-                    let extracted = mem::replace(a, None).unwrap();
+                    let extracted = a.take().unwrap();
                     let merged = try!(extracted.merge_multiple(new));
                     *a = Some(merged);
                 },
@@ -573,52 +566,52 @@ macro_rules! post_input {
                     },
                 };
 
-                while let Some(multipart_entry) = multipart.next() {
+                while let Some(mut multipart_entry) = multipart.next() {
                     $(
-                        if multipart_entry.name == stringify!($field) {
+                        if multipart_entry.headers.name.as_ref() == stringify!($field) {
                             let config = ();
                             $(
                                 let config = $config;
                             )* 
 
-                            match multipart_entry.data {
-                                multipart::MultipartData::Text(txt) => {
-                                    let decoded = match DecodePostField::from_field(config, &txt.text) {
-                                        Ok(d) => d,
-                                        Err(err) => return Err(PostError::Field {
-                                            field: stringify!($field).into(),
-                                            error: err,
-                                        }),
-                                    };
-                                    match merge(&mut $field, decoded) {
-                                        Ok(d) => d,
-                                        Err(err) => return Err(PostError::Field {
-                                            field: stringify!($field).into(),
-                                            error: err,
-                                        }),
-                                    };
-                                },
-                                multipart::MultipartData::File(f) => {
-                                    let name = f.filename.as_ref().map(|n| n.to_owned());
-                                    let name = name.as_ref().map(|n| &n[..]);
-                                    let mime = f.content_type.to_string();
-                                    let decoded = match DecodePostField::from_file(config, f, name, &mime) {
-                                        Ok(d) => d,
-                                        Err(err) => return Err(PostError::Field {
-                                            field: stringify!($field).into(),
-                                            error: err,
-                                        }),
-                                    };
-                                    match merge(&mut $field, decoded) {
-                                        Ok(d) => d,
-                                        Err(err) => return Err(PostError::Field {
-                                            field: stringify!($field).into(),
-                                            error: err,
-                                        }),
-                                    };
-                                },
+                            if multipart_entry.is_text() {
+                                let mut text = String::new();
+                                multipart_entry.data.read_to_string(&mut text)?;
+                                let decoded = match DecodePostField::from_field(config, &text) {
+                                    Ok(d) => d,
+                                    Err(err) => return Err(PostError::Field {
+                                        field: stringify!($field).into(),
+                                        error: err,
+                                    }),
+                                };
+                                match merge(&mut $field, decoded) {
+                                    Ok(d) => d,
+                                    Err(err) => return Err(PostError::Field {
+                                        field: stringify!($field).into(),
+                                        error: err,
+                                    }),
+                                };
+                            } else {
+                                let name = multipart_entry.headers.filename.as_ref().map(|n| n.to_owned());
+                                let name = name.as_ref().map(|n| &n[..]);
+                                let mime = multipart_entry.headers.content_type
+                                    .map(|m| m.to_string())
+                                    .unwrap_or_else(String::new);
+                                let decoded = match DecodePostField::from_file(config, multipart_entry.data, name, &mime) {
+                                    Ok(d) => d,
+                                    Err(err) => return Err(PostError::Field {
+                                        field: stringify!($field).into(),
+                                        error: err,
+                                    }),
+                                };
+                                match merge(&mut $field, decoded) {
+                                    Ok(d) => d,
+                                    Err(err) => return Err(PostError::Field {
+                                        field: stringify!($field).into(),
+                                        error: err,
+                                    }),
+                                };
                             }
-
                             continue;
                         }
                     )*

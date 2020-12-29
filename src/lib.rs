@@ -73,8 +73,14 @@ extern crate sha1;
 extern crate time;
 extern crate tiny_http;
 pub extern crate url;
+pub extern crate percent_encoding;
 extern crate threadpool;
 extern crate num_cpus;
+
+// https://github.com/servo/rust-url/blob/e121d8d0aafd50247de5f5310a227ecb1efe6ffe/percent_encoding/lib.rs#L126
+pub const DEFAULT_ENCODE_SET: &percent_encoding::AsciiSet = &percent_encoding::CONTROLS
+    .add(b' ').add(b'"').add(b'#').add(b'<').add(b'>')
+    .add(b'`').add(b'?').add(b'{').add(b'}');
 
 pub use assets::extension_to_mime;
 pub use assets::match_assets;
@@ -82,6 +88,7 @@ pub use log::{log, log_custom};
 pub use response::{Response, ResponseBody};
 pub use tiny_http::ReadWrite;
 
+use std::time::Duration;
 use std::error::Error;
 use std::io::Cursor;
 use std::io::Result as IoResult;
@@ -94,13 +101,10 @@ use std::panic::AssertUnwindSafe;
 use std::slice::Iter as SliceIter;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::mpsc;
 use std::thread;
 use std::fmt;
 
-// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
-// be removed when supporting older Rust is no longer needed.
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 
 pub mod cgi;
 pub mod content_encoding;
@@ -295,7 +299,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     ///
     /// Returns an error if there was an error while creating the listening socket, for example if
     /// the port is already in use.
-    pub fn new<A>(addr: A, handler: F) -> Result<Server<F>, Box<Error + Send + Sync>>
+    pub fn new<A>(addr: A, handler: F) -> Result<Server<F>, Box<dyn Error + Send + Sync>>
         where A: ToSocketAddrs
     {
         let server = try!(tiny_http::Server::http(addr));
@@ -318,7 +322,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         handler: F,
         certificate: Vec<u8>,
         private_key: Vec<u8>,
-    ) -> Result<Server<F>, Box<Error + Send + Sync>> where A: ToSocketAddrs {
+    ) -> Result<Server<F>, Box<dyn Error + Send + Sync>> where A: ToSocketAddrs {
         let ssl_config = tiny_http::SslConfig {
             certificate,
             private_key,
@@ -361,6 +365,77 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     #[inline]
     pub fn poll(&self) {
         while let Ok(Some(request)) = self.server.try_recv() {
+            self.process(request);
+        }
+    }
+
+    /// Creates a new thread for the server that can be gracefully stopped later.
+    ///
+    /// This function returns a tuple of a `JoinHandle` and a `Sender`.
+    /// You must call `JoinHandle::join()` otherwise the server will not run until completion.
+    /// The server can be stopped at will by sending it an empty `()` message from another thread.
+    /// There may be a maximum of a 1 second delay between sending the stop message and the server
+    /// stopping. This delay may be shortened in future.
+    ///
+    /// ```no_run
+    /// use std::thread;
+    /// use std::time::Duration;
+    /// use rouille::Server;
+    /// use rouille::Response;
+    ///
+    /// let server = Server::new("localhost:0", |request| {
+    ///     Response::text("hello world")
+    /// }).unwrap();
+    /// println!("Listening on {:?}", server.server_addr());
+    /// let (handle, sender) = server.stoppable();
+    ///
+    /// // Stop the server in 3 seconds
+    /// thread::spawn(move || {
+    ///     thread::sleep(Duration::from_secs(3));
+    ///     sender.send(()).unwrap();
+    /// });
+    ///
+    /// // Block the main thread until the server is stopped
+    /// handle.join().unwrap();
+    /// ```
+    #[inline]
+    pub fn stoppable(self) -> (thread::JoinHandle<()>, mpsc::Sender<()>) {
+        let (tx, rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            while let Err(_) = rx.try_recv() {
+                // In order to reduce CPU load wait 1s for a recv before looping again
+                while let Ok(Some(request)) = self.server.recv_timeout(Duration::from_secs(1)) {
+                    self.process(request);
+                }
+            }
+        });
+
+        (handle, tx)
+    }
+
+    /// Same as `poll()` but blocks for at most `duration` before returning.
+    ///
+    /// This function can be used implement a custom server loop in a more CPU-efficient manner
+    /// than calling `poll`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use rouille::Server;
+    /// use rouille::Response;
+    ///
+    /// let server = Server::new("localhost:0", |request| {
+    ///     Response::text("hello world")
+    /// }).unwrap();
+    /// println!("Listening on {:?}", server.server_addr());
+    ///
+    /// loop {
+    ///     server.poll_timeout(std::time::Duration::from_millis(100));
+    /// }
+    /// ```
+    #[inline]
+    pub fn poll_timeout(&self, dur: std::time::Duration) {
+        while let Ok(Some(request)) = self.server.recv_timeout(dur) {
             self.process(request);
         }
     }
@@ -465,7 +540,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
 /// The purpose of this trait is to be used with the `Connection: Upgrade` header, hence its name.
 pub trait Upgrade {
     /// Initializes the object with the given socket.
-    fn build(&mut self, socket: Box<ReadWrite + Send>);
+    fn build(&mut self, socket: Box<dyn ReadWrite + Send>);
 }
 
 /// Represents a request that your handler must answer to.
@@ -477,7 +552,7 @@ pub struct Request {
     url: String,
     headers: Vec<(String, String)>,
     https: bool,
-    data: Arc<Mutex<Option<Box<Read + Send>>>>,
+    data: Arc<Mutex<Option<Box<dyn Read + Send>>>>,
     remote_addr: SocketAddr,
 }
 
@@ -687,7 +762,7 @@ impl Request {
             url
         };
 
-        url::percent_encoding::percent_decode(url).decode_utf8_lossy().into_owned()
+        percent_encoding::percent_decode(url).decode_utf8_lossy().into_owned()
     }
 
     /// Returns the value of a GET parameter.
@@ -707,7 +782,7 @@ impl Request {
             Some(e) => &get_params[param .. e + param],
         };
 
-        Some(url::percent_encoding::percent_decode(value.replace("+", " ").as_bytes()).decode_utf8_lossy().into_owned())
+        Some(percent_encoding::percent_decode(value.replace("+", " ").as_bytes()).decode_utf8_lossy().into_owned())
     }
 
     /// Returns the value of a header of the request.
@@ -828,7 +903,7 @@ impl<'a> ExactSizeIterator for HeadersIter<'a> {
 ///
 /// In order to obtain this object, call `request.data()`.
 pub struct RequestBody<'a> {
-    body: Box<Read + Send>,
+    body: Box<dyn Read + Send>,
     marker: PhantomData<&'a ()>,
 }
 

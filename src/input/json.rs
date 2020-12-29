@@ -71,8 +71,19 @@ impl From<serde_json::Error> for JsonError {
 
 impl error::Error for JsonError {
     #[inline]
-    fn description(&self) -> &str {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
+            JsonError::IoError(ref e) => Some(e),
+            JsonError::ParseError(ref e) => Some(e),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for JsonError {
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let description = match *self {
             JsonError::BodyAlreadyExtracted => {
                 "the body of the request was already extracted"
             },
@@ -85,23 +96,9 @@ impl error::Error for JsonError {
             JsonError::ParseError(_) => {
                 "error while parsing the JSON body"
             },
-        }
-    }
+        };
 
-    #[inline]
-    fn cause(&self) -> Option<&error::Error> {
-        match *self {
-            JsonError::IoError(ref e) => Some(e),
-            JsonError::ParseError(ref e) => Some(e),
-            _ => None
-        }
-    }
-}
-
-impl fmt::Display for JsonError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        write!(fmt, "{}", description)
     }
 }
 

@@ -45,7 +45,7 @@
 //!   have to enumerate the protocols with `requested_protocols()` and choose one.
 //!
 //! # Example
-//! 
+//!
 //! ```
 //! # #[macro_use] extern crate rouille;
 //! use std::sync::Mutex;
@@ -77,11 +77,6 @@ use std::sync::mpsc;
 use std::vec::IntoIter as VecIntoIter;
 use sha1::Sha1;
 
-// The AsciiExt import is needed for Rust older than 1.23.0. These two lines can
-// be removed when supporting older Rust is no longer needed.
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
-
 use Request;
 use Response;
 
@@ -106,24 +101,21 @@ pub enum WebsocketError {
     WrongSubprotocol,
 }
 
-impl error::Error for WebsocketError {
+impl error::Error for WebsocketError {}
+
+impl fmt::Display for WebsocketError {
     #[inline]
-    fn description(&self) -> &str {
-        match *self {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let description = match *self {
             WebsocketError::InvalidWebsocketRequest => {
                 "the request does not match a websocket request"
             },
             WebsocketError::WrongSubprotocol => {
                 "the subprotocol passed to the function was not requested by the client"
             },
-        }
-    }
-}
+        };
 
-impl fmt::Display for WebsocketError {
-    #[inline]
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        write!(fmt, "{}", description)
     }
 }
 
@@ -194,7 +186,7 @@ pub fn start<S>(request: &Request, subprotocol: Option<S>)
 ///
 /// ```
 /// use rouille::websocket;
-/// 
+///
 /// # let request: rouille::Request = return;
 /// for protocol in websocket::requested_protocols(&request) {
 ///     // ...

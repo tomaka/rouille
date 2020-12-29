@@ -628,6 +628,7 @@ fn extension_to_mime_impl(extension: Option<&str>) -> &'static str {
         Some("vsw") => "application/vnd.visio",
         Some("vsx") => "application/vnd.visio",
         Some("vtx") => "application/vnd.visio",
+        Some("wasm") => "application/wasm",
         Some("wav") => "audio/wav",
         Some("wave") => "audio/wav",
         Some("wax") => "audio/x-ms-wax",

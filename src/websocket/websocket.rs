@@ -19,7 +19,7 @@ use websocket::low_level;
 /// A successful websocket. An open channel of communication. Implements `Read` and `Write`.
 pub struct Websocket {
     // The socket. `None` if closed.
-    socket: Option<Box<ReadWrite + Send>>,
+    socket: Option<Box<dyn ReadWrite + Send>>,
     // The websocket state machine.
     state_machine: low_level::StateMachine,
     // True if the fragmented message currently being processed is binary. False if string. Pings
@@ -110,7 +110,7 @@ impl Websocket {
 }
 
 impl Upgrade for Sender<Websocket> {
-    fn build(&mut self, socket: Box<ReadWrite + Send>) {
+    fn build(&mut self, socket: Box<dyn ReadWrite + Send>) {
         let websocket = Websocket {
             socket: Some(socket),
             state_machine: low_level::StateMachine::new(),
@@ -144,6 +144,11 @@ impl Iterator for Websocket {
             // Read `n` bytes in `buf`.
             let mut buf = [0; 256];
             let n = match self.socket.as_mut().unwrap().read(&mut buf) {
+                Ok(n) if n == 0 => {
+                    // Read returning zero means EOF
+                    self.socket = None;
+                    return None;
+                }
                 Ok(n) => n,
                 Err(ref err) if err.kind() == io::ErrorKind::Interrupted => 0,
                 Err(_) => {
