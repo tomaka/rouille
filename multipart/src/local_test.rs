@@ -28,7 +28,7 @@ const MAX_LEN: usize = 5;
 const MAX_DASHES: usize = 2;
 
 fn collect_rand<C: FromIterator<T>, T, F: FnMut() -> T>(mut gen: F) -> C {
-    (0..rand::thread_rng().gen_range(MIN_FIELDS, MAX_FIELDS))
+    (0..rand::thread_rng().gen_range(MIN_FIELDS..MAX_FIELDS))
         .map(|_| gen())
         .collect()
 }
@@ -326,15 +326,16 @@ fn gen_string() -> String {
     let mut rng_1 = rand::thread_rng();
     let mut rng_2 = rand::thread_rng();
 
-    let str_len_1 = rng_1.gen_range(MIN_LEN, MAX_LEN + 1);
-    let str_len_2 = rng_2.gen_range(MIN_LEN, MAX_LEN + 1);
-    let num_dashes = rng_1.gen_range(0, MAX_DASHES + 1);
+    let str_len_1 = rng_1.gen_range(MIN_LEN..=MAX_LEN);
+    let str_len_2 = rng_2.gen_range(MIN_LEN..=MAX_LEN);
+    let num_dashes = rng_1.gen_range(0..=MAX_DASHES);
 
     rng_1
         .sample_iter(&Alphanumeric)
         .take(str_len_1)
-        .chain(iter::repeat('-').take(num_dashes))
+        .chain(iter::repeat(b'-').take(num_dashes))
         .chain(rng_2.sample_iter(&Alphanumeric).take(str_len_2))
+        .map(|c| c as char)
         .collect()
 }
 

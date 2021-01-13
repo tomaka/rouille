@@ -5,7 +5,7 @@ Client- and server-side abstractions for HTTP file uploads (POST requests with  
 Supports several different (**sync**hronous API) HTTP crates. 
 **Async**hronous (i.e. `futures`-based) API support will be provided by [multipart-async].
 
-##### Minimum supported Rust version: 1.33.0
+##### Minimum supported Rust version: 1.36.0
 
 ##### Maintenance Status: Passive
 
