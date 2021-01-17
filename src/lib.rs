@@ -909,28 +909,15 @@ impl Request {
             .into_owned()
     }
 
-    /// Returns the value of a GET parameter.
-    /// TODO: clumbsy
+    /// Returns the value of a GET parameter or None if it doesn't exist.
     pub fn get_param(&self, param_name: &str) -> Option<String> {
-        let get_params = self.raw_query_string();
-
-        // TODO: `hello=5` will be matched for param name `lo`
-
-        let param = match get_params.rfind(&format!("{}=", param_name)) {
-            Some(p) => p + param_name.len() + 1,
-            None => return None,
-        };
-
-        let value = match get_params.bytes().skip(param).position(|c| c == b'&') {
-            None => &get_params[param..],
-            Some(e) => &get_params[param..e + param],
-        };
-
-        Some(
-            percent_encoding::percent_decode(value.replace("+", " ").as_bytes())
-                .decode_utf8_lossy()
-                .into_owned(),
-        )
+        let name_pattern = &format!("{}=", param_name);
+        let param_pairs = self.raw_query_string().split('&');
+        param_pairs
+            .filter(|pair| pair.starts_with(name_pattern))
+            .map(|pair| pair.split('=').skip(1).next().unwrap_or(""))
+            .next()
+            .map(|value| percent_encoding::percent_decode(value.replace("+", " ").as_bytes()).decode_utf8_lossy().into_owned())
     }
 
     /// Returns the value of a header of the request.
@@ -1089,6 +1076,23 @@ mod tests {
     fn get_param() {
         let request = Request::fake_http("GET", "/?p=hello", vec![], vec![]);
         assert_eq!(request.get_param("p"), Some("hello".to_owned()));
+    }
+
+    #[test]
+    fn get_param_multiple_param() {
+        let request = Request::fake_http("GET", "/?foo=bar&message=hello", vec![], vec![]);
+        assert_eq!(request.get_param("message"), Some("hello".to_owned()));
+    }
+    #[test]
+    fn get_param_no_match() {
+        let request = Request::fake_http("GET", "/?hello=world", vec![], vec![]);
+        assert_eq!(request.get_param("foo"), None);
+    }
+
+    #[test]
+    fn get_param_partial_match() {
+        let request = Request::fake_http("GET", "/?hello=world", vec![], vec![]);
+        assert_eq!(request.get_param("lo"), None);
     }
 
     #[test]
