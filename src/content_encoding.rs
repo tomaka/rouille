@@ -26,7 +26,6 @@
 //! }
 //! ```
 use input;
-use std::str;
 use Request;
 use Response;
 
@@ -151,5 +150,172 @@ fn brotli(response: &mut Response) {}
 
 #[cfg(test)]
 mod tests {
+    use content_encoding;
+    use Request;
+    use Response;
+
     // TODO: more tests for encoding stuff
+    #[test]
+    fn text_response() {
+        assert!(content_encoding::response_is_text(&Response::text("")));
+    }
+
+    #[test]
+    fn non_text_response() {
+        assert!(!content_encoding::response_is_text(&Response::from_data(
+            "image/jpeg",
+            ""
+        )));
+    }
+
+    #[test]
+    fn no_req_encodings() {
+        let request = Request::fake_http("GET", "/", vec![], vec![]);
+        let response = Response::html("<p>Hello world</p>");
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(!encoded_response
+            .headers
+            .iter()
+            .any(|(header_name, _)| header_name == "Content-Encoding")); // No Content-Encoding header
+        let mut encoded_content = vec![];
+        encoded_response
+            .data
+            .into_reader_and_size()
+            .0
+            .read_to_end(&mut encoded_content)
+            .unwrap();
+        assert_eq!(
+            String::from_utf8(encoded_content).unwrap(),
+            "<p>Hello world</p>"
+        ); // No encoding applied
+    }
+
+    #[test]
+    fn empty_req_encodings() {
+        let request = {
+            let h = vec![("Accept-Encoding".to_owned(), "".to_owned())];
+            Request::fake_http("GET", "/", h, vec![])
+        };
+        let response = Response::html("<p>Hello world</p>");
+
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(!encoded_response
+            .headers
+            .iter()
+            .any(|(header_name, _)| header_name == "Content-Encoding")); // No Content-Encoding header
+        let mut encoded_content = vec![];
+        encoded_response
+            .data
+            .into_reader_and_size()
+            .0
+            .read_to_end(&mut encoded_content)
+            .unwrap();
+        assert_eq!(
+            String::from_utf8(encoded_content).unwrap(),
+            "<p>Hello world</p>"
+        ); // No encoding applied
+    }
+
+    #[test]
+    fn multi_req_encoding() {
+        let request = {
+            let h = vec![("Accept-Encoding".to_owned(), "foo".to_owned())];
+            Request::fake_http("GET", "/", h, vec![])
+        };
+        let response = Response::html("<p>Hello world</p>");
+
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(!encoded_response
+            .headers
+            .iter()
+            .any(|(header_name, _)| header_name == "Content-Encoding")); // No Content-Encoding header
+        let mut encoded_content = vec![];
+        encoded_response
+            .data
+            .into_reader_and_size()
+            .0
+            .read_to_end(&mut encoded_content)
+            .unwrap();
+        assert_eq!(
+            String::from_utf8(encoded_content).unwrap(),
+            "<p>Hello world</p>"
+        ); // No encoding applied
+    }
+
+    #[test]
+    fn unknown_req_encoding() {
+        let request = {
+            let h = vec![("Accept-Encoding".to_owned(), "x-gzip, br".to_owned())];
+            Request::fake_http("GET", "/", h, vec![])
+        };
+        let response = Response::html("<p>Hello world</p>");
+
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(encoded_response
+            .headers
+            .contains(&("Content-Encoding".into(), "br".into()))); // Brotli Content-Encoding header
+    }
+
+    #[test]
+    fn brotli_encoding() {
+        let request = {
+            let h = vec![("Accept-Encoding".to_owned(), "br".to_owned())];
+            Request::fake_http("GET", "/", h, vec![])
+        };
+        let response = Response::html(
+            "<html><head><title>Hello world</title><body><p>Hello world</p></body></html>",
+        );
+
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(encoded_response
+            .headers
+            .contains(&("Content-Encoding".into(), "br".into()))); // Brotli Content-Encoding header
+        let mut encoded_content = vec![];
+        encoded_response
+            .data
+            .into_reader_and_size()
+            .0
+            .read_to_end(&mut encoded_content)
+            .unwrap();
+        assert_eq!(
+            encoded_content,
+            vec![
+                27, 75, 0, 0, 4, 28, 114, 164, 129, 5, 210, 206, 25, 30, 90, 114, 224, 114, 73,
+                109, 45, 196, 23, 126, 240, 144, 77, 40, 26, 211, 228, 67, 73, 40, 236, 55, 101,
+                254, 127, 147, 194, 129, 132, 65, 130, 120, 152, 249, 68, 56, 93, 2
+            ]
+        ); // Applied proper Brotli encoding
+    }
+
+    #[test]
+    fn gzip_encoding() {
+        let request = {
+            let h = vec![("Accept-Encoding".to_owned(), "gzip".to_owned())];
+            Request::fake_http("GET", "/", h, vec![])
+        };
+        let response = Response::html(
+            "<html><head><title>Hello world</title><body><p>Hello world</p></body></html>",
+        );
+
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(encoded_response
+            .headers
+            .contains(&("Content-Encoding".into(), "gzip".into()))); // gzip Content-Encoding header
+        let mut encoded_content = vec![];
+        encoded_response
+            .data
+            .into_reader_and_size()
+            .0
+            .read_to_end(&mut encoded_content)
+            .unwrap();
+        assert_eq!(
+            encoded_content,
+            vec![
+                31, 139, 8, 0, 0, 0, 0, 0, 0, 3, 179, 201, 40, 201, 205, 177, 179, 201, 72, 77, 76,
+                177, 179, 41, 201, 44, 201, 73, 181, 243, 72, 205, 201, 201, 87, 40, 207, 47, 202,
+                73, 177, 209, 135, 8, 217, 36, 229, 167, 84, 218, 217, 20, 160, 202, 21, 216, 217,
+                232, 67, 36, 244, 193, 166, 0, 0, 202, 239, 44, 120, 76, 0, 0, 0
+            ]
+        ); // Applied proper gzip encoding
+    }
 }
