@@ -110,12 +110,12 @@ fn response_is_text(response: &Response) -> bool {
             return false;
         }
 
-        // TODO: perform case-insensitive comparison
-        value.starts_with("text/")
-            || value.contains("javascript")
-            || value.contains("json")
-            || value.contains("xml")
-            || value.contains("font")
+        let content_type = value.to_lowercase();
+        content_type.starts_with("text/")
+            || content_type.contains("javascript")
+            || content_type.contains("json")
+            || content_type.contains("xml")
+            || content_type.contains("font")
     })
 }
 
