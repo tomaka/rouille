@@ -1,4 +1,4 @@
-//! Integration with the [Iron](https://ironframework.io) framework, enabled with the `iron` feature (optional). Includes a `BeforeMiddleware` implementation.
+//! Integration with the [Iron](https://github.com/iron/iron) framework, enabled with the `iron` feature (optional). Includes a `BeforeMiddleware` implementation.
 //!
 //! Not shown here: `impl `[`HttpRequest`](../trait.HttpRequest.html#implementors)` for
 //! iron::Request`.

@@ -46,7 +46,7 @@ $ cargo run --example hyper_server
 -----------------
 Author: [White-Oak]
 
-This example shows how to use `multipart` with the [Iron web application framework](http://ironframework.io/), via `multipart`'s support
+This example shows how to use `multipart` with the [Iron web application framework](https://github.com/iron/iron), via `multipart`'s support
 for the `iron::Request` type.
 
 To run:
