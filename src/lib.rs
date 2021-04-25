@@ -366,7 +366,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         let server = try!(tiny_http::Server::https(addr, ssl_config));
         Ok(Server {
             server,
-            executor: Executor::Threaded,
+            executor: Executor::default(),
             handler: Arc::new(AssertUnwindSafe(handler)),   // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
         })
     }
