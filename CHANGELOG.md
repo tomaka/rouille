@@ -1,8 +1,24 @@
 # Changelog
 
-## Version [Unreleased]
+## Version 3.1.0
+
+- Add `Server::poll_timeout()` for polling more efficiently.
+- Add `Server::stoppable()` for running a single, cancellable server thread.
+- Add `Server::join()` for finalising all in-flight requests before shutting down.
+- [Prevent infinite loop on Websocket EOF](https://github.com/tomaka/rouille/pull/212)
+- Update `tiny-http` to 0.8.1 containing fixes for:
+  - HTTPS deadlock where one request holds a locked resource while another is
+    attempting HTTPS negotiation
+  - Fix [RUSTSEC-2020-0031](https://rustsec.org/advisories/RUSTSEC-2020-0031.html)
+  - Don't set `Transfer-Encoding: chunked` on 1xx or 204 responses (which can lead
+    to clients hanging).
+- Bump minimum support Rust version to 1.41.1
+
+## Version 3.0.0
+
 - Bump minimum supported Rust version to 1.34.2
 - embedded, exposed `url` version increased to 2.0
+- Don't use deprecated `Error::description()`
 
 ## Version 2.2.0
 

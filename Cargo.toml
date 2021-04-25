@@ -1,6 +1,6 @@
 [package]
 name = "rouille"
-version = "3.0.0"
+version = "3.1.0"
 authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/tomaka/rouille"
@@ -31,7 +31,7 @@ serde_json = "1"
 sha1 = "0.6.0"
 term = "0.5.1"
 time = "0.1.31"
-tiny_http = "0.6.0"
+tiny_http = "0.8.1"
 url = "2"
 threadpool = "1"
 num_cpus = "1"
