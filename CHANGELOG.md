@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 3.1.1
+
+- Replace all uses of deprecated `try!` with `?` to suppress warnings that can
+  leak out of macro contexts.
+
 ## Version 3.1.0
 
 - Add `Server::poll_timeout()` for polling more efficiently.
