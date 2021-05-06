@@ -81,6 +81,7 @@ use Request;
 use Response;
 
 mod low_level;
+#[allow(clippy::module_inception)]
 mod websocket;
 
 /// Error that can happen when attempting to start websocket.

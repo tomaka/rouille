@@ -132,9 +132,7 @@ impl Iterator for Websocket {
     fn next(&mut self) -> Option<Message> {
         loop {
             // If the socket is `None`, the connection has been closed.
-            if self.socket.is_none() {
-                return None;
-            }
+            self.socket.as_ref()?;
 
             // There may be some messages waiting to be processed.
             if !self.messages_in_queue.is_empty() {

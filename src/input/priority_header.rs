@@ -56,23 +56,19 @@ pub fn priority_header_preferred<'a, I>(input: &'a str, elements: I) -> Option<u
                 let right = parts.next();
                 (left, right)
             };
-            
-            if req_elem_left == Some("*") || header_elem_left == Some("*") {
-                if req_elem_right == header_elem_right || req_elem_right == Some("*") ||
-                    header_elem_right == Some("*")
-                {
-                    result = (Some(index), prio);
-                    continue;
-                }
+
+            if (req_elem_left == Some("*") || header_elem_left == Some("*"))
+                && (req_elem_right == header_elem_right || req_elem_right == Some("*") || header_elem_right == Some("*"))
+            {
+                result = (Some(index), prio);
+                continue;
             }
 
-            if req_elem_right == Some("*") || header_elem_right == Some("*") {
-                if req_elem_left == header_elem_left || req_elem_left == Some("*") ||
-                    header_elem_left == Some("*")
-                {
-                    result = (Some(index), prio);
-                    continue;
-                }
+            if (req_elem_right == Some("*") || header_elem_right == Some("*"))
+                && (req_elem_left == header_elem_left || req_elem_left == Some("*") || header_elem_left == Some("*"))
+            {
+                result = (Some(index), prio);
+                continue;
             }
         }
     }

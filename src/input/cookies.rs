@@ -39,10 +39,7 @@ use Request;
 // TODO: should an error be returned if the header is malformed?
 // TODO: be less tolerent to what is accepted?
 pub fn cookies(request: &Request) -> CookiesIter {
-    let header = match request.header("Cookie") {
-        None => "",
-        Some(h) => h,
-    };
+    let header = request.header("Cookie").unwrap_or("");
 
     CookiesIter {
         iter: header.split(';')

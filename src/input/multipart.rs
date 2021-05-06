@@ -78,6 +78,7 @@ pub struct Multipart<'a> {
 }
 
 impl<'a> Multipart<'a> {
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<MultipartField<&mut InnerMultipart<RequestBody<'a>>>> {
         self.inner.read_entry().unwrap_or(None)
     }

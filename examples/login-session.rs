@@ -1,3 +1,4 @@
+#![allow(unreachable_code)]
 #[macro_use]
 extern crate rouille;
 

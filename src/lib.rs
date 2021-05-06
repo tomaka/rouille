@@ -438,7 +438,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     pub fn stoppable(self) -> (thread::JoinHandle<()>, mpsc::Sender<()>) {
         let (tx, rx) = mpsc::channel();
         let handle = thread::spawn(move || {
-            while let Err(_) = rx.try_recv() {
+            while rx.try_recv().is_err() {
                 // In order to reduce CPU load wait 1s for a recv before looping again
                 while let Ok(Some(request)) = self.server.recv_timeout(Duration::from_secs(1)) {
                     self.process(request);

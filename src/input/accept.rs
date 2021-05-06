@@ -156,7 +156,7 @@ mod tests {
         let request = Request::fake_http("GET", "/", vec![], vec![]);
 
         let result = accept!(&request,
-            "image/gif" => { 5 },
+            "image/gif" => 5,
             "text/plain" => 12,
             "text/html" => 28,
         );
@@ -171,7 +171,7 @@ mod tests {
         ], vec![]);
 
         let result = accept!(&request,
-            "image/gif" => { 5 },
+            "image/gif" => 5,
             "text/plain" => 12,
             "text/html" => 28,
             "*/*" => 37

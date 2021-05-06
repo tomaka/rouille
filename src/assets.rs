@@ -88,6 +88,8 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
 
     // The potential location of the file on the disk.
     let potential_file = {
+        // Clippy erroneously identifies this transform as a redundant clone
+        #[allow(clippy::redundant_clone)]
         let mut path = path.to_path_buf();
         for component in request.url().split('/') {
             path.push(component);

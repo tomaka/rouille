@@ -47,7 +47,7 @@ use input;
 pub fn session<'r, F>(request: &'r Request, cookie_name: &str, timeout_s: u64, inner: F) -> Response
     where F: FnOnce(&Session<'r>) -> Response
 {
-    let mut cookie = input::cookies(request).into_iter();
+    let mut cookie = input::cookies(request);
     let cookie = cookie.find(|&(ref k, _)| k == &cookie_name);
     let cookie = cookie.map(|(_, v)| v);
 
@@ -117,8 +117,7 @@ pub fn generate_session_id() -> String {
     // 5e+114 possibilities is reasonable.
     rand::thread_rng()
                       .sample_iter(&Alphanumeric)
-                      .filter(|&c| (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                                   (c >= '0' && c <= '9'))
+                      .filter(|&c| ('a'..='z').contains(&c) || ('A'..='Z').contains(&c) || ('0'..='9').contains(&c))
                       .take(64).collect::<String>()
 }
 
