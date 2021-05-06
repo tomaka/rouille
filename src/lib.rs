@@ -68,6 +68,7 @@ extern crate rand;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate byteorder;
 extern crate num_cpus;
 pub extern crate percent_encoding;
 extern crate serde_json;

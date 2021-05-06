@@ -24,6 +24,8 @@
 //! - Each message is made of one or more *frames*. See https://tools.ietf.org/html/rfc6455#section-5.4.
 //! - Each frame can be received progressively, where each packet is an `Element` object (below).
 
+use byteorder::{ByteOrder, NetworkEndian};
+
 /// A websocket element decoded from the data given to `StateMachine::feed`.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Element<'a> {
@@ -104,6 +106,38 @@ impl StateMachine {
     }
 }
 
+// Helpers for decoding masked big-endian byte sequences
+// These could probably be replaced with something more robust like `nom` if we want to
+// take the hit of adding another dependency.
+fn read_u16_be<'a, T: Iterator<Item = &'a u8>>(input: &mut T) -> u16 {
+    let buf: [u8; 2] = [*input.next().unwrap(), *input.next().unwrap()];
+    NetworkEndian::read_u16(&buf)
+}
+
+fn read_u32_be<'a, T: Iterator<Item = &'a u8>>(input: &mut T) -> u32 {
+    let buf: [u8; 4] = [
+        *input.next().unwrap(),
+        *input.next().unwrap(),
+        *input.next().unwrap(),
+        *input.next().unwrap(),
+    ];
+    NetworkEndian::read_u32(&buf)
+}
+
+fn read_u64_be<'a, T: Iterator<Item = &'a u8>>(input: &mut T) -> u64 {
+    let buf: [u8; 8] = [
+        *input.next().unwrap(),
+        *input.next().unwrap(),
+        *input.next().unwrap(),
+        *input.next().unwrap(),
+        *input.next().unwrap(),
+        *input.next().unwrap(),
+        *input.next().unwrap(),
+        *input.next().unwrap(),
+    ];
+    NetworkEndian::read_u64(&buf)
+}
+
 /// Iterator to the list of elements that were received.
 pub struct ElementsIter<'a> {
     state: &'a mut StateMachine,
@@ -163,20 +197,8 @@ impl<'a> Iterator for ElementsIter<'a> {
                         let mut mask_iter =
                             self.state.buffer.iter().chain(self.data.iter()).skip(2);
 
-                        let length = {
-                            let a = u64::from(*mask_iter.next().unwrap());
-                            let b = u64::from(*mask_iter.next().unwrap());
-                            (a << 8) | (b << 0)
-                        };
-
-                        let mask = {
-                            let a = u32::from(*mask_iter.next().unwrap());
-                            let b = u32::from(*mask_iter.next().unwrap());
-                            let c = u32::from(*mask_iter.next().unwrap());
-                            let d = u32::from(*mask_iter.next().unwrap());
-                            (a << 24) | (b << 16) | (c << 8) | (d << 0)
-                        };
-
+                        let length = read_u16_be(&mut mask_iter) as u64;
+                        let mask = read_u32_be(&mut mask_iter);
                         (length, mask)
                     }
                     127 => {
@@ -190,39 +212,17 @@ impl<'a> Iterator for ElementsIter<'a> {
                             self.state.buffer.iter().chain(self.data.iter()).skip(2);
 
                         let length = {
-                            let a = u64::from(*mask_iter.next().unwrap());
-                            let b = u64::from(*mask_iter.next().unwrap());
-                            let c = u64::from(*mask_iter.next().unwrap());
-                            let d = u64::from(*mask_iter.next().unwrap());
-                            let e = u64::from(*mask_iter.next().unwrap());
-                            let f = u64::from(*mask_iter.next().unwrap());
-                            let g = u64::from(*mask_iter.next().unwrap());
-                            let h = u64::from(*mask_iter.next().unwrap());
-
+                            let length = read_u64_be(&mut mask_iter);
                             // The most significant bit must be zero according to the specs.
-                            if (a & 0x80) != 0 {
+                            if (length & 0x8000000000000000) != 0 {
                                 return Some(Element::Error {
                                     desc: "Most-significant bit of the length must be zero",
                                 });
                             }
-
-                            (a << 56)
-                                | (b << 48)
-                                | (c << 40)
-                                | (d << 32)
-                                | (e << 24)
-                                | (f << 16)
-                                | (g << 8)
-                                | (h << 0)
+                            length
                         };
 
-                        let mask = {
-                            let a = u32::from(*mask_iter.next().unwrap());
-                            let b = u32::from(*mask_iter.next().unwrap());
-                            let c = u32::from(*mask_iter.next().unwrap());
-                            let d = u32::from(*mask_iter.next().unwrap());
-                            (a << 24) | (b << 16) | (c << 8) | (d << 0)
-                        };
+                        let mask = read_u32_be(&mut mask_iter);
 
                         (length, mask)
                     }
@@ -230,14 +230,7 @@ impl<'a> Iterator for ElementsIter<'a> {
                         let mut mask_iter =
                             self.state.buffer.iter().chain(self.data.iter()).skip(2);
 
-                        let mask = {
-                            let a = u32::from(*mask_iter.next().unwrap());
-                            let b = u32::from(*mask_iter.next().unwrap());
-                            let c = u32::from(*mask_iter.next().unwrap());
-                            let d = u32::from(*mask_iter.next().unwrap());
-                            (a << 24) | (b << 16) | (c << 8) | (d << 0)
-                        };
-
+                        let mask = read_u32_be(&mut mask_iter);
                         (u64::from(n), mask)
                     }
                 };
@@ -331,7 +324,7 @@ impl<'a> Iterator for Data<'a> {
         }
 
         let byte = self.data[0];
-        let mask = ((self.mask >> (3 - self.offset) * 8) & 0xff) as u8;
+        let mask = ((self.mask >> ((3 - self.offset) * 8)) & 0xff) as u8;
         let decoded = byte ^ mask;
 
         self.data = &self.data[1..];

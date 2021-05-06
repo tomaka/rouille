@@ -7,6 +7,7 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+use byteorder::{NetworkEndian, WriteBytesExt};
 use std::io;
 use std::io::Write;
 use std::mem;
@@ -342,7 +343,7 @@ impl Iterator for Websocket {
     }
 }
 
-// Sends a mesage to a websocket.
+// Sends a message to a websocket.
 // TODO: message fragmentation?
 fn send<W: Write>(data: &[u8], mut dest: W, opcode: u8) -> io::Result<()> {
     // Write the opcode
@@ -355,21 +356,11 @@ fn send<W: Write>(data: &[u8], mut dest: W, opcode: u8) -> io::Result<()> {
         dest.write_all(&[127u8])?;
         let len = data.len() as u64;
         assert!(len < 0x8000_0000_0000_0000);
-        let len1 = (len >> 56) as u8;
-        let len2 = (len >> 48) as u8;
-        let len3 = (len >> 40) as u8;
-        let len4 = (len >> 32) as u8;
-        let len5 = (len >> 24) as u8;
-        let len6 = (len >> 16) as u8;
-        let len7 = (len >> 8) as u8;
-        let len8 = (len >> 0) as u8;
-        dest.write_all(&[len1, len2, len3, len4, len5, len6, len7, len8])?;
+        dest.write_u64::<NetworkEndian>(len)?;
     } else if data.len() >= 126 {
         dest.write_all(&[126u8])?;
         let len = data.len() as u16;
-        let len1 = (len >> 8) as u8;
-        let len2 = len as u8;
-        dest.write_all(&[len1, len2])?;
+        dest.write_u16::<NetworkEndian>(len)?;
     } else {
         dest.write_all(&[data.len() as u8])?;
     }
@@ -378,4 +369,73 @@ fn send<W: Write>(data: &[u8], mut dest: W, opcode: u8) -> io::Result<()> {
     dest.write_all(data)?;
     dest.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ws_framing_short() {
+        let data: &[u8] = &[0xAB, 0xAB, 0xAB, 0xAB];
+        let mut buf = Vec::new();
+
+        send(data, &mut buf, 0x2).unwrap();
+
+        // Expected
+        // 0x82 (FIN = 1 | RSV1/2/3 = 0 | OPCODE = 2)
+        // 0x04 (len = 4 bytes)
+        // 0xABABABAB (payload = 4 bytes)
+        assert_eq!(&buf, &[0x82, 0x04, 0xAB, 0xAB, 0xAB, 0xAB]);
+    }
+
+    #[test]
+    fn test_ws_framing_medium() {
+        let data: [u8; 125] = [0xAB; 125];
+        let mut buf = Vec::new();
+
+        send(&data, &mut buf, 0x2).unwrap();
+
+        // Expected
+        // 0x82 (FIN = 1 | RSV1/2/3 = 0 | OPCODE = 2)
+        // 0x7D (len = 125 bytes)
+        // 0xABABABAB... (payload = 125 bytes)
+        assert_eq!(&buf[0..2], &[0x82, 0x7D]);
+        assert_eq!(&buf[2..], &data[..]);
+    }
+
+    #[test]
+    fn test_ws_framing_long() {
+        let data: [u8; 65534] = [0xAB; 65534];
+        let mut buf = Vec::new();
+
+        send(&data, &mut buf, 0x2).unwrap();
+
+        // Expected
+        // 0x82 (FIN = 1 | RSV1/2/3 = 0 | OPCODE = 2)
+        // 0x7E (len = 126 = extended 7+16)
+        // 0xFFFE (extended_len = 65534 - Network Byte Order)
+        // 0xABABABAB... (payload = 65534 bytes)
+        assert_eq!(&buf[0..4], &[0x82, 0x7E, 0xFF, 0xFE]);
+        assert_eq!(&buf[4..], &data[..]);
+    }
+
+    #[test]
+    fn test_ws_framing_very_long() {
+        let data: [u8; 0x100FF] = [0xAB; 0x100FF]; // 65791
+        let mut buf = Vec::new();
+
+        send(&data, &mut buf, 0x2).unwrap();
+
+        // Expected
+        // 0x82 (FIN = 1 | RSV1/2/3 = 0 | OPCODE = 2)
+        // 0x7F (len = 127 = extended 7+64)
+        // 0x00000000000100FF (extended_len = 65791 - Network Byte Order)
+        // 0xABABABAB... (payload = 65791 bytes)
+        assert_eq!(
+            &buf[0..10],
+            &[0x82, 0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0xFF]
+        );
+        assert_eq!(&buf[10..], &data[..]);
+    }
 }
