@@ -92,7 +92,7 @@ impl Write for HttpBuffer {
         }
 
         // Simulate the randomness of a network connection by not always reading everything
-        let len = self.rng.gen_range(1, buf.len() + 1);
+        let len = self.rng.gen_range(1..=buf.len());
 
         self.buf.write(&buf[..len])
     }
@@ -159,7 +159,7 @@ impl<'a> Read for ServerRequest<'a> {
         }
 
         // Simulate the randomness of a network connection by not always reading everything
-        let len = self.rng.gen_range(1, out.len() + 1);
+        let len = self.rng.gen_range(1..=out.len());
         self.data.read(&mut out[..len])
     }
 }
