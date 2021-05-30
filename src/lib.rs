@@ -335,7 +335,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     ///
     /// Returns an error if there was an error while creating the listening socket, for example if
     /// the port is already in use.
-    pub fn new<A>(addr: A, handler: F) -> Result<Server<F>, Box<dyn Error + Send + Sync>>
+    pub fn new<A>(addr: A, handler: F) -> Result<Server<F>, Box<dyn Error + Send + Sync + 'static>>
         where A: ToSocketAddrs
     {
         let server = tiny_http::Server::http(addr)?;
@@ -358,7 +358,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         handler: F,
         certificate: Vec<u8>,
         private_key: Vec<u8>,
-    ) -> Result<Server<F>, Box<dyn Error + Send + Sync>> where A: ToSocketAddrs {
+    ) -> Result<Server<F>, Box<dyn Error + Send + Sync + 'static>> where A: ToSocketAddrs {
         let ssl_config = tiny_http::SslConfig {
             certificate,
             private_key,
