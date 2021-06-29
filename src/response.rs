@@ -727,6 +727,29 @@ impl ResponseBody {
         }
     }
 
+    /// Builds a new `ResponseBody` that will read the data from a `Read`.
+    ///
+    /// The caller must provide the content length. It is unspecified
+    /// what will happen if the content length does not match the actual
+    /// length of the data returned from the reader.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use std::io;
+    /// use std::io::Read;
+    /// use rouille::ResponseBody;
+    ///
+    /// let body = ResponseBody::from_reader_and_size(io::stdin().take(128), 128);
+    /// ```
+    #[inline]
+    pub fn from_reader_and_size<R>(data: R, size: usize) -> ResponseBody where R: Read + Send + 'static {
+        ResponseBody {
+            data: Box::new(data),
+            data_length: Some(size),
+        }
+    }
+
     /// Builds a new `ResponseBody` that returns the given data.
     ///
     /// # Example
