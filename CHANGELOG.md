@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 3.2
+
+- Add `ResponseBody::from_reader_and_size` for constructing a `ResponseBody`
+  from a `Reader` and an already known size such that `Content-Length` may be
+  set on the response.
+
 ## Version 3.1.1
 
 - Replace all uses of deprecated `try!` with `?` to suppress warnings that can
