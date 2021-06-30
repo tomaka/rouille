@@ -8,17 +8,17 @@
 // according to those terms.
 
 //! Allows you to let an external process handle the request through CGI.
-//! 
+//!
 //! This module provides a trait named `CgiRun` which is implemented on `std::process::Command`.
 //! In order to dispatch a request, simply start building a `Command` object and call `start_cgi`
 //! on it.
-//! 
+//!
 //! ## Example
-//! 
+//!
 //! ```no_run
 //! use std::process::Command;
 //! use rouille::cgi::CgiRun;
-//! 
+//!
 //! rouille::start_server("localhost:8080", move |request| {
 //!     Command::new("php-cgi").start_cgi(request).unwrap()
 //! });
@@ -40,8 +40,8 @@
 use std::error;
 use std::fmt;
 use std::io;
-use std::io::Error as IoError;
 use std::io::BufRead;
+use std::io::Error as IoError;
 use std::io::Read;
 use std::process::Command;
 use std::process::Stdio;
@@ -71,7 +71,7 @@ impl error::Error for CgiError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             CgiError::IoError(ref e) => Some(e),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -80,12 +80,10 @@ impl fmt::Display for CgiError {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let description = match *self {
-            CgiError::BodyAlreadyExtracted => {
-                "the body of the request was already extracted"
-            },
+            CgiError::BodyAlreadyExtracted => "the body of the request was already extracted",
             CgiError::IoError(_) => {
                 "could not read the body from the request, or could not execute the CGI program"
-            },
+            }
         };
 
         write!(fmt, "{}", description)
@@ -109,19 +107,25 @@ pub trait CgiRun {
 impl CgiRun for Command {
     fn start_cgi(mut self, request: &Request) -> Result<Response, CgiError> {
         self.env("SERVER_SOFTWARE", "rouille")
-            .env("SERVER_NAME", "localhost")            // FIXME:
+            .env("SERVER_NAME", "localhost") // FIXME:
             .env("GATEWAY_INTERFACE", "CGI/1.1")
-            .env("SERVER_PROTOCOL", "HTTP/1.1")         // FIXME:
-            .env("SERVER_PORT", "80")                   // FIXME:
+            .env("SERVER_PROTOCOL", "HTTP/1.1") // FIXME:
+            .env("SERVER_PORT", "80") // FIXME:
             .env("REQUEST_METHOD", request.method())
-            .env("PATH_INFO", &request.url())           // TODO: incorrect + what about PATH_TRANSLATED?
-            .env("SCRIPT_NAME", "")                     // FIXME:
+            .env("PATH_INFO", &request.url()) // TODO: incorrect + what about PATH_TRANSLATED?
+            .env("SCRIPT_NAME", "") // FIXME:
             .env("QUERY_STRING", request.raw_query_string())
             .env("REMOTE_ADDR", &request.remote_addr().to_string())
-            .env("AUTH_TYPE", "")                       // FIXME:
-            .env("REMOTE_USER", "")                     // FIXME:
-            .env("CONTENT_TYPE", &request.header("Content-Type").unwrap_or(""))
-            .env("CONTENT_LENGTH", &request.header("Content-Length").unwrap_or(""))
+            .env("AUTH_TYPE", "") // FIXME:
+            .env("REMOTE_USER", "") // FIXME:
+            .env(
+                "CONTENT_TYPE",
+                &request.header("Content-Type").unwrap_or(""),
+            )
+            .env(
+                "CONTENT_LENGTH",
+                &request.header("Content-Length").unwrap_or(""),
+            )
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .stdin(Stdio::piped());
@@ -143,15 +147,19 @@ impl CgiRun for Command {
             let mut status_code = 200;
             for header in stdout.by_ref().lines() {
                 let header = header?;
-                if header.is_empty() { break; }
-    
+                if header.is_empty() {
+                    break;
+                }
+
                 let mut splits = header.splitn(2, ':');
-                let header = splits.next().unwrap();        // TODO: return Err instead?
-                let val = splits.next().unwrap();           // TODO: return Err instead?
+                let header = splits.next().unwrap(); // TODO: return Err instead?
+                let val = splits.next().unwrap(); // TODO: return Err instead?
                 let val = &val[1..];
 
                 if header == "Status" {
-                    status_code = val[0..3].parse().expect("Status returned by CGI program is invalid");
+                    status_code = val[0..3]
+                        .parse()
+                        .expect("Status returned by CGI program is invalid");
                 } else {
                     headers.push((header.to_owned().into(), val.to_owned().into()));
                 }

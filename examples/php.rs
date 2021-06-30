@@ -9,16 +9,16 @@
 
 extern crate rouille;
 
-use std::process::Command;
 use rouille::cgi::CgiRun;
+use std::process::Command;
 
 fn main() {
     rouille::start_server("localhost:8000", move |request| {
         // TODO: add logging
         let mut cmd = Command::new("php-cgi");
-        cmd.arg("-n");                                          // Don't use a php.ini.
-        cmd.env("SCRIPT_FILENAME", "examples/php-test.php");    // The PHP script to use.
-        cmd.env("REDIRECT_STATUS", "1");                        // Necessary for security.
+        cmd.arg("-n"); // Don't use a php.ini.
+        cmd.env("SCRIPT_FILENAME", "examples/php-test.php"); // The PHP script to use.
+        cmd.env("REDIRECT_STATUS", "1"); // Necessary for security.
         cmd.start_cgi(&request).unwrap()
     });
 }

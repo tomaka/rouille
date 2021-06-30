@@ -28,7 +28,8 @@ use std::str::Split;
 /// assert_eq!(priority_header_preferred(header, handled.iter().cloned()), Some(1));
 /// ```
 pub fn priority_header_preferred<'a, I>(input: &'a str, elements: I) -> Option<usize>
-    where I: Iterator<Item = &'a str>
+where
+    I: Iterator<Item = &'a str>,
 {
     let mut result = (None, f32::NEG_INFINITY);
 
@@ -58,14 +59,18 @@ pub fn priority_header_preferred<'a, I>(input: &'a str, elements: I) -> Option<u
             };
 
             if (req_elem_left == Some("*") || header_elem_left == Some("*"))
-                && (req_elem_right == header_elem_right || req_elem_right == Some("*") || header_elem_right == Some("*"))
+                && (req_elem_right == header_elem_right
+                    || req_elem_right == Some("*")
+                    || header_elem_right == Some("*"))
             {
                 result = (Some(index), prio);
                 continue;
             }
 
             if (req_elem_right == Some("*") || header_elem_right == Some("*"))
-                && (req_elem_left == header_elem_left || req_elem_left == Some("*") || header_elem_left == Some("*"))
+                && (req_elem_left == header_elem_left
+                    || req_elem_left == Some("*")
+                    || header_elem_left == Some("*"))
             {
                 result = (Some(index), prio);
                 continue;
@@ -118,7 +123,7 @@ impl<'a> Iterator for PriorityHeaderIter<'a> {
 
             let t = match params.next() {
                 Some(t) => t.trim(),
-                None => continue
+                None => continue,
             };
 
             let mut value = 1.0f32;
@@ -127,7 +132,8 @@ impl<'a> Iterator for PriorityHeaderIter<'a> {
                 let trimmed_p = p.trim_start();
                 if trimmed_p.starts_with("q=") {
                     if let Ok(val) = FromStr::from_str(&trimmed_p[2..].trim()) {
-                        value = val; break;
+                        value = val;
+                        break;
                     }
                 }
             }
@@ -168,34 +174,49 @@ mod tests {
     fn preferred_basic() {
         let header = "text/plain; q=1.2, image/png; q=2.0";
         let handled = ["image/gif", "image/png", "text/plain"];
-        assert_eq!(priority_header_preferred(header, handled.iter().cloned()), Some(1));
+        assert_eq!(
+            priority_header_preferred(header, handled.iter().cloned()),
+            Some(1)
+        );
     }
 
     #[test]
     fn preferred_multimatch_first() {
         let header = "text/plain";
         let handled = ["text/plain", "text/plain"];
-        assert_eq!(priority_header_preferred(header, handled.iter().cloned()), Some(0));
+        assert_eq!(
+            priority_header_preferred(header, handled.iter().cloned()),
+            Some(0)
+        );
     }
 
     #[test]
     fn preferred_wildcard_header() {
         let header = "text/plain; q=1.2, */*";
         let handled = ["image/gif"];
-        assert_eq!(priority_header_preferred(header, handled.iter().cloned()), Some(0));
+        assert_eq!(
+            priority_header_preferred(header, handled.iter().cloned()),
+            Some(0)
+        );
     }
 
     #[test]
     fn preferred_wildcard_header_left() {
         let header = "text/*; q=2.0, */*";
         let handled = ["image/gif", "text/html"];
-        assert_eq!(priority_header_preferred(header, handled.iter().cloned()), Some(1));
+        assert_eq!(
+            priority_header_preferred(header, handled.iter().cloned()),
+            Some(1)
+        );
     }
 
     #[test]
     fn preferred_empty() {
         let header = "*/*";
         let handled = [];
-        assert_eq!(priority_header_preferred(header, handled.iter().cloned()), None);
+        assert_eq!(
+            priority_header_preferred(header, handled.iter().cloned()),
+            None
+        );
     }
 }

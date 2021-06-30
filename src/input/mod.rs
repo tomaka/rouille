@@ -8,17 +8,17 @@
 // according to those terms.
 
 //! Analyze the request's headers and body.
-//! 
+//!
 //! This module provides functions and sub-modules that allow you to easily analyze or parse the
 //! request's headers and body.
-//! 
+//!
 //! - In order to parse JSON, see [the `json` module](json/index.html).
 //! - In order to parse input from HTML forms, see [the `post` module](post/index.html).
 //! - In order to read a plain text body, see
 //!   [the `plain_text_body` function](fn.plain_text_body.html).
 
-pub use self::basic_http_auth::HttpAuthCredentials;
 pub use self::basic_http_auth::basic_http_auth;
+pub use self::basic_http_auth::HttpAuthCredentials;
 pub use self::cookies::cookies;
 pub use self::cookies::CookiesIter;
 pub use self::json::json_input;

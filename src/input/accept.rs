@@ -96,9 +96,12 @@ mod tests {
 
     #[test]
     fn basic() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Accept".to_owned(), "text/plain, */*".to_owned())
-        ], vec![]);
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("Accept".to_owned(), "text/plain, */*".to_owned())],
+            vec![],
+        );
 
         let result = accept!(&request,
             "text/plain" => 5,
@@ -110,9 +113,12 @@ mod tests {
 
     #[test]
     fn wildcard() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Accept".to_owned(), "image/gif".to_owned())
-        ], vec![]);
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("Accept".to_owned(), "image/gif".to_owned())],
+            vec![],
+        );
 
         let result = accept!(&request,
             "text/plain" => 5,
@@ -124,9 +130,12 @@ mod tests {
 
     #[test]
     fn no_match() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Accept".to_owned(), "image/gif".to_owned())
-        ], vec![]);
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("Accept".to_owned(), "image/gif".to_owned())],
+            vec![],
+        );
 
         let result = accept!(&request,
             "text/plain" => 5,
@@ -138,9 +147,12 @@ mod tests {
 
     #[test]
     fn multimatch_first() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Accept".to_owned(), "image/gif".to_owned())
-        ], vec![]);
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("Accept".to_owned(), "image/gif".to_owned())],
+            vec![],
+        );
 
         let result = accept!(&request,
             "text/plain" => 5,
@@ -166,9 +178,12 @@ mod tests {
 
     #[test]
     fn no_header_wildcard() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Accept".to_owned(), "image/tiff".to_owned())
-        ], vec![]);
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("Accept".to_owned(), "image/tiff".to_owned())],
+            vec![],
+        );
 
         let result = accept!(&request,
             "image/gif" => 5,

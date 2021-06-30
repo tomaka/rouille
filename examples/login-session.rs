@@ -2,15 +2,17 @@
 #[macro_use]
 extern crate rouille;
 
+use rouille::Request;
+use rouille::Response;
 use std::collections::HashMap;
 use std::io;
 use std::sync::Mutex;
-use rouille::Request;
-use rouille::Response;
 
 // This struct contains the data that we store on the server about each client.
 #[derive(Debug, Clone)]
-struct SessionData { login: String }
+struct SessionData {
+    login: String,
+}
 
 fn main() {
     // This example demonstrates how to create a website with a simple login form.
@@ -63,8 +65,10 @@ fn main() {
                 // Since the function call to `handle_route` can modify the session data, we have
                 // to store it back in the `sessions_storage` when necessary.
                 if let Some(d) = session_data {
-                    sessions_storage.lock().unwrap().insert(session.id().to_owned(), d);
-
+                    sessions_storage
+                        .lock()
+                        .unwrap()
+                        .insert(session.id().to_owned(), d);
                 } else if session.client_has_sid() {
                     // If `handle_route` erased the content of the `Option`, we remove the session
                     // from the storage. This is only done if the client already has an identifier,
@@ -149,7 +153,6 @@ fn handle_route(request: &Request, session_data: &mut Option<SessionData>) -> Re
     if let Some(session_data) = session_data.as_ref() {
         // Logged in.
         handle_route_logged_in(request, session_data)
-
     } else {
         // Not logged in.
         router!(request,

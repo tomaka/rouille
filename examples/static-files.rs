@@ -40,8 +40,10 @@ fn main() {
 
         // In a real website you probably want to serve non-static files here (with the `router!`
         // macro for example), but here we just return a 404 response.
-        Response::html("404 error. Try <a href=\"/README.md\"`>README.md</a> or \
-                        <a href=\"/src/lib.rs\">src/lib.rs</a> for example.")
-            .with_status_code(404)
+        Response::html(
+            "404 error. Try <a href=\"/README.md\"`>README.md</a> or \
+                        <a href=\"/src/lib.rs\">src/lib.rs</a> for example.",
+        )
+        .with_status_code(404)
     });
 }

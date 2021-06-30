@@ -78,7 +78,8 @@ use Response;
 /// `public/test.txt` if it exists.
 ///
 pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
-    where P: AsRef<Path>
+where
+    P: AsRef<Path>,
 {
     let path = path.as_ref();
     let path = match path.canonicalize() {
@@ -122,16 +123,17 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
         Err(_) => return Response::empty_404(),
     };
 
-    let now = time::OffsetDateTime::try_now_local()
-        .unwrap_or_else(|_| time::OffsetDateTime::now_utc());
+    let now =
+        time::OffsetDateTime::try_now_local().unwrap_or_else(|_| time::OffsetDateTime::now_utc());
     let etag: String = (fs::metadata(&potential_file)
         .map(|meta| filetime::FileTime::from_last_modification_time(&meta).unix_seconds() as u64)
         .unwrap_or(now.nanosecond() as u64)
-        ^ 0xd3f4_0305_c9f8_e911_u64).to_string();
+        ^ 0xd3f4_0305_c9f8_e911_u64)
+        .to_string();
 
     Response::from_file(extension_to_mime_impl(extension), file)
         .with_etag(request, etag)
-        .with_public_cache(3600)        // TODO: is this a good idea? what if the file is private?
+        .with_public_cache(3600) // TODO: is this a good idea? what if the file is private?
 }
 
 /// Returns the mime type of a file based on its extension, or `application/octet-stream` if the
@@ -713,6 +715,6 @@ fn extension_to_mime_impl(extension: Option<&str>) -> &'static str {
         Some("xwd") => "image/x-xwindowdump",
         Some("z") => "application/x-compress",
         Some("zip") => "application/zip",
-        _ => "application/octet-stream"
+        _ => "application/octet-stream",
     }
 }

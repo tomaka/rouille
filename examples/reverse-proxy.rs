@@ -15,9 +15,13 @@ fn main() {
     println!("Now listening on localhost:8000");
 
     rouille::start_server("localhost:8000", move |request| {
-        rouille::proxy::full_proxy(&request, rouille::proxy::ProxyConfig {
-            addr: "example.com:80",
-            replace_host: Some("example.com".into()),
-        }).unwrap()
+        rouille::proxy::full_proxy(
+            &request,
+            rouille::proxy::ProxyConfig {
+                addr: "example.com:80",
+                replace_host: Some("example.com".into()),
+            },
+        )
+        .unwrap()
     });
 }

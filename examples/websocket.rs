@@ -82,16 +82,15 @@ fn main() {
 fn websocket_handling_thread(mut websocket: websocket::Websocket) {
     // We wait for a new message to come from the websocket.
     while let Some(message) = websocket.next() {
-
         match message {
             websocket::Message::Text(txt) => {
                 // If the message is text, send it back with `send_text`.
                 println!("received {:?} from a websocket", txt);
                 websocket.send_text(&txt).unwrap();
-            },
+            }
             websocket::Message::Binary(_) => {
                 println!("received binary from a websocket");
-            },
+            }
         }
     }
 }

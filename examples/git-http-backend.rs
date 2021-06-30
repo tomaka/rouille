@@ -9,10 +9,10 @@
 
 extern crate rouille;
 
-use std::io;
-use std::env;
-use std::process::Command;
 use rouille::cgi::CgiRun;
+use std::env;
+use std::io;
+use std::process::Command;
 
 fn main() {
     // This example demonstrates how to serve a git repository with rouille.
@@ -28,8 +28,11 @@ fn main() {
             cmd.arg("http-backend");
 
             // We need to set some git-specific environment variables.
-            cmd.env("GIT_PROJECT_ROOT", env::current_dir().unwrap().to_str().unwrap());
-            cmd.env("GIT_HTTP_EXPORT_ALL", "");   // This one is required to avoid security errors.
+            cmd.env(
+                "GIT_PROJECT_ROOT",
+                env::current_dir().unwrap().to_str().unwrap(),
+            );
+            cmd.env("GIT_HTTP_EXPORT_ALL", ""); // This one is required to avoid security errors.
 
             // Our `cmd` is now ready. We can run it with the `start_cgi` method of the `CgiRun`
             // trait.

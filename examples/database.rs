@@ -16,9 +16,9 @@ extern crate serde_derive;
 
 use std::sync::Mutex;
 
+use postgres::transaction::Transaction;
 use postgres::Connection;
 use postgres::TlsMode;
-use postgres::transaction::Transaction;
 
 use rouille::Request;
 use rouille::Response;
@@ -50,7 +50,10 @@ fn main() {
                     id SERIAL PRIMARY KEY,
                     content TEXT NOT NULL
                    );";
-        db.lock().unwrap().execute(sql, &[]).expect("Failed to initialize database");
+        db.lock()
+            .unwrap()
+            .execute(sql, &[])
+            .expect("Failed to initialize database");
     }
 
     // Small message so that people don't need to read the source code.

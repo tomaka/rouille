@@ -8,10 +8,10 @@
 // according to those terms.
 
 //! Analyze the request's headers and body.
-//! 
+//!
 //! This module provides functions and sub-modules that allow you to easily analyze or parse the
 //! request's headers and body.
-//! 
+//!
 //! - In order to parse JSON, see [the `json` module](json/input.html).
 //! - In order to parse input from HTML forms, see [the `post` module](post/input.html).
 //! - In order to read a plain text body, see
@@ -42,7 +42,7 @@ pub fn cookies(request: &Request) -> CookiesIter {
     let header = request.header("Cookie").unwrap_or("");
 
     CookiesIter {
-        iter: header.split(';')
+        iter: header.split(';'),
     }
 }
 
@@ -60,12 +60,18 @@ impl<'a> Iterator for CookiesIter<'a> {
         loop {
             let cookie = match self.iter.next() {
                 Some(c) => c,
-                None => return None
+                None => return None,
             };
-            
+
             let mut splits = cookie.splitn(2, |c| c == '=');
-            let key = match splits.next() { None => continue, Some(v) => v };
-            let value = match splits.next() { None => continue, Some(v) => v };
+            let key = match splits.next() {
+                None => continue,
+                Some(v) => v,
+            };
+            let value = match splits.next() {
+                None => continue,
+                Some(v) => v,
+            };
 
             let key = key.trim();
             let value = value.trim().trim_matches(|c| c == '"');
@@ -83,8 +89,8 @@ impl<'a> Iterator for CookiesIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use Request;
     use super::cookies;
+    use Request;
 
     #[test]
     fn no_cookie() {
@@ -94,14 +100,16 @@ mod test {
 
     #[test]
     fn cookies_ok() {
-        let request = Request::fake_http("GET", "/",
-                                         vec![("Cookie".to_owned(),
-                                               "a=b; hello=world".to_owned())],
-                                         Vec::new());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("Cookie".to_owned(), "a=b; hello=world".to_owned())],
+            Vec::new(),
+        );
 
-        assert_eq!(cookies(&request).collect::<Vec<_>>(), vec![
-            ("a".into(), "b".into()),
-            ("hello".into(), "world".into())
-        ]);
+        assert_eq!(
+            cookies(&request).collect::<Vec<_>>(),
+            vec![("a".into(), "b".into()), ("hello".into(), "world".into())]
+        );
     }
 }

@@ -7,15 +7,15 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+use percent_encoding;
+use serde;
+use serde_json;
 use std::borrow::Cow;
+use std::fmt;
+use std::fs::File;
 use std::io;
 use std::io::Cursor;
 use std::io::Read;
-use std::fs::File;
-use std::fmt;
-use serde;
-use serde_json;
-use percent_encoding;
 use Request;
 use Upgrade;
 
@@ -116,7 +116,8 @@ impl Response {
     /// ```
     #[inline]
     pub fn redirect_301<S>(target: S) -> Response
-        where S: Into<Cow<'static, str>>
+    where
+        S: Into<Cow<'static, str>>,
     {
         Response {
             status_code: 301,
@@ -140,7 +141,8 @@ impl Response {
     /// ```
     #[inline]
     pub fn redirect_302<S>(target: S) -> Response
-        where S: Into<Cow<'static, str>>
+    where
+        S: Into<Cow<'static, str>>,
     {
         Response {
             status_code: 302,
@@ -170,7 +172,8 @@ impl Response {
     /// ```
     #[inline]
     pub fn redirect_303<S>(target: S) -> Response
-        where S: Into<Cow<'static, str>>
+    where
+        S: Into<Cow<'static, str>>,
     {
         Response {
             status_code: 303,
@@ -199,7 +202,8 @@ impl Response {
     /// ```
     #[inline]
     pub fn redirect_307<S>(target: S) -> Response
-        where S: Into<Cow<'static, str>>
+    where
+        S: Into<Cow<'static, str>>,
     {
         Response {
             status_code: 307,
@@ -228,7 +232,8 @@ impl Response {
     /// ```
     #[inline]
     pub fn redirect_308<S>(target: S) -> Response
-        where S: Into<Cow<'static, str>>
+    where
+        S: Into<Cow<'static, str>>,
     {
         Response {
             status_code: 308,
@@ -248,8 +253,9 @@ impl Response {
     /// ```
     #[inline]
     pub fn from_data<C, D>(content_type: C, data: D) -> Response
-        where C: Into<Cow<'static, str>>,
-              D: Into<Vec<u8>>
+    where
+        C: Into<Cow<'static, str>>,
+        D: Into<Vec<u8>>,
     {
         Response {
             status_code: 200,
@@ -272,7 +278,8 @@ impl Response {
     /// ```
     #[inline]
     pub fn from_file<C>(content_type: C, file: File) -> Response
-        where C: Into<Cow<'static, str>>
+    where
+        C: Into<Cow<'static, str>>,
     {
         Response {
             status_code: 200,
@@ -291,7 +298,10 @@ impl Response {
     /// let response = Response::html("<p>hello <strong>world</strong></p>");
     /// ```
     #[inline]
-    pub fn html<D>(content: D) -> Response where D: Into<String> {
+    pub fn html<D>(content: D) -> Response
+    where
+        D: Into<String>,
+    {
         Response {
             status_code: 200,
             headers: vec![("Content-Type".into(), "text/html; charset=utf-8".into())],
@@ -309,7 +319,10 @@ impl Response {
     /// let response = Response::svg("<svg xmlns='http://www.w3.org/2000/svg'/>");
     /// ```
     #[inline]
-    pub fn svg<D>(content: D) -> Response where D: Into<String> {
+    pub fn svg<D>(content: D) -> Response
+    where
+        D: Into<String>,
+    {
         Response {
             status_code: 200,
             headers: vec![("Content-Type".into(), "image/svg+xml; charset=utf-8".into())],
@@ -327,7 +340,10 @@ impl Response {
     /// let response = Response::text("hello world");
     /// ```
     #[inline]
-    pub fn text<S>(text: S) -> Response where S: Into<String> {
+    pub fn text<S>(text: S) -> Response
+    where
+        S: Into<String>,
+    {
         Response {
             status_code: 200,
             headers: vec![("Content-Type".into(), "text/plain; charset=utf-8".into())],
@@ -358,12 +374,18 @@ impl Response {
     /// # }
     /// ```
     #[inline]
-    pub fn json<T>(content: &T) -> Response where T: serde::Serialize {
+    pub fn json<T>(content: &T) -> Response
+    where
+        T: serde::Serialize,
+    {
         let data = serde_json::to_string(content).unwrap();
 
         Response {
             status_code: 200,
-            headers: vec![("Content-Type".into(), "application/json; charset=utf-8".into())],
+            headers: vec![(
+                "Content-Type".into(),
+                "application/json; charset=utf-8".into(),
+            )],
             data: ResponseBody::from_data(data),
             upgrade: None,
         }
@@ -383,7 +405,10 @@ impl Response {
         // TODO: escape the realm
         Response {
             status_code: 401,
-            headers: vec![("WWW-Authenticate".into(), format!("Basic realm=\"{}\"", realm).into())],
+            headers: vec![(
+                "WWW-Authenticate".into(),
+                format!("Basic realm=\"{}\"", realm).into(),
+            )],
             data: ResponseBody::empty(),
             upgrade: None,
         }
@@ -477,15 +502,17 @@ impl Response {
 
     /// Removes all headers from the response that match `header`.
     pub fn without_header(mut self, header: &str) -> Response {
-        self.headers.retain(|&(ref h, _)| !h.eq_ignore_ascii_case(header));
+        self.headers
+            .retain(|&(ref h, _)| !h.eq_ignore_ascii_case(header));
         self
     }
 
     /// Adds an additional header to the response.
     #[inline]
     pub fn with_additional_header<H, V>(mut self, header: H, value: V) -> Response
-        where H: Into<Cow<'static, str>>,
-              V: Into<Cow<'static, str>>
+    where
+        H: Into<Cow<'static, str>>,
+        V: Into<Cow<'static, str>>,
     {
         self.headers.push((header.into(), value.into()));
         self
@@ -493,8 +520,9 @@ impl Response {
 
     /// Removes all headers from the response whose names are `header`, and replaces them .
     pub fn with_unique_header<H, V>(mut self, header: H, value: V) -> Response
-        where H: Into<Cow<'static, str>>,
-              V: Into<Cow<'static, str>>
+    where
+        H: Into<Cow<'static, str>>,
+        V: Into<Cow<'static, str>>,
     {
         // If Vec::retain provided a mutable reference this code would be much simpler and would
         // only need to iterate once.
@@ -521,7 +549,9 @@ impl Response {
 
         if found_one {
             for &mut (ref h, ref mut v) in &mut self.headers {
-                if !h.eq_ignore_ascii_case(&header) { continue; }
+                if !h.eq_ignore_ascii_case(&header) {
+                    continue;
+                }
                 *v = value.into();
                 break;
             }
@@ -553,7 +583,8 @@ impl Response {
     /// ```
     #[inline]
     pub fn with_etag<E>(self, request: &Request, etag: E) -> Response
-        where E: Into<Cow<'static, str>>
+    where
+        E: Into<Cow<'static, str>>,
     {
         self.with_etag_keep(etag).simplify_if_etag_match(request)
     }
@@ -571,7 +602,10 @@ impl Response {
                 continue;
             }
 
-            not_modified = request.header("If-None-Match").map(|header| header == etag).unwrap_or(false);
+            not_modified = request
+                .header("If-None-Match")
+                .map(|header| header == etag)
+                .unwrap_or(false);
         }
 
         if not_modified {
@@ -588,7 +622,8 @@ impl Response {
     /// > a 304 response. If you're unsure of what to do, prefer `with_etag`.
     #[inline]
     pub fn with_etag_keep<E>(self, etag: E) -> Response
-        where E: Into<Cow<'static, str>>
+    where
+        E: Into<Cow<'static, str>>,
     {
         self.with_unique_header("ETag", etag)
     }
@@ -611,8 +646,7 @@ impl Response {
     /// download the file "book.txt" whose content will be "hello world".
     pub fn with_content_disposition_attachment(mut self, filename: &str) -> Response {
         // The name must be percent-encoded.
-        let name = percent_encoding::percent_encode(filename.as_bytes(),
-                                                    super::DEFAULT_ENCODE_SET);
+        let name = percent_encoding::percent_encode(filename.as_bytes(), super::DEFAULT_ENCODE_SET);
 
         // If you find a more elegant way to do the thing below, don't hesitate to open a PR
 
@@ -642,9 +676,12 @@ impl Response {
     /// > that receive this response are allowed to cache it.
     #[inline]
     pub fn with_public_cache(self, max_age_seconds: u64) -> Response {
-        self.with_unique_header("Cache-Control", format!("public, max-age={}", max_age_seconds))
-            .without_header("Expires")
-            .without_header("Pragma")
+        self.with_unique_header(
+            "Cache-Control",
+            format!("public, max-age={}", max_age_seconds),
+        )
+        .without_header("Expires")
+        .without_header("Pragma")
     }
 
     /// Adds or replaces a `Cache-Control` header that specifies that the resource is private and
@@ -657,9 +694,12 @@ impl Response {
     /// > that receive this response are allowed to cache it.
     #[inline]
     pub fn with_private_cache(self, max_age_seconds: u64) -> Response {
-        self.with_unique_header("Cache-Control", format!("private, max-age={}", max_age_seconds))
-            .without_header("Expires")
-            .without_header("Pragma")
+        self.with_unique_header(
+            "Cache-Control",
+            format!("private, max-age={}", max_age_seconds),
+        )
+        .without_header("Expires")
+        .without_header("Pragma")
     }
 
     /// Adds or replaces a `Cache-Control` header that specifies that the client must not cache
@@ -720,7 +760,10 @@ impl ResponseBody {
     /// let body = ResponseBody::from_reader(io::stdin().take(128));
     /// ```
     #[inline]
-    pub fn from_reader<R>(data: R) -> ResponseBody where R: Read + Send + 'static {
+    pub fn from_reader<R>(data: R) -> ResponseBody
+    where
+        R: Read + Send + 'static,
+    {
         ResponseBody {
             data: Box::new(data),
             data_length: None,
@@ -743,7 +786,10 @@ impl ResponseBody {
     /// let body = ResponseBody::from_reader_and_size(io::stdin().take(128), 128);
     /// ```
     #[inline]
-    pub fn from_reader_and_size<R>(data: R, size: usize) -> ResponseBody where R: Read + Send + 'static {
+    pub fn from_reader_and_size<R>(data: R, size: usize) -> ResponseBody
+    where
+        R: Read + Send + 'static,
+    {
         ResponseBody {
             data: Box::new(data),
             data_length: Some(size),
@@ -759,7 +805,10 @@ impl ResponseBody {
     /// let body = ResponseBody::from_data(vec![12u8, 97, 34]);
     /// ```
     #[inline]
-    pub fn from_data<D>(data: D) -> ResponseBody where D: Into<Vec<u8>> {
+    pub fn from_data<D>(data: D) -> ResponseBody
+    where
+        D: Into<Vec<u8>>,
+    {
         let data = data.into();
         let len = data.len();
 
@@ -799,7 +848,10 @@ impl ResponseBody {
     /// let body = ResponseBody::from_string("hello world");
     /// ```
     #[inline]
-    pub fn from_string<S>(data: S) -> ResponseBody where S: Into<String> {
+    pub fn from_string<S>(data: S) -> ResponseBody
+    where
+        S: Into<String>,
+    {
         ResponseBody::from_data(data.into().into_bytes())
     }
 
@@ -821,7 +873,7 @@ mod tests {
     fn unique_header_adds() {
         let r = Response {
             headers: vec![],
-            .. Response::empty_400()
+            ..Response::empty_400()
         };
 
         let r = r.with_unique_header("Foo", "Bar");
@@ -834,7 +886,7 @@ mod tests {
     fn unique_header_adds_without_touching() {
         let r = Response {
             headers: vec![("Bar".into(), "Foo".into())],
-            .. Response::empty_400()
+            ..Response::empty_400()
         };
 
         let r = r.with_unique_header("Foo", "Bar");
@@ -852,7 +904,7 @@ mod tests {
                 ("fOO".into(), "B".into()),
                 ("Foo".into(), "C".into()),
             ],
-            .. Response::empty_400()
+            ..Response::empty_400()
         };
 
         let r = r.with_unique_header("Foo", "Bar");

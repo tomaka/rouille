@@ -56,27 +56,34 @@ extern crate base64;
 #[cfg(feature = "brotli2")]
 extern crate brotli2;
 extern crate chrono;
-extern crate filetime;
 #[cfg(feature = "gzip")]
 extern crate deflate;
+extern crate filetime;
 extern crate multipart;
 extern crate rand;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate num_cpus;
+pub extern crate percent_encoding;
 extern crate serde_json;
 extern crate sha1;
+extern crate threadpool;
 extern crate time;
 extern crate tiny_http;
 pub extern crate url;
-pub extern crate percent_encoding;
-extern crate threadpool;
-extern crate num_cpus;
 
 // https://github.com/servo/rust-url/blob/e121d8d0aafd50247de5f5310a227ecb1efe6ffe/percent_encoding/lib.rs#L126
 pub const DEFAULT_ENCODE_SET: &percent_encoding::AsciiSet = &percent_encoding::CONTROLS
-    .add(b' ').add(b'"').add(b'#').add(b'<').add(b'>')
-    .add(b'`').add(b'?').add(b'{').add(b'}');
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'<')
+    .add(b'>')
+    .add(b'`')
+    .add(b'?')
+    .add(b'{')
+    .add(b'}');
 
 pub use assets::extension_to_mime;
 pub use assets::match_assets;
@@ -84,24 +91,23 @@ pub use log::{log, log_custom};
 pub use response::{Response, ResponseBody};
 pub use tiny_http::ReadWrite;
 
-use std::time::Duration;
 use std::error::Error;
+use std::fmt;
 use std::io::Cursor;
-use std::io::Result as IoResult;
 use std::io::Read;
+use std::io::Result as IoResult;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
 use std::panic;
 use std::panic::AssertUnwindSafe;
 use std::slice::Iter as SliceIter;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::atomic::{Ordering, AtomicUsize};
-use std::sync::mpsc;
 use std::thread;
-use std::fmt;
-
+use std::time::Duration;
 
 pub mod cgi;
 pub mod content_encoding;
@@ -122,12 +128,12 @@ pub mod try_or_400;
 /// If the expression you pass to the macro is an error, then a 404 response is returned.
 #[macro_export]
 macro_rules! try_or_404 {
-    ($result:expr) => (
+    ($result:expr) => {
         match $result {
             Ok(r) => r,
             Err(_) => return $crate::Response::empty_404(),
         }
-    );
+    };
 }
 
 /// This macro assumes that the current function returns a `Response`. If the condition you pass
@@ -154,11 +160,11 @@ macro_rules! try_or_404 {
 /// ```
 #[macro_export]
 macro_rules! assert_or_400 {
-    ($cond:expr) => (
+    ($cond:expr) => {
         if !$cond {
             return $crate::Response::empty_400();
         }
-    );
+    };
 }
 
 /// Starts a server and uses the given requests handler.
@@ -215,23 +221,27 @@ macro_rules! assert_or_400 {
 ///
 /// If you need to handle these situations, please see `Server`.
 pub fn start_server<A, F>(addr: A, handler: F) -> !
-                          where A: ToSocketAddrs,
-                                F: Send + Sync + 'static + Fn(&Request) -> Response
+where
+    A: ToSocketAddrs,
+    F: Send + Sync + 'static + Fn(&Request) -> Response,
 {
-    Server::new(addr, handler).expect("Failed to start server").run();
+    Server::new(addr, handler)
+        .expect("Failed to start server")
+        .run();
     panic!("The server socket closed unexpectedly")
 }
-
 
 /// Identical to `start_server` but uses a `ThreadPool` of the given size.
 ///
 /// When `pool_size` is `None`, the thread pool size will default to `8 * num-cpus`.
 /// `pool_size` must be greater than zero or this function will panic.
 pub fn start_server_with_pool<A, F>(addr: A, pool_size: Option<usize>, handler: F) -> !
-                          where A: ToSocketAddrs,
-                                F: Send + Sync + 'static + Fn(&Request) -> Response
+where
+    A: ToSocketAddrs,
+    F: Send + Sync + 'static + Fn(&Request) -> Response,
 {
-    Server::new(addr, handler).expect("Failed to start server")
+    Server::new(addr, handler)
+        .expect("Failed to start server")
         .pool_size(pool_size.unwrap_or_else(|| 8 * num_cpus::get()))
         .run();
     panic!("The server socket closed unexpectedly")
@@ -254,12 +264,8 @@ impl Drop for AtomicCounter {
 
 /// Executes a function in either a thread of a thread pool
 enum Executor {
-    Threaded {
-        count: Arc<AtomicUsize>,
-    },
-    Pooled {
-        pool: threadpool::ThreadPool,
-    }
+    Threaded { count: Arc<AtomicUsize> },
+    Pooled { pool: threadpool::ThreadPool },
 }
 impl Executor {
     /// `size` must be greater than zero or the call to `ThreadPool::new` will panic.
@@ -278,7 +284,9 @@ impl Executor {
                     f()
                 });
             }
-            Executor::Pooled { ref pool } => { pool.execute(f); }
+            Executor::Pooled { ref pool } => {
+                pool.execute(f);
+            }
         }
     }
 
@@ -289,17 +297,20 @@ impl Executor {
                     thread::sleep(Duration::from_millis(100));
                 }
             }
-            Executor::Pooled { ref pool } => { pool.join(); }
+            Executor::Pooled { ref pool } => {
+                pool.join();
+            }
         }
     }
 }
 
 impl Default for Executor {
     fn default() -> Self {
-        Executor::Threaded { count: Arc::new(AtomicUsize::new(0)) }
+        Executor::Threaded {
+            count: Arc::new(AtomicUsize::new(0)),
+        }
     }
 }
-
 
 /// A listening server.
 ///
@@ -327,8 +338,10 @@ pub struct Server<F> {
     executor: Executor,
 }
 
-
-impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
+impl<F> Server<F>
+where
+    F: Send + Sync + 'static + Fn(&Request) -> Response,
+{
     /// Builds a new `Server` object.
     ///
     /// After this function returns, the HTTP server is listening.
@@ -336,13 +349,14 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     /// Returns an error if there was an error while creating the listening socket, for example if
     /// the port is already in use.
     pub fn new<A>(addr: A, handler: F) -> Result<Server<F>, Box<dyn Error + Send + Sync + 'static>>
-        where A: ToSocketAddrs
+    where
+        A: ToSocketAddrs,
     {
         let server = tiny_http::Server::http(addr)?;
         Ok(Server {
             server,
             executor: Executor::default(),
-            handler: Arc::new(AssertUnwindSafe(handler)),   // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
+            handler: Arc::new(AssertUnwindSafe(handler)), // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
         })
     }
 
@@ -358,7 +372,10 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         handler: F,
         certificate: Vec<u8>,
         private_key: Vec<u8>,
-    ) -> Result<Server<F>, Box<dyn Error + Send + Sync + 'static>> where A: ToSocketAddrs {
+    ) -> Result<Server<F>, Box<dyn Error + Send + Sync + 'static>>
+    where
+        A: ToSocketAddrs,
+    {
         let ssl_config = tiny_http::SslConfig {
             certificate,
             private_key,
@@ -367,7 +384,7 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
         Ok(Server {
             server,
             executor: Executor::default(),
-            handler: Arc::new(AssertUnwindSafe(handler)),   // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
+            handler: Arc::new(AssertUnwindSafe(handler)), // TODO: using AssertUnwindSafe here is wrong, but unwind safety has some usability problems in Rust in general
         })
     }
 
@@ -478,18 +495,18 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
 
     /// Waits for all in-flight requests to be processed. This is useful for implementing a graceful
     /// shutdown.
-    /// 
+    ///
     /// Note: new connections may still be accepted while we wait, and this function does not guarantee
     /// to wait for those new requests. To implement a graceful shutdown or a clean rolling-update,
     /// the following approach should be used:
-    /// 
+    ///
     /// 1) Stop routing requests to this server. For a rolling update, requests should be routed
     ///    to the new instance. This logic typically sits outside of your application.
-    /// 
+    ///
     /// 2) Drain the queue of incoming connections by calling `poll_timeout` with a short timeout.
-    /// 
+    ///
     /// 3) Wait for in-flight requests to be processed by using this method.
-    /// 
+    ///
     /// # Example
     /// ```no_run
     /// # use std::time::Duration;
@@ -497,17 +514,17 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
     /// #
     /// # let server = Server::new("", |_| unimplemented!()).unwrap();
     /// # fn is_stopping() -> bool { unimplemented!() }
-    /// 
+    ///
     /// // Accept connections until we receive a SIGTERM
     /// while !is_stopping() {
     ///     server.poll_timeout(Duration::from_millis(100));
     /// }
-    /// 
+    ///
     /// // We received a SIGTERM, but there still may be some queued connections,
     /// // so wait for them to be accepted.
     /// println!("Shutting down gracefully...");
     /// server.poll_timeout(Duration::from_millis(100));
-    /// 
+    ///
     /// // We can expect there to be no more queued connections now, but slow requests
     /// // may still be in-flight, so wait for them to finish.
     /// server.join();
@@ -527,7 +544,13 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
             impl Read for RequestRead {
                 #[inline]
                 fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
-                    self.0.lock().unwrap().as_mut().unwrap().as_reader().read(buf)
+                    self.0
+                        .lock()
+                        .unwrap()
+                        .as_mut()
+                        .unwrap()
+                        .as_reader()
+                        .read(buf)
                 }
             }
 
@@ -536,11 +559,17 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
             let rouille_request = {
                 let url = request.url().to_owned();
                 let method = request.method().as_str().to_owned();
-                let headers = request.headers().iter().map(|h| (h.field.to_string(), h.value.clone().into())).collect();
+                let headers = request
+                    .headers()
+                    .iter()
+                    .map(|h| (h.field.to_string(), h.value.clone().into()))
+                    .collect();
                 let remote_addr = *request.remote_addr();
 
                 tiny_http_request = Arc::new(Mutex::new(Some(request)));
-                let data = Arc::new(Mutex::new(Some(Box::new(RequestRead(tiny_http_request.clone())) as Box<_>)));
+                let data = Arc::new(Mutex::new(Some(
+                    Box::new(RequestRead(tiny_http_request.clone())) as Box<_>,
+                )));
 
                 Request {
                     url,
@@ -565,18 +594,18 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
 
                 match res {
                     Ok(r) => r,
-                    Err(_) => {
-                        Response::html("<h1>Internal Server Error</h1>\
-                                        <p>An internal error has occurred on the server.</p>")
-                            .with_status_code(500)
-                    }
+                    Err(_) => Response::html(
+                        "<h1>Internal Server Error</h1>\
+                                        <p>An internal error has occurred on the server.</p>",
+                    )
+                    .with_status_code(500),
                 }
             };
 
             // writing the response
             let (res_data, res_len) = rouille_response.data.into_reader_and_size();
             let mut response = tiny_http::Response::empty(rouille_response.status_code)
-                                            .with_data(res_data, res_len);
+                .with_data(res_data, res_len);
 
             let mut upgrade_header = "".into();
 
@@ -590,7 +619,8 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
                     continue;
                 }
 
-                if let Ok(header) = tiny_http::Header::from_bytes(key.as_bytes(), value.as_bytes()) {
+                if let Ok(header) = tiny_http::Header::from_bytes(key.as_bytes(), value.as_bytes())
+                {
                     response.add_header(header);
                 } else {
                     // TODO: ?
@@ -601,11 +631,15 @@ impl<F> Server<F> where F: Send + Sync + 'static + Fn(&Request) -> Response {
                 let trq = tiny_http_request.lock().unwrap().take().unwrap();
                 let socket = trq.upgrade(&upgrade_header, response);
                 upgrade.build(socket);
-
             } else {
                 // We don't really care if we fail to send the response to the client, as there's
                 // nothing we can do anyway.
-                let _ = tiny_http_request.lock().unwrap().take().unwrap().respond(response);
+                let _ = tiny_http_request
+                    .lock()
+                    .unwrap()
+                    .take()
+                    .unwrap()
+                    .respond(response);
             }
         });
     }
@@ -649,8 +683,15 @@ impl Request {
     ///
     /// The remote address of the client will be `127.0.0.1:12345`. Use `fake_http_from` to
     /// specify what the client's address should be.
-    pub fn fake_http<U, M>(method: M, url: U, headers: Vec<(String, String)>, data: Vec<u8>)
-                           -> Request where U: Into<String>, M: Into<String>
+    pub fn fake_http<U, M>(
+        method: M,
+        url: U,
+        headers: Vec<(String, String)>,
+        data: Vec<u8>,
+    ) -> Request
+    where
+        U: Into<String>,
+        M: Into<String>,
     {
         let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
         let remote_addr = "127.0.0.1:12345".parse().unwrap();
@@ -666,9 +707,16 @@ impl Request {
     }
 
     /// Builds a fake HTTP request to be used during tests.
-    pub fn fake_http_from<U, M>(from: SocketAddr, method: M, url: U,
-                                headers: Vec<(String, String)>, data: Vec<u8>)
-                                -> Request where U: Into<String>, M: Into<String>
+    pub fn fake_http_from<U, M>(
+        from: SocketAddr,
+        method: M,
+        url: U,
+        headers: Vec<(String, String)>,
+        data: Vec<u8>,
+    ) -> Request
+    where
+        U: Into<String>,
+        M: Into<String>,
     {
         let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
 
@@ -686,8 +734,15 @@ impl Request {
     ///
     /// The remote address of the client will be `127.0.0.1:12345`. Use `fake_https_from` to
     /// specify what the client's address should be.
-    pub fn fake_https<U, M>(method: M, url: U, headers: Vec<(String, String)>, data: Vec<u8>)
-                            -> Request where U: Into<String>, M: Into<String>
+    pub fn fake_https<U, M>(
+        method: M,
+        url: U,
+        headers: Vec<(String, String)>,
+        data: Vec<u8>,
+    ) -> Request
+    where
+        U: Into<String>,
+        M: Into<String>,
     {
         let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
         let remote_addr = "127.0.0.1:12345".parse().unwrap();
@@ -703,9 +758,16 @@ impl Request {
     }
 
     /// Builds a fake HTTPS request to be used during tests.
-    pub fn fake_https_from<U, M>(from: SocketAddr, method: M, url: U,
-                                 headers: Vec<(String, String)>, data: Vec<u8>)
-                                 -> Request where U: Into<String>, M: Into<String>
+    pub fn fake_https_from<U, M>(
+        from: SocketAddr,
+        method: M,
+        url: U,
+        headers: Vec<(String, String)>,
+        data: Vec<u8>,
+    ) -> Request
+    where
+        U: Into<String>,
+        M: Into<String>,
     {
         let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
 
@@ -745,8 +807,8 @@ impl Request {
         assert!(self.url.starts_with(prefix));
         Some(Request {
             method: self.method.clone(),
-            url: self.url[prefix.len() ..].to_owned(),
-            headers: self.headers.clone(),      // TODO: expensive
+            url: self.url[prefix.len()..].to_owned(),
+            headers: self.headers.clone(), // TODO: expensive
             https: self.https,
             data: self.data.clone(),
             remote_addr: self.remote_addr,
@@ -838,7 +900,9 @@ impl Request {
             url
         };
 
-        percent_encoding::percent_decode(url).decode_utf8_lossy().into_owned()
+        percent_encoding::percent_decode(url)
+            .decode_utf8_lossy()
+            .into_owned()
     }
 
     /// Returns the value of a GET parameter.
@@ -855,10 +919,14 @@ impl Request {
 
         let value = match get_params.bytes().skip(param).position(|c| c == b'&') {
             None => &get_params[param..],
-            Some(e) => &get_params[param .. e + param],
+            Some(e) => &get_params[param..e + param],
         };
 
-        Some(percent_encoding::percent_decode(value.replace("+", " ").as_bytes()).decode_utf8_lossy().into_owned())
+        Some(
+            percent_encoding::percent_decode(value.replace("+", " ").as_bytes())
+                .decode_utf8_lossy()
+                .into_owned(),
+        )
     }
 
     /// Returns the value of a header of the request.
@@ -866,13 +934,18 @@ impl Request {
     /// Returns `None` if no such header could be found.
     #[inline]
     pub fn header(&self, key: &str) -> Option<&str> {
-        self.headers.iter().find(|&&(ref k, _)| k.eq_ignore_ascii_case(key)).map(|&(_, ref v)| &v[..])
+        self.headers
+            .iter()
+            .find(|&&(ref k, _)| k.eq_ignore_ascii_case(key))
+            .map(|&(_, ref v)| &v[..])
     }
 
     /// Returns a list of all the headers of the request.
     #[inline]
     pub fn headers(&self) -> HeadersIter {
-        HeadersIter { iter: self.headers.iter() }
+        HeadersIter {
+            iter: self.headers.iter(),
+        }
     }
 
     /// Returns the state of the `DNT` (Do Not Track) header.
@@ -899,7 +972,7 @@ impl Request {
         match self.header("DNT") {
             Some(h) if h == "1" => Some(true),
             Some(h) if h == "0" => Some(false),
-            _ => None
+            _ => None,
         }
     }
 
@@ -932,7 +1005,10 @@ impl Request {
     /// ```
     pub fn data(&self) -> Option<RequestBody> {
         let reader = self.data.lock().unwrap().take();
-        reader.map(|r| RequestBody { body: r, marker: PhantomData })
+        reader.map(|r| RequestBody {
+            body: r,
+            marker: PhantomData,
+        })
     }
 
     /// Returns the address of the client that made this request.
@@ -955,7 +1031,7 @@ impl Request {
 /// Iterator to the list of headers in a request.
 #[derive(Debug, Clone)]
 pub struct HeadersIter<'a> {
-    iter: SliceIter<'a, (String, String)>
+    iter: SliceIter<'a, (String, String)>,
 }
 
 impl<'a> Iterator for HeadersIter<'a> {
@@ -972,8 +1048,7 @@ impl<'a> Iterator for HeadersIter<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for HeadersIter<'a> {
-}
+impl<'a> ExactSizeIterator for HeadersIter<'a> {}
 
 /// Gives access to the body of a request.
 ///
@@ -996,7 +1071,12 @@ mod tests {
 
     #[test]
     fn header() {
-        let request = Request::fake_http("GET", "/", vec![("Host".to_owned(), "localhost".to_owned())], vec![]);
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("Host".to_owned(), "localhost".to_owned())],
+            vec![],
+        );
         assert_eq!(request.header("Host"), Some("localhost"));
         assert_eq!(request.header("host"), Some("localhost"));
     }
@@ -1052,16 +1132,23 @@ mod tests {
 
     #[test]
     fn dnt() {
-        let request = Request::fake_http("GET", "/", vec![("DNT".to_owned(), "1".to_owned())], vec![]);
+        let request =
+            Request::fake_http("GET", "/", vec![("DNT".to_owned(), "1".to_owned())], vec![]);
         assert_eq!(request.do_not_track(), Some(true));
 
-        let request = Request::fake_http("GET", "/", vec![("DNT".to_owned(), "0".to_owned())], vec![]);
+        let request =
+            Request::fake_http("GET", "/", vec![("DNT".to_owned(), "0".to_owned())], vec![]);
         assert_eq!(request.do_not_track(), Some(false));
 
         let request = Request::fake_http("GET", "/", vec![], vec![]);
         assert_eq!(request.do_not_track(), None);
 
-        let request = Request::fake_http("GET", "/", vec![("DNT".to_owned(), "malformed".to_owned())], vec![]);
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("DNT".to_owned(), "malformed".to_owned())],
+            vec![],
+        );
         assert_eq!(request.do_not_track(), None);
     }
 }

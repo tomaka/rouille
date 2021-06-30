@@ -43,7 +43,11 @@ pub fn apply(request: &Request, response: Response) -> Response {
 
     // If any of the response's headers is equal to `Content-Encoding`, ignore the function
     // call and return immediately.
-    if response.headers.iter().any(|&(ref key, _)| key.eq_ignore_ascii_case("Content-Encoding")) {
+    if response
+        .headers
+        .iter()
+        .any(|&(ref key, _)| key.eq_ignore_ascii_case("Content-Encoding"))
+    {
         return response;
     }
 
@@ -84,8 +88,11 @@ fn response_is_text(response: &Response) -> bool {
         }
 
         // TODO: perform case-insensitive comparison
-        value.starts_with("text/") || value.contains("javascript") || value.contains("json") ||
-            value.contains("xml") || value.contains("font")
+        value.starts_with("text/")
+            || value.contains("javascript")
+            || value.contains("json")
+            || value.contains("xml")
+            || value.contains("font")
     })
 }
 
@@ -113,7 +120,7 @@ pub fn accepted_content_encodings(request: &Request) -> AcceptedContentEncodings
 
 /// Iterator to the list of content encodings accepted by a request.
 pub struct AcceptedContentEncodingsIter<'a> {
-    elements: str::Split<'a, char>
+    elements: str::Split<'a, char>,
 }
 
 impl<'a> Iterator for AcceptedContentEncodingsIter<'a> {
@@ -143,17 +150,19 @@ impl<'a> Iterator for AcceptedContentEncodingsIter<'a> {
 
 #[cfg(feature = "gzip")]
 fn gzip(e: &str, response: &mut Option<Response>) -> bool {
-    use ResponseBody;
-    use std::mem;
-    use std::io;
     use deflate::deflate_bytes_gzip;
+    use std::io;
+    use std::mem;
+    use ResponseBody;
 
     if !e.eq_ignore_ascii_case("gzip") {
         return false;
     }
 
     let response = response.as_mut().unwrap();
-    response.headers.push(("Content-Encoding".into(), "gzip".into()));
+    response
+        .headers
+        .push(("Content-Encoding".into(), "gzip".into()));
     let previous_body = mem::replace(&mut response.data, ResponseBody::empty());
     let (mut raw_data, size) = previous_body.into_reader_and_size();
     let mut src = match size {
@@ -174,16 +183,18 @@ fn gzip(e: &str, response: &mut Option<Response>) -> bool {
 
 #[cfg(feature = "brotli")]
 fn brotli(e: &str, response: &mut Option<Response>) -> bool {
-    use ResponseBody;
-    use std::mem;
     use brotli2::read::BrotliEncoder;
+    use std::mem;
+    use ResponseBody;
 
     if !e.eq_ignore_ascii_case("br") {
         return false;
     }
 
     let response = response.as_mut().unwrap();
-    response.headers.push(("Content-Encoding".into(), "br".into()));
+    response
+        .headers
+        .push(("Content-Encoding".into(), "br".into()));
     let previous_body = mem::replace(&mut response.data, ResponseBody::empty());
     let (raw_data, _) = previous_body.into_reader_and_size();
     response.data = ResponseBody::from_reader(BrotliEncoder::new(raw_data, 6));
@@ -198,13 +209,16 @@ fn brotli(e: &str, response: &mut Option<Response>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use Request;
     use content_encoding;
+    use Request;
 
     #[test]
     fn no_req_encodings() {
         let request = Request::fake_http("GET", "/", vec![], vec![]);
-        assert_eq!(content_encoding::accepted_content_encodings(&request).count(), 0);
+        assert_eq!(
+            content_encoding::accepted_content_encodings(&request).count(),
+            0
+        );
     }
 
     #[test]
@@ -214,7 +228,10 @@ mod tests {
             Request::fake_http("GET", "/", h, vec![])
         };
 
-        assert_eq!(content_encoding::accepted_content_encodings(&request).count(), 0);
+        assert_eq!(
+            content_encoding::accepted_content_encodings(&request).count(),
+            0
+        );
     }
 
     #[test]

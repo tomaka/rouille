@@ -21,8 +21,8 @@ use RequestBody;
 use multipart::server::Multipart as InnerMultipart;
 
 // TODO: provide wrappers around these
-pub use multipart::server::MultipartField;
 pub use multipart::server::MultipartData;
+pub use multipart::server::MultipartField;
 
 /// Error that can happen when decoding multipart data.
 #[derive(Clone, Debug)]
@@ -44,10 +44,10 @@ impl fmt::Display for MultipartError {
             MultipartError::WrongContentType => {
                 "the `Content-Type` header of the request indicates that it doesn't contain \
                  multipart data or is invalid"
-            },
+            }
             MultipartError::BodyAlreadyExtracted => {
                 "can't parse the body of the request because it was already extracted"
-            },
+            }
         };
 
         write!(fmt, "{}", description)
@@ -58,7 +58,7 @@ impl fmt::Display for MultipartError {
 pub fn get_multipart_input(request: &Request) -> Result<Multipart, MultipartError> {
     let boundary = match multipart_boundary(request) {
         Some(b) => b,
-        None => return Err(MultipartError::WrongContentType)
+        None => return Err(MultipartError::WrongContentType),
     };
 
     let request_body = if let Some(body) = request.data() {
@@ -68,13 +68,13 @@ pub fn get_multipart_input(request: &Request) -> Result<Multipart, MultipartErro
     };
 
     Ok(Multipart {
-        inner: InnerMultipart::with_body(request_body, boundary)
+        inner: InnerMultipart::with_body(request_body, boundary),
     })
 }
 
 /// Allows you to inspect the content of the multipart input of a request.
 pub struct Multipart<'a> {
-    inner: InnerMultipart<RequestBody<'a>>
+    inner: InnerMultipart<RequestBody<'a>>,
 }
 
 impl<'a> Multipart<'a> {
@@ -89,14 +89,16 @@ fn multipart_boundary(request: &Request) -> Option<String> {
 
     let content_type = match request.header("Content-Type") {
         None => return None,
-        Some(c) => c
+        Some(c) => c,
     };
 
     let start = match content_type.find(BOUNDARY) {
         Some(pos) => pos + BOUNDARY.len(),
-        None => return None
+        None => return None,
     };
 
-    let end = content_type[start..].find(';').map_or(content_type.len(), |end| start + end);
-    Some(content_type[start .. end].to_owned())
+    let end = content_type[start..]
+        .find(';')
+        .map_or(content_type.len(), |end| start + end);
+    Some(content_type[start..end].to_owned())
 }

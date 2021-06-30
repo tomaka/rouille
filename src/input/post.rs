@@ -44,7 +44,7 @@
 //!   to parse the number from the data passed by the client. An error is produced if the client
 //!   sent a value that failed to parse or that overflows the capacity of the number.
 //! - `Option<T>`: This is equivalent to `T`, but if the field is missing or fails to parse then
-//!   the `Option` will contain `None` and no error will be produced. 
+//!   the `Option` will contain `None` and no error will be produced.
 //! - `bool`: Will be `true` if the field is present at least once and `false` if it is absent.
 //!   This is suitable to know whether a `<input type="checkbox" />` is checked or not.
 //! - `Vec<T>`: Same as `T`, except that if the client sends multiple fields with that name then
@@ -134,7 +134,7 @@ pub enum PostError {
     Field {
         field: Cow<'static, str>,
         error: PostFieldError,
-    }
+    },
 }
 
 impl From<IoError> for PostError {
@@ -150,7 +150,7 @@ impl error::Error for PostError {
         match *self {
             PostError::IoError(ref e) => Some(e),
             PostError::Field { ref error, .. } => Some(error),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -159,21 +159,15 @@ impl fmt::Display for PostError {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let description = match *self {
-            PostError::BodyAlreadyExtracted => {
-                "the body of the request was already extracted"
-            },
-            PostError::WrongContentType => {
-                "the request didn't have a post content type"
-            },
+            PostError::BodyAlreadyExtracted => "the body of the request was already extracted",
+            PostError::WrongContentType => "the request didn't have a post content type",
             PostError::IoError(_) => {
                 "could not read the body from the request, or could not execute the CGI program"
-            },
+            }
             PostError::NotUtf8(_) => {
                 "the content-type encoding is not ASCII or UTF-8, or the body is not valid UTF-8"
-            },
-            PostError::Field { .. } => {
-                "failed to parse a requested field"
-            },
+            }
+            PostError::Field { .. } => "failed to parse a requested field",
         };
 
         write!(fmt, "{}", description)
@@ -230,7 +224,7 @@ impl error::Error for PostFieldError {
             PostFieldError::IoError(ref e) => Some(e),
             PostFieldError::WrongDataTypeInt(ref e) => Some(e),
             PostFieldError::WrongDataTypeFloat(ref e) => Some(e),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -241,22 +235,14 @@ impl fmt::Display for PostFieldError {
         let description = match *self {
             PostFieldError::IoError(_) => {
                 "could not read the body from the request, or could not execute the CGI program"
-            },
-            PostFieldError::MissingField => {
-                "the field is missing from the request's client"
-            },
-            PostFieldError::WrongFieldType => {
-                "expected a file but got a field, or vice versa"
-            },
+            }
+            PostFieldError::MissingField => "the field is missing from the request's client",
+            PostFieldError::WrongFieldType => "expected a file but got a field, or vice versa",
             PostFieldError::UnexpectedMultipleValues => {
                 "got multiple values for the same field while only one was expected"
-            },
-            PostFieldError::WrongDataTypeInt(_) => {
-                "failed to parse an integer field"
-            },
-            PostFieldError::WrongDataTypeFloat(_) => {
-                "failed to parse a floating-point field"
-            },
+            }
+            PostFieldError::WrongDataTypeInt(_) => "failed to parse an integer field",
+            PostFieldError::WrongDataTypeFloat(_) => "failed to parse a floating-point field",
         };
 
         write!(fmt, "{}", description)
@@ -275,7 +261,8 @@ pub trait DecodePostField<Config>: fmt::Debug {
     /// into `Self` or return an error if it couldn't. If `Self` can't handle a field, then a
     /// `PostFieldError::WrongFieldType` error should be returned.
     fn from_field(config: Config, content: &str) -> Result<Self, PostFieldError>
-        where Self: Sized;
+    where
+        Self: Sized;
 
     /// Called when a file with the given name is found in the POST input.
     ///
@@ -292,16 +279,24 @@ pub trait DecodePostField<Config>: fmt::Debug {
     ///
     /// If `Self` can't handle a file, then a `PostFieldError::WrongFieldType` error should
     /// be returned.
-    fn from_file<R>(config: Config, file: R, filename: Option<&str>, mime: &str)
-                    -> Result<Self, PostFieldError>
-        where Self: Sized,
-              R: BufRead;
+    fn from_file<R>(
+        config: Config,
+        file: R,
+        filename: Option<&str>,
+        mime: &str,
+    ) -> Result<Self, PostFieldError>
+    where
+        Self: Sized,
+        R: BufRead;
 
     /// When multiple fields with the same name are found in the client's input, rouille will build
     /// an object for each of them and then merge them with this method.
     ///
     /// The default implementation returns `UnexpectedMultipleValues`.
-    fn merge_multiple(self, _existing: Self) -> Result<Self, PostFieldError> where Self: Sized {
+    fn merge_multiple(self, _existing: Self) -> Result<Self, PostFieldError>
+    where
+        Self: Sized,
+    {
         Err(PostFieldError::UnexpectedMultipleValues)
     }
 
@@ -309,7 +304,10 @@ pub trait DecodePostField<Config>: fmt::Debug {
     ///
     /// The default implementation returns `MissingField`.
     #[inline]
-    fn not_found(_: Config) -> Result<Self, PostFieldError> where Self: Sized {
+    fn not_found(_: Config) -> Result<Self, PostFieldError>
+    where
+        Self: Sized,
+    {
         Err(PostFieldError::MissingField)
     }
 }
@@ -320,18 +318,18 @@ macro_rules! impl_decode_post_field_decode {
             fn from_field(_: (), content: &str) -> Result<Self, PostFieldError> {
                 Ok(match content.parse() {
                     Ok(v) => v,
-                    Err(err) => return Err(err.into())
+                    Err(err) => return Err(err.into()),
                 })
             }
 
-            fn from_file<R>(_: (), _: R, _: Option<&str>, _: &str)
-                            -> Result<Self, PostFieldError>
-                where R: BufRead
+            fn from_file<R>(_: (), _: R, _: Option<&str>, _: &str) -> Result<Self, PostFieldError>
+            where
+                R: BufRead,
             {
                 Err(PostFieldError::WrongFieldType)
             }
         }
-    }
+    };
 }
 
 impl_decode_post_field_decode!(u8);
@@ -352,29 +350,37 @@ impl DecodePostField<()> for String {
         Ok(content.to_owned())
     }
 
-    fn from_file<R>(_: (), _: R, _: Option<&str>, _: &str)
-                    -> Result<Self, PostFieldError>
-        where R: BufRead
+    fn from_file<R>(_: (), _: R, _: Option<&str>, _: &str) -> Result<Self, PostFieldError>
+    where
+        R: BufRead,
     {
         Err(PostFieldError::WrongFieldType)
     }
 }
 
-impl<T, C> DecodePostField<C> for Option<T> where T: DecodePostField<C> {
+impl<T, C> DecodePostField<C> for Option<T>
+where
+    T: DecodePostField<C>,
+{
     fn from_field(config: C, content: &str) -> Result<Self, PostFieldError> {
         match DecodePostField::from_field(config, content) {
             Ok(val) => Ok(Some(val)),
-            Err(_) => Ok(None)
+            Err(_) => Ok(None),
         }
     }
 
-    fn from_file<R>(config: C, file: R, filename: Option<&str>, mime: &str)
-                    -> Result<Self, PostFieldError>
-        where R: BufRead
+    fn from_file<R>(
+        config: C,
+        file: R,
+        filename: Option<&str>,
+        mime: &str,
+    ) -> Result<Self, PostFieldError>
+    where
+        R: BufRead,
     {
         match DecodePostField::from_file(config, file, filename, mime) {
             Ok(val) => Ok(Some(val)),
-            Err(_) => Ok(None)
+            Err(_) => Ok(None),
         }
     }
 
@@ -392,7 +398,8 @@ impl DecodePostField<()> for bool {
 
     #[inline]
     fn from_file<R>(_: (), _: R, _: Option<&str>, _: &str) -> Result<Self, PostFieldError>
-        where R: BufRead
+    where
+        R: BufRead,
     {
         Ok(true)
     }
@@ -408,16 +415,26 @@ impl DecodePostField<()> for bool {
     }
 }
 
-impl<T, C> DecodePostField<C> for Vec<T> where T: DecodePostField<C> {
+impl<T, C> DecodePostField<C> for Vec<T>
+where
+    T: DecodePostField<C>,
+{
     fn from_field(config: C, content: &str) -> Result<Self, PostFieldError> {
         Ok(vec![DecodePostField::from_field(config, content)?])
     }
 
-    fn from_file<R>(config: C, file: R, filename: Option<&str>, mime: &str)
-                    -> Result<Self, PostFieldError>
-        where R: BufRead
+    fn from_file<R>(
+        config: C,
+        file: R,
+        filename: Option<&str>,
+        mime: &str,
+    ) -> Result<Self, PostFieldError>
+    where
+        R: BufRead,
     {
-        Ok(vec![DecodePostField::from_file(config, file, filename, mime)?])
+        Ok(vec![DecodePostField::from_file(
+            config, file, filename, mime,
+        )?])
     }
 
     fn merge_multiple(mut self, mut existing: Vec<T>) -> Result<Vec<T>, PostFieldError> {
@@ -457,9 +474,14 @@ impl DecodePostField<()> for BufferedFile {
         Err(PostFieldError::WrongFieldType)
     }
 
-    fn from_file<R>(_: (), mut file: R, filename: Option<&str>, mime: &str)
-                    -> Result<Self, PostFieldError>
-        where R: BufRead
+    fn from_file<R>(
+        _: (),
+        mut file: R,
+        filename: Option<&str>,
+        mime: &str,
+    ) -> Result<Self, PostFieldError>
+    where
+        R: BufRead,
     {
         let mut out = Vec::new();
         file.read_to_end(&mut out)?;
@@ -504,7 +526,7 @@ macro_rules! post_input {
                 },
                 a @ &mut None => *a = Some(new),
             };
-            
+
             Ok(())
         }
 
@@ -533,7 +555,7 @@ macro_rules! post_input {
                             let config = ();
                             $(
                                 let config = $config;
-                            )* 
+                            )*
 
                             let decoded = match DecodePostField::from_field(config, &value) {
                                 Ok(d) => d,
@@ -572,7 +594,7 @@ macro_rules! post_input {
                             let config = ();
                             $(
                                 let config = $config;
-                            )* 
+                            )*
 
                             if multipart_entry.is_text() {
                                 let mut text = String::new();
@@ -626,7 +648,7 @@ macro_rules! post_input {
                             let config = ();
                             $(
                                 let config = $config;
-                            )* 
+                            )*
 
                             match DecodePostField::not_found(config) {
                                 Ok(d) => d,
@@ -652,13 +674,17 @@ macro_rules! post_input {
 /// Returns an error if the request's content-type is not related to POST data.
 // TODO: what to do with this function?
 pub fn raw_urlencoded_post_input(request: &Request) -> Result<Vec<(String, String)>, PostError> {
-    if request.header("Content-Type").map(|ct| !ct.starts_with("application/x-www-form-urlencoded")).unwrap_or(true) {
+    if request
+        .header("Content-Type")
+        .map(|ct| !ct.starts_with("application/x-www-form-urlencoded"))
+        .unwrap_or(true)
+    {
         return Err(PostError::WrongContentType);
     }
 
     let body = {
         // TODO: DDoSable server if body is too large?
-        let mut out = Vec::new();       // TODO: with_capacity()?
+        let mut out = Vec::new(); // TODO: with_capacity()?
         if let Some(mut b) = request.data() {
             b.read_to_end(&mut out)?;
         } else {
@@ -667,352 +693,511 @@ pub fn raw_urlencoded_post_input(request: &Request) -> Result<Vec<(String, Strin
         out
     };
 
-    Ok(form_urlencoded::parse(&body).into_owned().collect())        // TODO: suboptimal
+    Ok(form_urlencoded::parse(&body).into_owned().collect()) // TODO: suboptimal
 }
 
 #[cfg(test)]
 mod tests {
-    use Request;
     use input::post::PostError;
     use input::post::PostFieldError;
+    use Request;
 
     #[test]
     fn basic_int() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=12".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=12".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: u32
-        }).unwrap();
+        let input = post_input!(&request, { field: u32 }).unwrap();
 
         assert_eq!(input.field, 12);
     }
 
     #[test]
     fn basic_float() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=12.8".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=12.8".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: f32
-        }).unwrap();
+        let input = post_input!(&request, { field: f32 }).unwrap();
 
         assert_eq!(input.field, 12.8);
     }
 
     #[test]
     fn basic_string() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=value".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=value".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: String
-        }).unwrap();
+        let input = post_input!(&request, { field: String }).unwrap();
 
         assert_eq!(input.field, "value");
     }
 
     #[test]
     fn basic_option_string() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=value".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=value".to_vec(),
+        );
 
         let input = post_input!(&request, {
             field: Option<String>
-        }).unwrap();
+        })
+        .unwrap();
 
         assert_eq!(input.field.unwrap(), "value");
     }
 
     #[test]
     fn basic_bool() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=value".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=value".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: bool
-        }).unwrap();
+        let input = post_input!(&request, { field: bool }).unwrap();
 
         assert_eq!(input.field, true);
     }
 
     #[test]
     fn weird_stuff() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"&=&aa&b=&c=c=c&field=value&".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"&=&aa&b=&c=c=c&field=value&".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: String
-        }).unwrap();
+        let input = post_input!(&request, { field: String }).unwrap();
 
         assert_eq!(input.field, "value");
     }
 
     #[test]
     fn wrong_content_type() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "wrong".to_owned())
-        ], b"field=value".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                ("Content-Type".to_owned(), "wrong".to_owned()),
+            ],
+            b"field=value".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: String
-        });
+        let input = post_input!(&request, { field: String });
 
         match input {
             Err(PostError::WrongContentType) => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
 
     #[test]
     fn too_many_fields() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=12&field2=58".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=12&field2=58".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: u32
-        }).unwrap();
+        let input = post_input!(&request, { field: u32 }).unwrap();
 
         assert_eq!(input.field, 12);
     }
 
     #[test]
     fn multiple_values() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=12&field=58".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=12&field=58".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: u32
-        });
+        let input = post_input!(&request, { field: u32 });
 
         match input {
-            Err(PostError::Field { ref field, error: PostFieldError::UnexpectedMultipleValues })
-                if field == "field" => (),
-            _ => panic!()
+            Err(PostError::Field {
+                ref field,
+                error: PostFieldError::UnexpectedMultipleValues,
+            }) if field == "field" => (),
+            _ => panic!(),
         }
     }
 
     #[test]
     fn multiple_values_bool() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=12&field=58".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=12&field=58".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: bool
-        }).unwrap();
+        let input = post_input!(&request, { field: bool }).unwrap();
 
         assert_eq!(input.field, true);
     }
 
     #[test]
     fn multiple_values_vec() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=12&field=58".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=12&field=58".to_vec(),
+        );
 
         let input = post_input!(&request, {
             field: Vec<u32>
-        }).unwrap();
+        })
+        .unwrap();
 
         assert_eq!(input.field, &[12, 58]);
     }
 
     #[test]
     fn multiple_values_vec_parse_failure() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=12&field=800".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=12&field=800".to_vec(),
+        );
 
         let input = post_input!(&request, {
             field: Vec<u8>
         });
 
         match input {
-            Err(PostError::Field { ref field, error: PostFieldError::WrongDataTypeInt(_) })
-                if field == "field" => (),
-            _ => panic!()
+            Err(PostError::Field {
+                ref field,
+                error: PostFieldError::WrongDataTypeInt(_),
+            }) if field == "field" => (),
+            _ => panic!(),
         }
     }
 
     #[test]
     fn multiple_values_vec_option_parse_failure() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=12&field=800".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=12&field=800".to_vec(),
+        );
 
         let input = post_input!(&request, {
             field: Vec<Option<u8>>
-        }).unwrap();
+        })
+        .unwrap();
 
         assert_eq!(input.field, &[Some(12), None]);
     }
 
     #[test]
     fn missing_field() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"wrong_field=value".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"wrong_field=value".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: String
-        });
+        let input = post_input!(&request, { field: String });
 
         match input {
-            Err(PostError::Field { ref field, error: PostFieldError::MissingField })
-                if field == "field" => (),
-            _ => panic!()
+            Err(PostError::Field {
+                ref field,
+                error: PostFieldError::MissingField,
+            }) if field == "field" => (),
+            _ => panic!(),
         }
     }
 
     #[test]
     fn missing_field_option() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"wrong=value".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"wrong=value".to_vec(),
+        );
 
         let input = post_input!(&request, {
             field: Option<String>
-        }).unwrap();
+        })
+        .unwrap();
 
         assert_eq!(input.field, None);
     }
 
     #[test]
     fn missing_field_bool() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"wrong=value".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"wrong=value".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: bool
-        }).unwrap();
+        let input = post_input!(&request, { field: bool }).unwrap();
 
         assert_eq!(input.field, false);
     }
 
     #[test]
     fn missing_field_vec() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"wrong=value".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"wrong=value".to_vec(),
+        );
 
         let input = post_input!(&request, {
             field: Vec<String>
-        }).unwrap();
+        })
+        .unwrap();
 
         assert!(input.field.is_empty());
     }
 
     #[test]
     fn num_parse_error() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=12foo".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=12foo".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: u32
-        });
+        let input = post_input!(&request, { field: u32 });
 
         match input {
-            Err(PostError::Field { ref field, error: PostFieldError::WrongDataTypeInt(_) })
-                if field == "field" => (),
-            _ => panic!()
+            Err(PostError::Field {
+                ref field,
+                error: PostFieldError::WrongDataTypeInt(_),
+            }) if field == "field" => (),
+            _ => panic!(),
         }
     }
 
     #[test]
     fn num_parse_error_option() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=12foo".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=12foo".to_vec(),
+        );
 
         let input = post_input!(&request, {
             field: Option<u32>
-        }).unwrap();
+        })
+        .unwrap();
 
         assert_eq!(input.field, None);
     }
 
     #[test]
     fn num_overflow() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=800".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=800".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: u8
-        });
+        let input = post_input!(&request, { field: u8 });
 
         match input {
-            Err(PostError::Field { ref field, error: PostFieldError::WrongDataTypeInt(_) })
-                if field == "field" => (),
-            _ => panic!()
+            Err(PostError::Field {
+                ref field,
+                error: PostFieldError::WrongDataTypeInt(_),
+            }) if field == "field" => (),
+            _ => panic!(),
         }
     }
 
     #[test]
     fn body_extracted() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=800".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=800".to_vec(),
+        );
 
         let _ = request.data();
 
-        let input = post_input!(&request, {
-            field: u8
-        });
+        let input = post_input!(&request, { field: u8 });
 
         match input {
             Err(PostError::BodyAlreadyExtracted) => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
 
     #[test]
-    #[ignore]       // FIXME:
+    #[ignore] // FIXME:
     fn not_utf8() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Host".to_owned(), "localhost".to_owned()),
-            ("Content-Type".to_owned(), "application/x-www-form-urlencoded".to_owned())
-        ], b"field=\xc3\x28".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![
+                ("Host".to_owned(), "localhost".to_owned()),
+                (
+                    "Content-Type".to_owned(),
+                    "application/x-www-form-urlencoded".to_owned(),
+                ),
+            ],
+            b"field=\xc3\x28".to_vec(),
+        );
 
-        let input = post_input!(&request, {
-            field: String
-        });
+        let input = post_input!(&request, { field: String });
 
         match input {
             Err(PostError::NotUtf8(_)) => (),
-            v => panic!("{:?}", v)
+            v => panic!("{:?}", v),
         }
     }
 

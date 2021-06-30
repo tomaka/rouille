@@ -48,7 +48,7 @@ pub enum Element<'a> {
     /// An error in the stream. The connection must be dropped ASAP.
     Error {
         /// A description of the error. Can or cannot be be returned to the client.
-        desc: &'static str
+        desc: &'static str,
     },
 }
 
@@ -68,7 +68,7 @@ pub struct StateMachine {
     // Actual state.
     inner: StateMachineInner,
     // Contains the start of the header. Must be empty if `inner` is equal to `InData`.
-    buffer: Vec<u8>,        // TODO: use SmallVec?
+    buffer: Vec<u8>, // TODO: use SmallVec?
 }
 
 enum StateMachineInner {
@@ -83,7 +83,7 @@ enum StateMachineInner {
         offset: u8,
         // Number of bytes remaining in the frame.
         remaining_len: u64,
-    }
+    },
 }
 
 impl StateMachine {
@@ -140,14 +140,14 @@ impl<'a> Iterator for ElementsIter<'a> {
                 // Reserved bits must be zero, otherwise error.
                 if (first_byte & 0x70) != 0 {
                     return Some(Element::Error {
-                        desc: "Reserved bits must be zero"
+                        desc: "Reserved bits must be zero",
                     });
                 }
 
                 // Client-to-server messages **must** be encoded.
                 if (second_byte & 0x80) == 0 {
                     return Some(Element::Error {
-                        desc: "Client-to-server messages must be masked"
+                        desc: "Client-to-server messages must be masked",
                     });
                 }
 
@@ -160,7 +160,8 @@ impl<'a> Iterator for ElementsIter<'a> {
                             return None;
                         }
 
-                        let mut mask_iter = self.state.buffer.iter().chain(self.data.iter()).skip(2);
+                        let mut mask_iter =
+                            self.state.buffer.iter().chain(self.data.iter()).skip(2);
 
                         let length = {
                             let a = u64::from(*mask_iter.next().unwrap());
@@ -177,7 +178,7 @@ impl<'a> Iterator for ElementsIter<'a> {
                         };
 
                         (length, mask)
-                    },
+                    }
                     127 => {
                         if total_buffered < 14 {
                             self.state.buffer.extend_from_slice(self.data);
@@ -185,7 +186,8 @@ impl<'a> Iterator for ElementsIter<'a> {
                             return None;
                         }
 
-                        let mut mask_iter = self.state.buffer.iter().chain(self.data.iter()).skip(2);
+                        let mut mask_iter =
+                            self.state.buffer.iter().chain(self.data.iter()).skip(2);
 
                         let length = {
                             let a = u64::from(*mask_iter.next().unwrap());
@@ -200,12 +202,18 @@ impl<'a> Iterator for ElementsIter<'a> {
                             // The most significant bit must be zero according to the specs.
                             if (a & 0x80) != 0 {
                                 return Some(Element::Error {
-                                    desc: "Most-significant bit of the length must be zero"
+                                    desc: "Most-significant bit of the length must be zero",
                                 });
                             }
 
-                            (a << 56) | (b << 48) | (c << 40) | (d << 32) |
-                                (e << 24) | (f << 16) | (g << 8) | (h << 0)
+                            (a << 56)
+                                | (b << 48)
+                                | (c << 40)
+                                | (d << 32)
+                                | (e << 24)
+                                | (f << 16)
+                                | (g << 8)
+                                | (h << 0)
                         };
 
                         let mask = {
@@ -217,9 +225,10 @@ impl<'a> Iterator for ElementsIter<'a> {
                         };
 
                         (length, mask)
-                    },
+                    }
                     n => {
-                        let mut mask_iter = self.state.buffer.iter().chain(self.data.iter()).skip(2);
+                        let mut mask_iter =
+                            self.state.buffer.iter().chain(self.data.iter()).skip(2);
 
                         let mask = {
                             let a = u32::from(*mask_iter.next().unwrap());
@@ -230,7 +239,7 @@ impl<'a> Iterator for ElementsIter<'a> {
                         };
 
                         (u64::from(n), mask)
-                    },
+                    }
                 };
 
                 // Builds a slice containing the start of the data.
@@ -238,11 +247,11 @@ impl<'a> Iterator for ElementsIter<'a> {
                     let data_start_off = match second_byte & 0x7f {
                         126 => 8,
                         127 => 14,
-                        _ => 6
+                        _ => 6,
                     };
 
                     assert!(self.state.buffer.len() < data_start_off);
-                    &self.data[(data_start_off - self.state.buffer.len()) ..]
+                    &self.data[(data_start_off - self.state.buffer.len())..]
                 };
 
                 // Update ourselves for the next loop and return a FrameStart message.
@@ -251,20 +260,22 @@ impl<'a> Iterator for ElementsIter<'a> {
                 self.state.inner = StateMachineInner::InData {
                     mask,
                     remaining_len: length,
-                    offset: 0
+                    offset: 0,
                 };
                 Some(Element::FrameStart {
                     fin: (first_byte & 0x80) != 0,
                     length,
                     opcode: first_byte & 0xf,
                 })
-            },
+            }
 
             // Second situation, we are in the message and we don't have enough data to finish the
             // current frame.
-            StateMachineInner::InData { mask, ref mut remaining_len, ref mut offset }
-                if *remaining_len > self.data.len() as u64 =>
-            {
+            StateMachineInner::InData {
+                mask,
+                ref mut remaining_len,
+                ref mut offset,
+            } if *remaining_len > self.data.len() as u64 => {
                 let data = Data {
                     data: self.data,
                     mask,
@@ -277,25 +288,35 @@ impl<'a> Iterator for ElementsIter<'a> {
 
                 self.data = &[];
 
-                Some(Element::Data { data, last_in_frame: false })
-            },
+                Some(Element::Data {
+                    data,
+                    last_in_frame: false,
+                })
+            }
 
             // Third situation, we have enough data to finish the frame.
-            StateMachineInner::InData { mask, remaining_len, offset } => {
+            StateMachineInner::InData {
+                mask,
+                remaining_len,
+                offset,
+            } => {
                 debug_assert!(self.data.len() as u64 >= remaining_len);
 
                 let data = Data {
-                    data: &self.data[0 .. remaining_len as usize],
+                    data: &self.data[0..remaining_len as usize],
                     mask,
                     offset,
                 };
 
-                self.data = &self.data[remaining_len as usize ..];
+                self.data = &self.data[remaining_len as usize..];
                 self.state.inner = StateMachineInner::InHeader;
                 debug_assert!(self.state.buffer.is_empty());
 
-                Some(Element::Data { data, last_in_frame: true })
-            },
+                Some(Element::Data {
+                    data,
+                    last_in_frame: true,
+                })
+            }
         }
     }
 }
@@ -326,8 +347,7 @@ impl<'a> Iterator for Data<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for Data<'a> {
-}
+impl<'a> ExactSizeIterator for Data<'a> {}
 
 #[cfg(test)]
 mod tests {
@@ -338,21 +358,29 @@ mod tests {
     fn basic() {
         let mut machine = StateMachine::new();
 
-        let data = &[0x81, 0x85, 0x37, 0xfa, 0x21, 0x3d, 0x7f, 0x9f, 0x4d, 0x51, 0x58];
+        let data = &[
+            0x81, 0x85, 0x37, 0xfa, 0x21, 0x3d, 0x7f, 0x9f, 0x4d, 0x51, 0x58,
+        ];
         let mut iter = machine.feed(data);
 
-        assert_eq!(iter.next().unwrap(), Element::FrameStart {
-            fin: true,
-            length: 5,
-            opcode: 1
-        });
+        assert_eq!(
+            iter.next().unwrap(),
+            Element::FrameStart {
+                fin: true,
+                length: 5,
+                opcode: 1
+            }
+        );
 
         match iter.next().unwrap() {
-            Element::Data { data, last_in_frame } => {
+            Element::Data {
+                data,
+                last_in_frame,
+            } => {
                 assert!(last_in_frame);
                 assert_eq!(data.collect::<Vec<_>>(), b"Hello");
             }
-            _ => panic!()
+            _ => panic!(),
         }
     }
 }

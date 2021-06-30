@@ -41,7 +41,7 @@ pub struct Websocket {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
     /// Text data. If the client is in Javascript, this happens when the client called `send()`
-    /// with a string. 
+    /// with a string.
     Text(String),
 
     /// Binary data. If the client is in Javascript, this happens when the client called `send()`
@@ -152,19 +152,22 @@ impl Iterator for Websocket {
                 Err(_) => {
                     self.socket = None;
                     return None;
-                },
+                }
             };
 
             // Fill `messages_in_queue` by analyzing the packets.
-            for element in self.state_machine.feed(&buf[0 .. n]) {
+            for element in self.state_machine.feed(&buf[0..n]) {
                 match element {
                     low_level::Element::FrameStart { fin, opcode, .. } => {
                         debug_assert!(self.current_frame_payload.is_empty());
                         self.current_frame_fin = fin;
                         self.current_frame_opcode = opcode;
-                    },
+                    }
 
-                    low_level::Element::Data { data, last_in_frame } => {
+                    low_level::Element::Data {
+                        data,
+                        last_in_frame,
+                    } => {
                         // Under normal circumstances we just handle data by pushing it to
                         // `current_frame_payload`.
                         self.current_frame_payload.extend(data);
@@ -174,11 +177,15 @@ impl Iterator for Websocket {
                             match self.current_frame_opcode {
                                 // Frame is a continuation of the current message.
                                 0x0 => {
-                                    self.current_message_payload.append(&mut self.current_frame_payload);
+                                    self.current_message_payload
+                                        .append(&mut self.current_frame_payload);
 
                                     // If the message is finished, dispatch it.
                                     if self.current_frame_fin {
-                                        let binary = mem::replace(&mut self.current_message_payload, Vec::new());
+                                        let binary = mem::replace(
+                                            &mut self.current_message_payload,
+                                            Vec::new(),
+                                        );
 
                                         if self.current_message_binary {
                                             self.messages_in_queue.push(Message::Binary(binary));
@@ -187,117 +194,148 @@ impl Iterator for Websocket {
                                                 Ok(s) => s,
                                                 Err(_) => {
                                                     // Closing connection because text wasn't UTF-8
-                                                    let _ = send(b"1007 Invalid UTF-8 encoding",
-                                                                 Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                                                    let _ = send(
+                                                        b"1007 Invalid UTF-8 encoding",
+                                                        Write::by_ref(
+                                                            self.socket.as_mut().unwrap(),
+                                                        ),
+                                                        0x8,
+                                                    );
                                                     self.socket = None;
                                                     return None;
-                                                },
+                                                }
                                             };
 
                                             self.messages_in_queue.push(Message::Text(string));
                                         }
                                     }
-                                },
+                                }
 
                                 // Frame is an individual text frame.
                                 0x1 => {
                                     // If we're in the middle of a message, this frame is invalid
                                     // and we need to close.
                                     if !self.current_message_payload.is_empty() {
-                                        let _ = send(b"1002 Expected continuation frame",
-                                                     Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                                        let _ = send(
+                                            b"1002 Expected continuation frame",
+                                            Write::by_ref(self.socket.as_mut().unwrap()),
+                                            0x8,
+                                        );
                                         self.socket = None;
                                         return None;
                                     }
 
                                     if self.current_frame_fin {
                                         // There's only one frame in this message.
-                                        let binary = mem::replace(&mut self.current_frame_payload,
-                                                                  Vec::new());
+                                        let binary = mem::replace(
+                                            &mut self.current_frame_payload,
+                                            Vec::new(),
+                                        );
                                         let string = match String::from_utf8(binary) {
                                             Ok(s) => s,
                                             Err(_err) => {
                                                 // Closing connection because text wasn't UTF-8
-                                                let _ = send(b"1007 Invalid UTF-8 encoding",
-                                                             Write::by_ref(self.socket.as_mut().unwrap()),
-                                                             0x8);
+                                                let _ = send(
+                                                    b"1007 Invalid UTF-8 encoding",
+                                                    Write::by_ref(self.socket.as_mut().unwrap()),
+                                                    0x8,
+                                                );
                                                 self.socket = None;
                                                 return None;
-                                            },
+                                            }
                                         };
 
                                         self.messages_in_queue.push(Message::Text(string));
-
                                     } else {
                                         // Start of a fragmented message.
                                         self.current_message_binary = false;
-                                        self.current_message_payload.append(&mut self.current_frame_payload);
+                                        self.current_message_payload
+                                            .append(&mut self.current_frame_payload);
                                     }
-                                },
+                                }
 
                                 // Frame is an individual binary frame.
                                 0x2 => {
                                     // If we're in the middle of a message, this frame is invalid
                                     // and we need to close.
                                     if !self.current_message_payload.is_empty() {
-                                        let _ = send(b"1002 Expected continuation frame",
-                                                     Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                                        let _ = send(
+                                            b"1002 Expected continuation frame",
+                                            Write::by_ref(self.socket.as_mut().unwrap()),
+                                            0x8,
+                                        );
                                         self.socket = None;
                                         return None;
                                     }
 
                                     if self.current_frame_fin {
-                                        let binary = mem::replace(&mut self.current_frame_payload,
-                                                                  Vec::new());
+                                        let binary = mem::replace(
+                                            &mut self.current_frame_payload,
+                                            Vec::new(),
+                                        );
                                         self.messages_in_queue.push(Message::Binary(binary));
                                     } else {
                                         // Start of a fragmented message.
                                         self.current_message_binary = true;
-                                        self.current_message_payload.append(&mut self.current_frame_payload);
+                                        self.current_message_payload
+                                            .append(&mut self.current_frame_payload);
                                     }
-                                },
+                                }
 
                                 // Close request.
                                 0x8 => {
                                     // We need to send a confirmation.
-                                    let _ = send(&self.current_frame_payload,
-                                                 Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                                    let _ = send(
+                                        &self.current_frame_payload,
+                                        Write::by_ref(self.socket.as_mut().unwrap()),
+                                        0x8,
+                                    );
                                     // Since the packets are always received in order, and since
                                     // the server is considered dead as soon as it sends the
                                     // confirmation, we have no risk of losing packets.
                                     self.socket = None;
                                     return None;
-                                },
+                                }
 
                                 // Ping.
                                 0x9 => {
                                     // Send the pong.
-                                    let _ = send(&self.current_frame_payload,
-                                                 Write::by_ref(self.socket.as_mut().unwrap()), 0xA);
-                                },
+                                    let _ = send(
+                                        &self.current_frame_payload,
+                                        Write::by_ref(self.socket.as_mut().unwrap()),
+                                        0xA,
+                                    );
+                                }
 
                                 // Pong. We ignore this as there's nothing to do.
-                                0xA => {},
+                                0xA => {}
 
                                 // Unknown opcode means error and close.
                                 _ => {
-                                    let _ = send(b"Unknown opcode",
-                                                 Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                                    let _ = send(
+                                        b"Unknown opcode",
+                                        Write::by_ref(self.socket.as_mut().unwrap()),
+                                        0x8,
+                                    );
                                     self.socket = None;
                                     return None;
-                                },
+                                }
                             }
 
                             self.current_frame_payload.clear();
                         }
-                    },
+                    }
 
                     low_level::Element::Error { desc } => {
                         // The low level layer signaled an error. Sending it to client and closing.
-                        let _ = send(desc.as_bytes(), Write::by_ref(self.socket.as_mut().unwrap()), 0x8);
+                        let _ = send(
+                            desc.as_bytes(),
+                            Write::by_ref(self.socket.as_mut().unwrap()),
+                            0x8,
+                        );
                         self.socket = None;
                         return None;
-                    },
+                    }
                 }
             }
         }
@@ -326,14 +364,12 @@ fn send<W: Write>(data: &[u8], mut dest: W, opcode: u8) -> io::Result<()> {
         let len7 = (len >> 8) as u8;
         let len8 = (len >> 0) as u8;
         dest.write_all(&[len1, len2, len3, len4, len5, len6, len7, len8])?;
-
     } else if data.len() >= 126 {
         dest.write_all(&[126u8])?;
         let len = data.len() as u16;
         let len1 = (len >> 8) as u8;
         let len2 = len as u8;
         dest.write_all(&[len1, len2])?;
-
     } else {
         dest.write_all(&[data.len() as u8])?;
     }

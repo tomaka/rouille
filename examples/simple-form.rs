@@ -26,14 +26,14 @@ fn main() {
                     // corresponds to an element of the form.
                     // If the macro returns an error (for example if a field is missing, which
                     // can happen if you screw up the form or if the user made a manual request)
-                    // we return a 400 response. 
+                    // we return a 400 response.
                     let data = try_or_400!(post_input!(request, {
                         txt: String,
                         files: Vec<rouille::input::post::BufferedFile>,
                     }));
 
                     // We just print what was received on stdout. Of course in a real application
-                    // you probably want to process the data, eg. store it in a database. 
+                    // you probably want to process the data, eg. store it in a database.
                     println!("Received data: {:?}", data);
 
                     rouille::Response::html("Success! <a href=\"/\">Go back</a>.")

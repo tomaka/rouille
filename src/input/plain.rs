@@ -43,7 +43,7 @@ impl error::Error for PlainTextError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             PlainTextError::IoError(ref e) => Some(e),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -52,21 +52,15 @@ impl fmt::Display for PlainTextError {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let description = match *self {
-            PlainTextError::BodyAlreadyExtracted => {
-                "the body of the request was already extracted"
-            },
-            PlainTextError::WrongContentType => {
-                "the request didn't have a plain text content type"
-            },
+            PlainTextError::BodyAlreadyExtracted => "the body of the request was already extracted",
+            PlainTextError::WrongContentType => "the request didn't have a plain text content type",
             PlainTextError::IoError(_) => {
                 "could not read the body from the request, or could not execute the CGI program"
-            },
-            PlainTextError::LimitExceeded => {
-                "the limit to the number of bytes has been exceeded"
-            },
+            }
+            PlainTextError::LimitExceeded => "the limit to the number of bytes has been exceeded",
             PlainTextError::NotUtf8 => {
                 "the content-type encoding is not ASCII or UTF-8, or the body is not valid UTF-8"
-            },
+            }
         };
 
         write!(fmt, "{}", description)
@@ -104,9 +98,10 @@ pub fn plain_text_body(request: &Request) -> Result<String, PlainTextError> {
 /// This does the same as `plain_text_body`, but with a customizable limit in bytes to how much
 /// data will be read from the request. If the limit is exceeded, a `LimitExceeded` error is
 /// returned.
-pub fn plain_text_body_with_limit(request: &Request, limit: usize)
-                                  -> Result<String, PlainTextError>
-{
+pub fn plain_text_body_with_limit(
+    request: &Request,
+    limit: usize,
+) -> Result<String, PlainTextError> {
     // TODO: handle encoding ; return NotUtf8 if a non-utf8 charset is sent
     // if no encoding is specified by the client, the default is `US-ASCII` which is compatible with UTF8
 
@@ -124,7 +119,8 @@ pub fn plain_text_body_with_limit(request: &Request, limit: usize)
     };
 
     let mut out = Vec::new();
-    body.take(limit.saturating_add(1) as u64).read_to_end(&mut out)?;
+    body.take(limit.saturating_add(1) as u64)
+        .read_to_end(&mut out)?;
     if out.len() > limit {
         return Err(PlainTextError::LimitExceeded);
     }
@@ -139,32 +135,41 @@ pub fn plain_text_body_with_limit(request: &Request, limit: usize)
 
 #[cfg(test)]
 mod test {
-    use Request;
     use super::plain_text_body;
     use super::plain_text_body_with_limit;
     use super::PlainTextError;
+    use Request;
 
     #[test]
     fn ok() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Content-Type".to_owned(), "text/plain".to_owned())
-        ], b"test".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("Content-Type".to_owned(), "text/plain".to_owned())],
+            b"test".to_vec(),
+        );
 
         match plain_text_body(&request) {
             Ok(ref d) if d == "test" => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
-    
+
     #[test]
     fn charset() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Content-Type".to_owned(), "text/plain; charset=utf8".to_owned())
-        ], b"test".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![(
+                "Content-Type".to_owned(),
+                "text/plain; charset=utf8".to_owned(),
+            )],
+            b"test".to_vec(),
+        );
 
         match plain_text_body(&request) {
             Ok(ref d) if d == "test" => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
 
@@ -174,85 +179,112 @@ mod test {
 
         match plain_text_body(&request) {
             Err(PlainTextError::WrongContentType) => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
 
     #[test]
     fn wrong_content_type() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Content-Type".to_owned(), "text/html".to_owned())
-        ], b"test".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("Content-Type".to_owned(), "text/html".to_owned())],
+            b"test".to_vec(),
+        );
 
         match plain_text_body(&request) {
             Err(PlainTextError::WrongContentType) => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
 
     #[test]
     fn body_twice() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Content-Type".to_owned(), "text/plain; charset=utf8".to_owned())
-        ], b"test".to_vec());
-        
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![(
+                "Content-Type".to_owned(),
+                "text/plain; charset=utf8".to_owned(),
+            )],
+            b"test".to_vec(),
+        );
+
         match plain_text_body(&request) {
             Ok(ref d) if d == "test" => (),
-            _ => panic!()
+            _ => panic!(),
         }
 
         match plain_text_body(&request) {
             Err(PlainTextError::BodyAlreadyExtracted) => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
 
     #[test]
     fn bytes_limit() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Content-Type".to_owned(), "text/plain".to_owned())
-        ], b"test".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("Content-Type".to_owned(), "text/plain".to_owned())],
+            b"test".to_vec(),
+        );
 
         match plain_text_body_with_limit(&request, 2) {
             Err(PlainTextError::LimitExceeded) => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
 
     #[test]
     fn exact_limit() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Content-Type".to_owned(), "text/plain".to_owned())
-        ], b"test".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![("Content-Type".to_owned(), "text/plain".to_owned())],
+            b"test".to_vec(),
+        );
 
         match plain_text_body_with_limit(&request, 4) {
             Ok(ref d) if d == "test" => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
 
     #[test]
     fn non_utf8_body() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Content-Type".to_owned(), "text/plain; charset=utf8".to_owned())
-        ], b"\xc3\x28".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![(
+                "Content-Type".to_owned(),
+                "text/plain; charset=utf8".to_owned(),
+            )],
+            b"\xc3\x28".to_vec(),
+        );
 
         match plain_text_body(&request) {
             Err(PlainTextError::NotUtf8) => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
 
     #[test]
-    #[ignore]       // TODO: not implemented
+    #[ignore] // TODO: not implemented
     fn non_utf8_encoding() {
-        let request = Request::fake_http("GET", "/", vec![
-            ("Content-Type".to_owned(), "text/plain; charset=iso-8859-1".to_owned())
-        ], b"test".to_vec());
+        let request = Request::fake_http(
+            "GET",
+            "/",
+            vec![(
+                "Content-Type".to_owned(),
+                "text/plain; charset=iso-8859-1".to_owned(),
+            )],
+            b"test".to_vec(),
+        );
 
         match plain_text_body(&request) {
             Err(PlainTextError::NotUtf8) => (),
-            _ => panic!()
+            _ => panic!(),
         }
     }
 }

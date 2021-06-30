@@ -353,7 +353,6 @@ macro_rules! router {
     );
 }
 
-
 #[allow(unused_variables)]
 #[cfg(test)]
 mod tests {
@@ -364,60 +363,75 @@ mod tests {
     fn old_style_basic() {
         let request = Request::fake_http("GET", "/", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) (/hello) => { 0 },
-            (GET) (/{_val:u32}) => { 0 },
-            (GET) (/) => { 1 },
-            _ => 0
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) (/hello) => { 0 },
+                (GET) (/{_val:u32}) => { 0 },
+                (GET) (/) => { 1 },
+                _ => 0
+            )
+        );
     }
 
     #[test]
     fn old_style_dash() {
         let request = Request::fake_http("GET", "/a-b", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) (/a/b) => { 0 },
-            (GET) (/a_b) => { 0 },
-            (GET) (/a-b) => { 1 },
-            _ => 0
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) (/a/b) => { 0 },
+                (GET) (/a_b) => { 0 },
+                (GET) (/a-b) => { 1 },
+                _ => 0
+            )
+        );
     }
 
     #[test]
     fn old_style_params() {
         let request = Request::fake_http("GET", "/hello/5", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) (/hello/) => { 0 },
-            (GET) (/hello/{id:u32}) => { if id == 5 { 1 } else { 0 } },
-            (GET) (/hello/{_id:String}) => { 0 },
-            _ => 0
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) (/hello/) => { 0 },
+                (GET) (/hello/{id:u32}) => { if id == 5 { 1 } else { 0 } },
+                (GET) (/hello/{_id:String}) => { 0 },
+                _ => 0
+            )
+        );
     }
 
     #[test]
     fn old_style_trailing_comma() {
         let request = Request::fake_http("GET", "/hello/5", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) (/hello/) => { 0 },
-            (GET) (/hello/{id:u32}) => { if id == 5 { 1 } else { 0 } },
-            (GET) (/hello/{_id:String}) => { 0 },
-            _ => 0,
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) (/hello/) => { 0 },
+                (GET) (/hello/{id:u32}) => { if id == 5 { 1 } else { 0 } },
+                (GET) (/hello/{_id:String}) => { 0 },
+                _ => 0,
+            )
+        );
     }
 
     #[test]
     fn old_style_trailing_commas() {
         let request = Request::fake_http("GET", "/hello/5", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) (/hello/) => { 0 },
-            (GET) (/hello/{id:u32}) => { if id == 5 { 1 } else { 0 } },
-            (GET) (/hello/{_id:String}) => { 0 },
-            _ => 0,,,,
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) (/hello/) => { 0 },
+                (GET) (/hello/{id:u32}) => { if id == 5 { 1 } else { 0 } },
+                (GET) (/hello/{_id:String}) => { 0 },
+                _ => 0,,,,
+            )
+        );
     }
 
     // -- new-style tests --
@@ -433,89 +447,109 @@ mod tests {
         assert_eq!(7.2, resp);
     }
 
-
     #[test]
     fn basic() {
         let request = Request::fake_http("GET", "/", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) ["/hello"] => { 0 },
-            (GET) ["/{_val}", _val: u32] => { 0 },
-            (GET) ["/"] => { 1 },
-            _ => 0
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) ["/hello"] => { 0 },
+                (GET) ["/{_val}", _val: u32] => { 0 },
+                (GET) ["/"] => { 1 },
+                _ => 0
+            )
+        );
     }
 
     #[test]
     fn dash() {
         let request = Request::fake_http("GET", "/a-b", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) ["/a/b"] => { 0 },
-            (GET) ["/a_b"] => { 0 },
-            (GET) ["/a-b"] => { 1 },
-            _ => 0
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) ["/a/b"] => { 0 },
+                (GET) ["/a_b"] => { 0 },
+                (GET) ["/a-b"] => { 1 },
+                _ => 0
+            )
+        );
     }
 
     #[test]
     fn numbers() {
         let request = Request::fake_http("GET", "/5", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) ["/a"] => { 0 },
-            (GET) ["/3"] => { 0 },
-            (GET) ["/5"] => { 1 },
-            _ => 0
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) ["/a"] => { 0 },
+                (GET) ["/3"] => { 0 },
+                (GET) ["/5"] => { 1 },
+                _ => 0
+            )
+        );
     }
 
     #[test]
     fn trailing_comma() {
         let request = Request::fake_http("GET", "/5", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) ["/a"] => { 0 },
-            (GET) ["/3"] => { 0 },
-            (GET) ["/5"] => { 1 },
-            _ => 0,
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) ["/a"] => { 0 },
+                (GET) ["/3"] => { 0 },
+                (GET) ["/5"] => { 1 },
+                _ => 0,
+            )
+        );
     }
 
     #[test]
     fn trailing_commas() {
         let request = Request::fake_http("GET", "/5", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) ["/a"] => { 0 },
-            (GET) ["/3"] => { 0 },
-            (GET) ["/5"] => { 1 },
-            _ => 0,,,,
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) ["/a"] => { 0 },
+                (GET) ["/3"] => { 0 },
+                (GET) ["/5"] => { 1 },
+                _ => 0,,,,
+            )
+        );
     }
 
     #[test]
     fn files() {
         let request = Request::fake_http("GET", "/robots.txt", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) ["/a"] => { 0 },
-            (GET) ["/3/2/1"] => { 0 },
-            (GET) ["/robots.txt"] => { 1 },
-            _ => 0
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) ["/a"] => { 0 },
+                (GET) ["/3/2/1"] => { 0 },
+                (GET) ["/robots.txt"] => { 1 },
+                _ => 0
+            )
+        );
     }
 
     #[test]
     fn skip_failed_parse_float() {
         let request = Request::fake_http("GET", "/hello/5.1", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) ["/hello/"] => { 0 },
-            (GET) ["/hello/{_id}", _id: u32] => { 0 },
-            (GET) ["/hello/{id}", id: f32] => { if id == 5.1 { 1 } else { 0 } },
-            _ => 0
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) ["/hello/"] => { 0 },
+                (GET) ["/hello/{_id}", _id: u32] => { 0 },
+                (GET) ["/hello/{id}", id: f32] => { if id == 5.1 { 1 } else { 0 } },
+                _ => 0
+            )
+        );
     }
 
     #[test]
@@ -548,49 +582,63 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected="Url parameter identity, `id`, does not have a matching `{id}` segment in url: \"/hello/james\"")]
+    #[should_panic(
+        expected = "Url parameter identity, `id`, does not have a matching `{id}` segment in url: \"/hello/james\""
+    )]
     fn identity_not_present_in_url_string() {
         let request = Request::fake_http("GET", "/hello/james", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) ["/hello/"] => { 0 },
-            (GET) ["/hello/{name}", name: String, id: u32] => { 1 }, // this should fail
-            _ => 0
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) ["/hello/"] => { 0 },
+                (GET) ["/hello/{name}", name: String, id: u32] => { 1 }, // this should fail
+                _ => 0
+            )
+        );
     }
 
     #[test]
-    #[should_panic(expected="Unable to match url parameter name, `name`, to an `identity: type` pair in url: \"/hello/1/james\"")]
+    #[should_panic(
+        expected = "Unable to match url parameter name, `name`, to an `identity: type` pair in url: \"/hello/1/james\""
+    )]
     fn parameter_with_no_matching_identity() {
         let request = Request::fake_http("GET", "/hello/1/james", vec![], vec![]);
 
-        assert_eq!(1, router!(request,
-            (GET) ["/hello/"] => { 0 },
-            (GET) ["/hello/{id}/{name}"] => { 0 },           // exact match should be ignored
-            (GET) ["/hello/{id}/{name}", id: u32] => { id }, // this one should fail
-            _ => 0
-        ));
+        assert_eq!(
+            1,
+            router!(request,
+                (GET) ["/hello/"] => { 0 },
+                (GET) ["/hello/{id}/{name}"] => { 0 },           // exact match should be ignored
+                (GET) ["/hello/{id}/{name}", id: u32] => { id }, // this one should fail
+                _ => 0
+            )
+        );
     }
 
     #[test]
     fn encoded() {
         let request = Request::fake_http("GET", "/hello/%3Fa/test", vec![], vec![]);
 
-        assert_eq!("?a", router!(request,
+        assert_eq!(
+            "?a",
+            router!(request,
            (GET) ["/hello/{val}/test", val: String] => { val },
-           _ => String::from("")));
+           _ => String::from(""))
+        );
     }
 
     #[test]
     fn encoded_old() {
         let request = Request::fake_http("GET", "/hello/%3Fa/test", vec![], vec![]);
 
-        assert_eq!("?a", router!(request,
+        assert_eq!(
+            "?a",
+            router!(request,
            (GET) (/hello/{val: String}/test) => { val },
-           _ => String::from("")));
+           _ => String::from(""))
+        );
     }
-
-
 
     #[test]
     fn param_slash() {
@@ -602,4 +650,3 @@ mod tests {
         );
     }
 }
-
