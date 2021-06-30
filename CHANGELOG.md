@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 3.2.1
+
+- Removed unused dependency `term` and updated `rand`, `multipart`, `deflate`
+  and `time` to latest supported versions.
+
 ## Version 3.2
 
 - Add `ResponseBody::from_reader_and_size` for constructing a `ResponseBody`
