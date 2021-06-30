@@ -18,11 +18,11 @@ jobs:
           command: clippy
           args: --all-features
 
-      # - name: Format
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: fmt
-      #     args: -- --check
+      - name: Format
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: -- --check
 
   test:
     name: Build & Test

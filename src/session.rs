@@ -123,7 +123,7 @@ pub fn generate_session_id() -> String {
     // 5e+114 possibilities is reasonable.
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
-        .map(|c| char::from(c))
+        .map(char::from)
         .filter(|&c| {
             ('a'..='z').contains(&c) || ('A'..='Z').contains(&c) || ('0'..='9').contains(&c)
         })
