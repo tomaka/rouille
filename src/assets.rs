@@ -122,9 +122,11 @@ pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
         Err(_) => return Response::empty_404(),
     };
 
+    let now = time::OffsetDateTime::try_now_local()
+        .unwrap_or_else(|_| time::OffsetDateTime::now_utc());
     let etag: String = (fs::metadata(&potential_file)
         .map(|meta| filetime::FileTime::from_last_modification_time(&meta).unix_seconds() as u64)
-        .unwrap_or(time::now().tm_nsec as u64)
+        .unwrap_or(now.nanosecond() as u64)
         ^ 0xd3f4_0305_c9f8_e911_u64).to_string();
 
     Response::from_file(extension_to_mime_impl(extension), file)
