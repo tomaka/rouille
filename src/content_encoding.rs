@@ -7,7 +7,7 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use std::str;
+use input;
 use Request;
 use Response;
 
@@ -35,7 +35,7 @@ use Response;
 ///     content_encoding::apply(request, Response::text("hello world"))
 /// }
 /// ```
-pub fn apply(request: &Request, response: Response) -> Response {
+pub fn apply(request: &Request, mut response: Response) -> Response {
     // Only text should be encoded. Otherwise just return.
     if !response_is_text(&response) {
         return response;
@@ -47,31 +47,18 @@ pub fn apply(request: &Request, response: Response) -> Response {
         return response;
     }
 
-    // Put the response in an Option for later.
-    let mut response = Some(response);
-
     // Now let's get the list of content encodings accepted by the request.
-    // The list should be ordered from the most desired to the list desired.
-    // TODO: use input::priority_header_preferred instead
-    for encoding in accepted_content_encodings(request) {
-        // Try the brotli encoding.
-        if brotli(encoding, &mut response) {
-            return response.take().unwrap();
-        }
-
-        // Try the gzip encoding.
-        if gzip(encoding, &mut response) {
-            return response.take().unwrap();
-        }
-
-        // The identity encoding is always supported.
-        if encoding.eq_ignore_ascii_case("identity") {
-            return response.take().unwrap();
+    // The list should be ordered from the most desired to the least desired.
+    let encoding_preference = ["br", "gzip", "x-gzip", "identity"];
+    let accept_encoding_header = request.header("Accept-Encoding").unwrap_or("");
+    if let Some(preferred_index) = input::priority_header_preferred(&accept_encoding_header, encoding_preference.iter().cloned()) {
+        match encoding_preference[preferred_index] {
+            "br" => brotli(&mut response),
+            "gzip" | "x-gzip" => gzip(&mut response),
+            _ => (),
         }
     }
-
-    // No encoding accepted, don't do anything.
-    response.take().unwrap()
+    return response;
 }
 
 // Returns true if the Content-Type of the response is a type that should be encoded.
@@ -83,76 +70,22 @@ fn response_is_text(response: &Response) -> bool {
             return false;
         }
 
-        // TODO: perform case-insensitive comparison
-        value.starts_with("text/") || value.contains("javascript") || value.contains("json") ||
-            value.contains("xml") || value.contains("font")
+        let content_type = value.to_lowercase();
+        content_type.starts_with("text/") ||
+        content_type.contains("javascript") ||
+        content_type.contains("json") ||
+        content_type.contains("xml") ||
+        content_type.contains("font")
     })
 }
 
-/// Returns an iterator of the list of content encodings accepted by the request.
-///
-/// # Example
-///
-/// ```
-/// use rouille::{Request, Response};
-/// use rouille::content_encoding;
-///
-/// fn handle(request: &Request) -> Response {
-///     for encoding in content_encoding::accepted_content_encodings(request) {
-///         // ...
-///     }
-///
-///     // ...
-/// # panic!()
-/// }
-/// ```
-pub fn accepted_content_encodings(request: &Request) -> AcceptedContentEncodingsIter {
-    let elems = request.header("Accept-Encoding").unwrap_or("").split(',');
-    AcceptedContentEncodingsIter { elements: elems }
-}
-
-/// Iterator to the list of content encodings accepted by a request.
-pub struct AcceptedContentEncodingsIter<'a> {
-    elements: str::Split<'a, char>
-}
-
-impl<'a> Iterator for AcceptedContentEncodingsIter<'a> {
-    type Item = &'a str;
-
-    #[inline]
-    fn next(&mut self) -> Option<&'a str> {
-        loop {
-            match self.elements.next() {
-                None => return None,
-                Some(e) => {
-                    let e = e.trim();
-                    if !e.is_empty() {
-                        return Some(e);
-                    }
-                }
-            }
-        }
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let (_, max) = self.elements.size_hint();
-        (0, max)
-    }
-}
-
 #[cfg(feature = "gzip")]
-fn gzip(e: &str, response: &mut Option<Response>) -> bool {
+fn gzip(response: &mut Response) {
     use ResponseBody;
     use std::mem;
     use std::io;
     use deflate::deflate_bytes_gzip;
 
-    if !e.eq_ignore_ascii_case("gzip") {
-        return false;
-    }
-
-    let response = response.as_mut().unwrap();
     response.headers.push(("Content-Encoding".into(), "gzip".into()));
     let previous_body = mem::replace(&mut response.data, ResponseBody::empty());
     let (mut raw_data, size) = previous_body.into_reader_and_size();
@@ -163,48 +96,53 @@ fn gzip(e: &str, response: &mut Option<Response>) -> bool {
     io::copy(&mut raw_data, &mut src).expect("Failed reading response body while gzipping");
     let zipped = deflate_bytes_gzip(&src);
     response.data = ResponseBody::from_data(zipped);
-    true
 }
 
 #[cfg(not(feature = "gzip"))]
 #[inline]
-fn gzip(e: &str, response: &mut Option<Response>) -> bool {
-    false
-}
+fn gzip(response: &mut Response) {}
 
 #[cfg(feature = "brotli")]
-fn brotli(e: &str, response: &mut Option<Response>) -> bool {
+fn brotli(response: &mut Response) {
     use ResponseBody;
     use std::mem;
     use brotli2::read::BrotliEncoder;
 
-    if !e.eq_ignore_ascii_case("br") {
-        return false;
-    }
-
-    let response = response.as_mut().unwrap();
     response.headers.push(("Content-Encoding".into(), "br".into()));
     let previous_body = mem::replace(&mut response.data, ResponseBody::empty());
     let (raw_data, _) = previous_body.into_reader_and_size();
     response.data = ResponseBody::from_reader(BrotliEncoder::new(raw_data, 6));
-    true
 }
 
 #[cfg(not(feature = "brotli"))]
 #[inline]
-fn brotli(e: &str, response: &mut Option<Response>) -> bool {
-    false
-}
+fn brotli(response: &mut Response) {}
 
 #[cfg(test)]
 mod tests {
     use Request;
+    use Response;
     use content_encoding;
+
+    #[test]
+    fn text_response() {
+        assert!(content_encoding::response_is_text(&Response::text("")));
+    }
+
+    #[test]
+    fn non_text_response() {
+        assert!(!content_encoding::response_is_text(&Response::from_data("image/jpeg", "")));
+    }
 
     #[test]
     fn no_req_encodings() {
         let request = Request::fake_http("GET", "/", vec![], vec![]);
-        assert_eq!(content_encoding::accepted_content_encodings(&request).count(), 0);
+        let response = Response::html("<p>Hello world</p>");
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(!encoded_response.headers.iter().any(|(header_name, _)| header_name == "Content-Encoding")); // No Content-Encoding header
+        let mut encoded_content = vec![];
+        encoded_response.data.into_reader_and_size().0.read_to_end(&mut encoded_content).unwrap();
+        assert_eq!(String::from_utf8(encoded_content).unwrap(), "<p>Hello world</p>"); // No encoding applied
     }
 
     #[test]
@@ -213,34 +151,76 @@ mod tests {
             let h = vec![("Accept-Encoding".to_owned(), "".to_owned())];
             Request::fake_http("GET", "/", h, vec![])
         };
+        let response = Response::html("<p>Hello world</p>");
 
-        assert_eq!(content_encoding::accepted_content_encodings(&request).count(), 0);
-    }
-
-    #[test]
-    fn one_req_encoding() {
-        let request = {
-            let h = vec![("Accept-Encoding".to_owned(), "foo".to_owned())];
-            Request::fake_http("GET", "/", h, vec![])
-        };
-
-        let mut list = content_encoding::accepted_content_encodings(&request);
-        assert_eq!(list.next().unwrap(), "foo");
-        assert_eq!(list.next(), None);
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(!encoded_response.headers.iter().any(|(header_name, _)| header_name == "Content-Encoding")); // No Content-Encoding header
+        let mut encoded_content = vec![];
+        encoded_response.data.into_reader_and_size().0.read_to_end(&mut encoded_content).unwrap();
+        assert_eq!(String::from_utf8(encoded_content).unwrap(), "<p>Hello world</p>"); // No encoding applied
     }
 
     #[test]
     fn multi_req_encoding() {
         let request = {
-            let h = vec![("Accept-Encoding".to_owned(), "foo, bar".to_owned())];
+            let h = vec![("Accept-Encoding".to_owned(), "foo".to_owned())];
             Request::fake_http("GET", "/", h, vec![])
         };
+        let response = Response::html("<p>Hello world</p>");
 
-        let mut list = content_encoding::accepted_content_encodings(&request);
-        assert_eq!(list.next().unwrap(), "foo");
-        assert_eq!(list.next().unwrap(), "bar");
-        assert_eq!(list.next(), None);
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(!encoded_response.headers.iter().any(|(header_name, _)| header_name == "Content-Encoding")); // No Content-Encoding header
+        let mut encoded_content = vec![];
+        encoded_response.data.into_reader_and_size().0.read_to_end(&mut encoded_content).unwrap();
+        assert_eq!(String::from_utf8(encoded_content).unwrap(), "<p>Hello world</p>"); // No encoding applied
     }
 
-    // TODO: more tests for encoding stuff
+    #[test]
+    fn unknown_req_encoding() {
+        let request = {
+            let h = vec![("Accept-Encoding".to_owned(), "x-gzip, br".to_owned())];
+            Request::fake_http("GET", "/", h, vec![])
+        };
+        let response = Response::html("<p>Hello world</p>");
+
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(encoded_response.headers.contains(&("Content-Encoding".into(), "br".into()))); // Brotli Content-Encoding header
+    }
+
+    #[test]
+    fn brotli_encoding() {
+        let request = {
+            let h = vec![("Accept-Encoding".to_owned(), "br".to_owned())];
+            Request::fake_http("GET", "/", h, vec![])
+        };
+        let response = Response::html("<html><head><title>Hello world</title><body><p>Hello world</p></body></html>");
+
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(encoded_response.headers.contains(&("Content-Encoding".into(), "br".into()))); // Brotli Content-Encoding header
+        let mut encoded_content = vec![];
+        encoded_response.data.into_reader_and_size().0.read_to_end(&mut encoded_content).unwrap();
+        assert_eq!(encoded_content,
+                   vec![27, 75, 0, 0, 4, 28, 114, 164, 129, 5, 210, 206, 25, 30, 90, 114, 224, 114, 73, 109, 45, 196,
+                   23, 126, 240, 144, 77, 40, 26, 211, 228, 67, 73, 40, 236, 55, 101, 254, 127, 147, 194, 129, 132, 65,
+                   130, 120, 152, 249, 68, 56, 93, 2]); // Applied proper Brotli encoding
+    }
+
+    #[test]
+    fn gzip_encoding() {
+        let request = {
+            let h = vec![("Accept-Encoding".to_owned(), "gzip".to_owned())];
+            Request::fake_http("GET", "/", h, vec![])
+        };
+        let response = Response::html("<html><head><title>Hello world</title><body><p>Hello world</p></body></html>");
+
+        let encoded_response = content_encoding::apply(&request, response);
+        assert!(encoded_response.headers.contains(&("Content-Encoding".into(), "gzip".into()))); // gzip Content-Encoding header
+        let mut encoded_content = vec![];
+        encoded_response.data.into_reader_and_size().0.read_to_end(&mut encoded_content).unwrap();
+        assert_eq!(encoded_content,
+                   vec![31, 139, 8, 0, 0, 0, 0, 0, 0, 3, 179, 201, 40, 201, 205, 177, 179, 201, 72, 77, 76, 177, 179,
+                   41, 201, 44, 201, 73, 181, 243, 72, 205, 201, 201, 87, 40, 207, 47, 202, 73, 177, 209, 135, 8, 217,
+                   36, 229, 167, 84, 218, 217, 20, 160, 202, 21, 216, 217, 232, 67, 36, 244, 193, 166, 0, 0, 202, 239,
+                   44, 120, 76, 0, 0, 0]); // Applied proper gzip encoding
+    }
 }
