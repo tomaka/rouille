@@ -16,9 +16,9 @@ extern crate serde_derive;
 
 use std::sync::Mutex;
 
-use postgres::Client;
-use postgres::tls::NoTls;
-use postgres::Transaction;
+use postgres::Connection;
+use postgres::TlsMode;
+use postgres::transaction::Transaction;
 
 use rouille::Request;
 use rouille::Response;
@@ -38,7 +38,7 @@ fn main() {
     // Not wrapping a mutex around the database would lead to a compilation error when we attempt
     // to use the variable `db` from within the closure passed to `start_server`.
     let db = {
-        let db = Client::connect("postgres://test:test@localhost/test", NoTls);
+        let db = Connection::connect("postgres://test:test@localhost/test", TlsMode::None);
         Mutex::new(db.expect("Failed to connect to database"))
     };
 
@@ -77,14 +77,14 @@ fn main() {
         // In addition to this, if a panic happens while the `Mutex` is locked then the database
         // connection will likely be in a corrupted state and the next time the mutex is locked
         // it will panic. This is another good reason to use multiple connections.
-        let mut db = db.lock().unwrap();
+        let db = db.lock().unwrap();
 
         // Start a transaction so that if a panic happens during the processing of the request,
         // any change made to the database will be rolled back.
-        let mut db = db.transaction().unwrap();
+        let db = db.transaction().unwrap();
 
         // For better readability, we handle the request in a separate function.
-        let response = note_routes(&request, &mut db);
+        let response = note_routes(&request, &db);
 
         // If the response is a success, we commit the transaction before returning. It's only at
         // this point that data are actually written in the database.
@@ -97,7 +97,7 @@ fn main() {
 }
 
 // This function actually handles the request.
-fn note_routes(request: &Request, db: &mut Transaction) -> Response {
+fn note_routes(request: &Request, db: &Transaction) -> Response {
     router!(request,
         (GET) (/) => {
             // For the sake of the example we just put a dummy route for `/` so that you see
