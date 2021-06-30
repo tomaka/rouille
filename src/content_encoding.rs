@@ -21,13 +21,13 @@
 //! use rouille::content_encoding;
 //!
 //! fn handle_request(request: &Request) -> Response {
-//!     let text = String::new();
+//!     let mut text = String::new();
 //!     for encoding in content_encoding::accepted_content_encodings(request) {
 //!         text.push_str(encoding);
 //!         text.push('\n');
 //!     }
 //!     let response = Response::text(&text);
-//!     content_encoding::apply(response)
+//!     content_encoding::apply(&request, response)
 //! }
 //! ```
 use std::str;
