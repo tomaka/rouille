@@ -24,8 +24,6 @@
 //! - Each message is made of one or more *frames*. See https://tools.ietf.org/html/rfc6455#section-5.4.
 //! - Each frame can be received progressively, where each packet is an `Element` object (below).
 
-use byteorder::{ByteOrder, NetworkEndian};
-
 /// A websocket element decoded from the data given to `StateMachine::feed`.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Element<'a> {
@@ -111,7 +109,7 @@ impl StateMachine {
 // take the hit of adding another dependency.
 fn read_u16_be<'a, T: Iterator<Item = &'a u8>>(input: &mut T) -> u16 {
     let buf: [u8; 2] = [*input.next().unwrap(), *input.next().unwrap()];
-    NetworkEndian::read_u16(&buf)
+    u16::from_be_bytes(buf)
 }
 
 fn read_u32_be<'a, T: Iterator<Item = &'a u8>>(input: &mut T) -> u32 {
@@ -121,7 +119,7 @@ fn read_u32_be<'a, T: Iterator<Item = &'a u8>>(input: &mut T) -> u32 {
         *input.next().unwrap(),
         *input.next().unwrap(),
     ];
-    NetworkEndian::read_u32(&buf)
+    u32::from_be_bytes(buf)
 }
 
 fn read_u64_be<'a, T: Iterator<Item = &'a u8>>(input: &mut T) -> u64 {
@@ -135,7 +133,7 @@ fn read_u64_be<'a, T: Iterator<Item = &'a u8>>(input: &mut T) -> u64 {
         *input.next().unwrap(),
         *input.next().unwrap(),
     ];
-    NetworkEndian::read_u64(&buf)
+    u64::from_be_bytes(buf)
 }
 
 /// Iterator to the list of elements that were received.

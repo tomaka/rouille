@@ -7,7 +7,6 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-use byteorder::{NetworkEndian, WriteBytesExt};
 use std::io;
 use std::io::Write;
 use std::mem;
@@ -347,11 +346,11 @@ fn send<W: Write>(data: &[u8], mut dest: W, opcode: u8) -> io::Result<()> {
         dest.write_all(&[127u8])?;
         let len = data.len() as u64;
         assert!(len < 0x8000_0000_0000_0000);
-        dest.write_u64::<NetworkEndian>(len)?;
+        dest.write_all(&len.to_be_bytes())?;
     } else if data.len() >= 126 {
         dest.write_all(&[126u8])?;
         let len = data.len() as u16;
-        dest.write_u16::<NetworkEndian>(len)?;
+        dest.write_all(&len.to_be_bytes())?;
     } else {
         dest.write_all(&[data.len() as u8])?;
     }
