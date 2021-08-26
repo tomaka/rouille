@@ -31,7 +31,7 @@
 //! The parameter that the closure receives is a [`Request`](struct.Request.html) object that
 //! represents the request made by the client.
 //!
-//! The `Request` object itself provides some getters, but most advanced functionnalities are
+//! The `Request` object itself provides some getters, but most advanced functionalities are
 //! provided by other modules of this crate.
 //!
 //! - In order to dispatch between various code depending on the URL, you can use the
@@ -217,7 +217,7 @@ macro_rules! assert_or_400 {
 ///
 /// # Panic handling in the handler
 ///
-/// If your request handler panicks, a 500 error will automatically be sent to the client.
+/// If your request handler panics, a 500 error will automatically be sent to the client.
 ///
 /// # Panic
 ///
@@ -886,7 +886,7 @@ impl Request {
     /// If there is any non-unicode character in the URL, it will be replaced with `U+FFFD`.
     ///
     /// > **Note**: This function will decode the token `%2F` will be decoded as `/`. However the
-    /// > official speficiations say that such a token must not count as a delimiter for URL paths.
+    /// > official specifications say that such a token must not count as a delimiter for URL paths.
     /// > In other words, `/hello/world` is not the same as `/hello%2Fworld`.
     ///
     /// # Example
@@ -983,7 +983,7 @@ impl Request {
 
     /// Returns the body of the request.
     ///
-    /// The body can only be retrieved once. Returns `None` is the body has already been retreived
+    /// The body can only be retrieved once. Returns `None` is the body has already been retrieved
     /// before.
     ///
     /// # Example

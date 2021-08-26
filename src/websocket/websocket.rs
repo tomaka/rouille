@@ -173,7 +173,7 @@ impl Iterator for Websocket {
                         // `current_frame_payload`.
                         self.current_frame_payload.extend(data);
 
-                        // But if the frame is finished we additionnally need to dispatch it.
+                        // But if the frame is finished we additionally need to dispatch it.
                         if last_in_frame {
                             match self.current_frame_opcode {
                                 // Frame is a continuation of the current message.

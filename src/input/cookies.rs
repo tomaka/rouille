@@ -37,7 +37,7 @@ use Request;
 /// }
 /// ```
 // TODO: should an error be returned if the header is malformed?
-// TODO: be less tolerent to what is accepted?
+// TODO: be less tolerant to what is accepted?
 pub fn cookies(request: &Request) -> CookiesIter {
     let header = request.header("Cookie").unwrap_or("");
 

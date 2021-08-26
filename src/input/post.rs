@@ -28,7 +28,7 @@
 //! ```
 //!
 //! In this example, the macro will read the body of the request and try to find fields whose
-//! names are `field1` and `field2`. If the body was already retreived earlier, if the content-type
+//! names are `field1` and `field2`. If the body was already retrieved earlier, if the content-type
 //! is not one of the possible values, or if a field is missing or can't be parsed, then an error
 //! is returned. Usually you want to handle this error by returning an error to the client.
 //!

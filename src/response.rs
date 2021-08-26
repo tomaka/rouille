@@ -38,7 +38,7 @@ pub struct Response {
     /// - Trailer
     /// - Transfer-Encoding
     ///
-    /// Additionnaly, the `Upgrade` header is ignored as well unless the `upgrade` field of the
+    /// Additionally, the `Upgrade` header is ignored as well unless the `upgrade` field of the
     /// `Response` is set to something.
     ///
     /// The reason for this is that these headers are too low-level and are directly handled by

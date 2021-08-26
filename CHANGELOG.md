@@ -45,7 +45,7 @@
 ## Version 2.1.0
 
 - Replace `flate2` with `deflate`
-- Fixed handling of url-encoded path components in route!() macro. 
+- Fixed handling of url-encoded path components in route!() macro.
   Previously, URL was eagerly decoded and thus would fail to match
   intended routes if special characters were used (such as ? or /).
   Now, individual matched components are decoded after matching.
@@ -95,7 +95,7 @@
 - Renamed `get_json_input()` to `json_input()`.
 - Renamed `get_cookies()` to `cookies()`.
 - Renamed `get_basic_http_auth()` to `basic_http_auth()`.
-- The logs now show the time of the start of the request processing. 
+- The logs now show the time of the start of the request processing.
 - `Request::header()` now returns a `Option<&str>` instead of `Option<String>`.
 - `Response::svg()` and `Response::html()` now take a `Into<String>` instead of a `Into<Vec<u8>>`.
 - Renamed `Response::error()` and `success()` to `is_error()` and `is_success()`.
@@ -109,7 +109,7 @@
 - Added `plain_text_body_with_limit` which does the same as `plain_text_body` but with a
   customizable limit.
 - Implemented the `std::error::Error` trait on all error types.
-- Added `Response::into_reader_and_size()` to retreive a `Read` object from a `ResponseBody`.
+- Added `Response::into_reader_and_size()` to retrieve a `Read` object from a `ResponseBody`.
 - Fixed issue with static files not being found on Windows because of `/` and `\` mismatch.
 
 ## Version 0.3.3

@@ -102,7 +102,7 @@ pub fn apply(request: &Request, response: Response) -> Response {
 }
 
 // Returns true if the Content-Type of the response is a type that should be encoded.
-// Since encoding is purely an optimisation, it's not a problem if the function sometimes has
+// Since encoding is purely an optimization, it's not a problem if the function sometimes has
 // false positives or false negatives.
 fn response_is_text(response: &Response) -> bool {
     response.headers.iter().any(|&(ref key, ref value)| {

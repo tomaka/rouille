@@ -155,7 +155,7 @@ impl<'a> Iterator for ElementsIter<'a> {
         match self.state.inner {
             // First situation, we are in the header.
             StateMachineInner::InHeader => {
-                // We need at least 6 bytes for a succesful header. Otherwise we just return.
+                // We need at least 6 bytes for a successful header. Otherwise we just return.
                 let total_buffered = self.state.buffer.len() + self.data.len();
                 if total_buffered < 6 {
                     self.state.buffer.extend_from_slice(self.data);
@@ -163,7 +163,7 @@ impl<'a> Iterator for ElementsIter<'a> {
                     return None;
                 }
 
-                // Retreive the first two bytes of the header.
+                // Retrieve the first two bytes of the header.
                 let (first_byte, second_byte) = {
                     let mut mask_iter = self.state.buffer.iter().chain(self.data.iter());
                     let first_byte = *mask_iter.next().unwrap();

@@ -54,13 +54,13 @@ where
 
     let session = if let Some(cookie) = cookie {
         Session {
-            key_was_retreived: AtomicBool::new(false),
+            key_was_retrieved: AtomicBool::new(false),
             key_was_given: true,
             key: cookie.into(),
         }
     } else {
         Session {
-            key_was_retreived: AtomicBool::new(false),
+            key_was_retrieved: AtomicBool::new(false),
             key_was_given: false,
             key: generate_session_id().into(),
         }
@@ -68,7 +68,7 @@ where
 
     let mut response = inner(&session);
 
-    if session.key_was_retreived.load(Ordering::Relaxed) {
+    if session.key_was_retrieved.load(Ordering::Relaxed) {
         // TODO: use `get_mut()`
         // FIXME: correct interactions with existing headers
         // TODO: allow setting domain
@@ -86,7 +86,7 @@ where
 
 /// Contains the ID of the session.
 pub struct Session<'r> {
-    key_was_retreived: AtomicBool,
+    key_was_retrieved: AtomicBool,
     key_was_given: bool,
     key: Cow<'r, str>,
 }
@@ -103,7 +103,7 @@ impl<'r> Session<'r> {
     /// Returns the id of the session.
     #[inline]
     pub fn id(&self) -> &str {
-        self.key_was_retreived.store(true, Ordering::Relaxed);
+        self.key_was_retrieved.store(true, Ordering::Relaxed);
         &self.key
     }
 

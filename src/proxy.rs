@@ -9,7 +9,7 @@
 
 //! Dispatch a request to another HTTP server.
 //!
-//! This module provides functionnalities to dispatch a request to another server. This can be
+//! This module provides functionalities to dispatch a request to another server. This can be
 //! used to make rouille behave as a reverse proxy.
 //!
 //! This function call will return immediately after the remote server has finished sending its

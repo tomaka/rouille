@@ -99,7 +99,7 @@ fn handle_route(request: &Request, session_data: &mut Option<SessionData>) -> Re
         (POST) (/login) => {
             // This is the route that is called when the user wants to log in.
 
-            // In order to retreive what the user sent us through the <form>, we use the
+            // In order to retrieve what the user sent us through the <form>, we use the
             // `post_input!` macro. This macro returns an error (if a field is missing for example),
             // so we use the `try_or_400!` macro to handle any possible error.
             //

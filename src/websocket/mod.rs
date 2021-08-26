@@ -149,7 +149,7 @@ where
         _ => return Err(WebsocketError::InvalidWebsocketRequest),
     }
 
-    // TODO: there are some version shanigans to handle
+    // TODO: there are some version shenanigans to handle
     // see https://tools.ietf.org/html/rfc6455#section-4.4
     match request.header("Sec-WebSocket-Version") {
         Some(h) if h == "13" => (),

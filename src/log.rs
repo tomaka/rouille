@@ -53,7 +53,7 @@ where
 
     // Calling the handler and catching potential panics.
     // Note that this we always resume unwinding afterwards, we can ignore the small panic-safety
-    // mecanism of `catch_unwind`.
+    // mechanism of `catch_unwind`.
     let response = panic::catch_unwind(panic::AssertUnwindSafe(f));
 
     let elapsed_time = format_time(start_instant.elapsed());
