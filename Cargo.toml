@@ -34,7 +34,6 @@ tiny_http = "0.8.1"
 url = "2"
 threadpool = "1"
 num_cpus = "1"
-byteorder = "1.4.3"
 
 [dev-dependencies]
 postgres = { version = "0.19", default-features = false }
