@@ -140,12 +140,12 @@ where
     }*/
 
     match request.header("Connection") {
-        Some(ref h) if h.to_ascii_lowercase().contains("upgrade") => (),
+        Some(h) if h.to_ascii_lowercase().contains("upgrade") => (),
         _ => return Err(WebsocketError::InvalidWebsocketRequest),
     }
 
     match request.header("Upgrade") {
-        Some(ref h) if h.to_ascii_lowercase().contains("websocket") => (),
+        Some(h) if h.to_ascii_lowercase().contains("websocket") => (),
         _ => return Err(WebsocketError::InvalidWebsocketRequest),
     }
 
@@ -168,7 +168,7 @@ where
             None => return Err(WebsocketError::InvalidWebsocketRequest),
         };
 
-        convert_key(&in_key)
+        convert_key(in_key)
     };
 
     let (tx, rx) = mpsc::channel();

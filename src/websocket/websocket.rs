@@ -183,10 +183,7 @@ impl Iterator for Websocket {
 
                                     // If the message is finished, dispatch it.
                                     if self.current_frame_fin {
-                                        let binary = mem::replace(
-                                            &mut self.current_message_payload,
-                                            Vec::new(),
-                                        );
+                                        let binary = mem::take(&mut self.current_message_payload);
 
                                         if self.current_message_binary {
                                             self.messages_in_queue.push(Message::Binary(binary));
@@ -228,10 +225,7 @@ impl Iterator for Websocket {
 
                                     if self.current_frame_fin {
                                         // There's only one frame in this message.
-                                        let binary = mem::replace(
-                                            &mut self.current_frame_payload,
-                                            Vec::new(),
-                                        );
+                                        let binary = mem::take(&mut self.current_frame_payload);
                                         let string = match String::from_utf8(binary) {
                                             Ok(s) => s,
                                             Err(_err) => {
@@ -270,10 +264,7 @@ impl Iterator for Websocket {
                                     }
 
                                     if self.current_frame_fin {
-                                        let binary = mem::replace(
-                                            &mut self.current_frame_payload,
-                                            Vec::new(),
-                                        );
+                                        let binary = mem::take(&mut self.current_frame_payload);
                                         self.messages_in_queue.push(Message::Binary(binary));
                                     } else {
                                         // Start of a fragmented message.
