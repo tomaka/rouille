@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 3.3.0
+- Bumped minimum supported Rust version to 1.48
+- Added module-level documentation for `rouille::content_encoding`
+- Updated `time` dependency to `0.3` and `postgres` to `0.19` to fix a compile failure due to a yanked version of
+  `sha1`.
+- Fixed numerous typos in the crate documentation.
+
 ## Version 3.2.1
 
 - Removed unused dependency `term` and updated `rand`, `multipart`, `deflate`
