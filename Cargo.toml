@@ -37,5 +37,4 @@ num_cpus = "1"
 byteorder = "1.4.3"
 
 [dev-dependencies]
-postgres = { version = "0.15.2", default-features = false }
 log = "0.4"
