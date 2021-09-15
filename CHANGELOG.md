@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 3.3.1
+- Use `.strip_prefix` in place of `.starts_with` where appropriate, this stops a Clippy lint from
+  leaking out of our `router!` macro and into downstream code.
+
 ## Version 3.3.0
 - Bumped minimum supported Rust version to 1.48
 - Added module-level documentation for `rouille::content_encoding`
