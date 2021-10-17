@@ -917,7 +917,11 @@ impl Request {
             .filter(|pair| pair.starts_with(name_pattern))
             .map(|pair| pair.split('=').skip(1).next().unwrap_or(""))
             .next()
-            .map(|value| percent_encoding::percent_decode(value.replace("+", " ").as_bytes()).decode_utf8_lossy().into_owned())
+            .map(|value| {
+                percent_encoding::percent_decode(value.replace("+", " ").as_bytes())
+                    .decode_utf8_lossy()
+                    .into_owned()
+            })
     }
 
     /// Returns the value of a header of the request.
