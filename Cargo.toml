@@ -19,7 +19,7 @@ ssl = ["tiny_http/ssl"]
 [dependencies]
 base64 = "0.13"
 brotli2 = { version = "0.3.2", optional = true }
-chrono = "0.4.0"
+chrono = { version = "0.4.19", default-features = false }
 filetime = "0.2.0"
 deflate = { version = "0.9", optional = true, features = ["gzip"] }
 multipart = { version = "0.18", default-features = false, features = ["server"] }
