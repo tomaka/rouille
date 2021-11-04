@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 3.4
+- Resolved a number of cleanup & refactoring TODOs
+- Correctly identify non-lowercase content types as text (e.g. `text/JSON`
+  would be incorrectly identified as non-text).
+- Pinned `time-rs` to 0.3.2 to avoid a semver-breaking change in their MSRV.
+- Bumped `chrono` to 0.4.19 and disabled their default feature set to avoid
+  warnings about `RUSTSEC-2020-0071` (Rouille was never vulnerable, but used a
+  vulnerable version of `chrono`).
+
 ## Version 3.3.1
 - Use `.strip_prefix` in place of `.starts_with` where appropriate, this stops a Clippy lint from
   leaking out of our `router!` macro and into downstream code.
