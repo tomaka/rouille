@@ -458,14 +458,12 @@ where
     #[inline]
     pub fn stoppable(self) -> (thread::JoinHandle<()>, mpsc::Sender<()>) {
         let (tx, rx) = mpsc::channel();
-        let handle = thread::spawn(move || {
-            loop {
-                // In order to reduce CPU load wait 1s for a recv before looping again
-                while let Ok(Some(request)) = self.server.recv_timeout(Duration::from_secs(1)) {
-                    self.process(request);
-                    if rx.try_recv().is_ok() {
-                        return;
-                    }
+        let handle = thread::spawn(move || loop {
+            // In order to reduce CPU load wait 1s for a recv before looping again
+            while let Ok(Some(request)) = self.server.recv_timeout(Duration::from_secs(1)) {
+                self.process(request);
+                if rx.try_recv().is_ok() {
+                    return;
                 }
             }
         });
