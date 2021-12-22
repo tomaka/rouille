@@ -132,7 +132,7 @@ fn gzip(response: &mut Response) {}
 
 #[cfg(feature = "brotli")]
 fn brotli(response: &mut Response) {
-    use brotli2::read::BrotliEncoder;
+    use brotli::enc::reader::CompressorReader;
     use std::mem;
     use ResponseBody;
 
@@ -141,7 +141,8 @@ fn brotli(response: &mut Response) {
         .push(("Content-Encoding".into(), "br".into()));
     let previous_body = mem::replace(&mut response.data, ResponseBody::empty());
     let (raw_data, _) = previous_body.into_reader_and_size();
-    response.data = ResponseBody::from_reader(BrotliEncoder::new(raw_data, 6));
+    // Using default Brotli parameters: 0 buffer_size == 4096, compression level 6, lgwin == 22
+    response.data = ResponseBody::from_reader(CompressorReader::new(raw_data, 0, 6, 22));
 }
 
 #[cfg(not(feature = "brotli"))]

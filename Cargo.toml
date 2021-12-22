@@ -12,13 +12,12 @@ categories = ["web-programming::http-server", "web-programming::websocket"]
 
 [features]
 default = ["gzip", "brotli"]
-brotli = ["brotli2"]
 gzip = ["deflate"]
 ssl = ["tiny_http/ssl"]
 
 [dependencies]
 base64 = "0.13"
-brotli2 = { version = "0.3.2", optional = true }
+brotli = { version = "3.3.2", optional = true }
 chrono = { version = "0.4.19", default-features = false }
 filetime = "0.2.0"
 deflate = { version = "0.9", optional = true, features = ["gzip"] }

@@ -57,8 +57,8 @@
 #![deny(unsafe_code)]
 
 extern crate base64;
-#[cfg(feature = "brotli2")]
-extern crate brotli2;
+#[cfg(feature = "brotli")]
+extern crate brotli;
 extern crate chrono;
 #[cfg(feature = "gzip")]
 extern crate deflate;
