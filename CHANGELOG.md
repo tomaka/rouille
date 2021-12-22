@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 3.5
+- Replaced our use of the `brotli2` crate with the alternative pure Rust implementation
+  [`brotli`](https://github.com/dropbox/rust-brotli). This removes Rouille's vulnerability to
+  [RUSTSEC-2021-0131](https://rustsec.org/advisories/RUSTSEC-2021-0131.html), which existed due to `brotli-sys`
+  bundling a vulnerable version of the underlying C library.
+- Unpinned `time-rs` and as a result increased our MSRV to 1.51, we don't have a formal MSRV policy and the ecosystem
+  is making it more and more difficult to support compiler versions more than about 6 months old.
+
 ## Version 3.4
 - Resolved a number of cleanup & refactoring TODOs
 - Correctly identify non-lowercase content types as text (e.g. `text/JSON`
