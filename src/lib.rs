@@ -915,7 +915,7 @@ impl Request {
         let param_pairs = self.raw_query_string().split('&');
         param_pairs
             .filter(|pair| pair.starts_with(name_pattern))
-            .map(|pair| pair.split('=').skip(1).next().unwrap_or(""))
+            .map(|pair| pair.split('=').nth(1).unwrap_or(""))
             .next()
             .map(|value| {
                 percent_encoding::percent_decode(value.replace("+", " ").as_bytes())

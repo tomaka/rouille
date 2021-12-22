@@ -74,7 +74,7 @@ pub fn apply(request: &Request, mut response: Response) -> Response {
     let encoding_preference = ["br", "gzip", "x-gzip", "identity"];
     let accept_encoding_header = request.header("Accept-Encoding").unwrap_or("");
     if let Some(preferred_index) = input::priority_header_preferred(
-        &accept_encoding_header,
+        accept_encoding_header,
         encoding_preference.iter().cloned(),
     ) {
         match encoding_preference[preferred_index] {
@@ -84,7 +84,7 @@ pub fn apply(request: &Request, mut response: Response) -> Response {
         }
     }
 
-    return response;
+    response
 }
 
 // Returns true if the Content-Type of the response is a type that should be encoded.
