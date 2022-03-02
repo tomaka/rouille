@@ -70,7 +70,7 @@ pub use self::websocket::SendError;
 pub use self::websocket::Websocket;
 
 use base64;
-use sha1::Sha1;
+use sha1::{Digest, Sha1};
 use std::borrow::Cow;
 use std::error;
 use std::fmt;
@@ -246,5 +246,5 @@ fn convert_key(input: &str) -> String {
     sha1.update(input.as_bytes());
     sha1.update(b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
-    base64::encode_config(&sha1.digest().bytes(), base64::STANDARD)
+    base64::encode_config(&sha1.finalize(), base64::STANDARD)
 }
