@@ -59,11 +59,15 @@
 extern crate base64;
 #[cfg(feature = "brotli")]
 extern crate brotli;
+#[cfg(feature = "logging")]
 extern crate chrono;
 #[cfg(feature = "gzip")]
 extern crate deflate;
+#[cfg(feature = "assets")]
 extern crate filetime;
+#[cfg(feature = "post")]
 extern crate multipart;
+#[cfg(feature = "session")]
 extern crate rand;
 extern crate serde;
 #[macro_use]
@@ -73,6 +77,7 @@ pub extern crate percent_encoding;
 extern crate serde_json;
 extern crate sha1;
 extern crate threadpool;
+#[cfg(feature = "assets")]
 extern crate time;
 extern crate tiny_http;
 pub extern crate url;
@@ -89,8 +94,11 @@ pub const DEFAULT_ENCODE_SET: &percent_encoding::AsciiSet = &percent_encoding::C
     .add(b'{')
     .add(b'}');
 
+#[cfg(feature = "assets")]
 pub use assets::extension_to_mime;
+#[cfg(feature = "assets")]
 pub use assets::match_assets;
+#[cfg(feature = "logging")]
 pub use log::{log, log_custom};
 pub use response::{Response, ResponseBody};
 pub use tiny_http::ReadWrite;
@@ -117,11 +125,14 @@ pub mod cgi;
 pub mod content_encoding;
 pub mod input;
 pub mod proxy;
+#[cfg(feature = "session")]
 pub mod session;
 pub mod websocket;
 
+#[cfg(feature = "assets")]
 mod assets;
 mod find_route;
+#[cfg(feature = "logging")]
 mod log;
 mod response;
 mod router;
