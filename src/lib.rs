@@ -929,7 +929,7 @@ impl Request {
             .map(|pair| pair.split('=').nth(1).unwrap_or(""))
             .next()
             .map(|value| {
-                percent_encoding::percent_decode(value.replace("+", " ").as_bytes())
+                percent_encoding::percent_decode(value.replace('+', " ").as_bytes())
                     .decode_utf8_lossy()
                     .into_owned()
             })
