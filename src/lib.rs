@@ -276,7 +276,7 @@ where
     A: ToSocketAddrs,
     F: Send + Sync + 'static + Fn(&Request) -> Response,
 {
-    Server::new_ssl(addr, handler, certificate, private_key)
+    Server::new_ssl(addr, handler, certificate, key)
         .expect("Failed to start server")
         .pool_size(pool_size.unwrap_or_else(|| 8 * num_cpus::get()))
         .run();
