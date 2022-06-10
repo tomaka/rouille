@@ -92,7 +92,7 @@ macro_rules! accept {
 
 #[cfg(test)]
 mod tests {
-    use Request;
+    use crate::Request;
 
     #[test]
     fn basic() {

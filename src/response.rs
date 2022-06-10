@@ -16,8 +16,8 @@ use std::fs::File;
 use std::io;
 use std::io::Cursor;
 use std::io::Read;
-use Request;
-use Upgrade;
+use crate::Request;
+use crate::Upgrade;
 
 /// Contains a prototype of a response.
 ///
@@ -867,7 +867,7 @@ impl ResponseBody {
 
 #[cfg(test)]
 mod tests {
-    use Response;
+    use crate::Response;
 
     #[test]
     fn unique_header_adds() {

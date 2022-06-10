@@ -101,7 +101,7 @@
 //! `from_file` method. You should return `PostFieldError::WrongFieldType` if you're
 //! expecting a file and `from_field` was called, or vice-versa.
 
-use Request;
+use crate::Request;
 
 use std::borrow::Cow;
 use std::error;
@@ -698,9 +698,9 @@ pub fn raw_urlencoded_post_input(request: &Request) -> Result<Vec<(String, Strin
 
 #[cfg(test)]
 mod tests {
-    use input::post::PostError;
-    use input::post::PostFieldError;
-    use Request;
+    use crate::input::post::PostError;
+    use crate::input::post::PostFieldError;
+    use crate::Request;
 
     #[test]
     fn basic_int() {

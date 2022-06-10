@@ -11,7 +11,7 @@ use std::error;
 use std::fmt;
 use std::io::Error as IoError;
 use std::io::Read;
-use Request;
+use crate::Request;
 
 /// Error that can happen when parsing the request body as plain text.
 #[derive(Debug)]
@@ -138,7 +138,7 @@ mod test {
     use super::plain_text_body;
     use super::plain_text_body_with_limit;
     use super::PlainTextError;
-    use Request;
+    use crate::Request;
 
     #[test]
     fn ok() {

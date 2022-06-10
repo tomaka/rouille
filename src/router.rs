@@ -352,7 +352,7 @@ macro_rules! router {
 #[allow(unused_variables)]
 #[cfg(test)]
 mod tests {
-    use Request;
+    use crate::Request;
 
     // -- old-style tests --
     #[test]

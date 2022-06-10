@@ -77,8 +77,8 @@ use std::fmt;
 use std::sync::mpsc;
 use std::vec::IntoIter as VecIntoIter;
 
-use Request;
-use Response;
+use crate::Request;
+use crate::Response;
 
 mod low_level;
 #[allow(clippy::module_inception)]

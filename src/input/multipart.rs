@@ -15,8 +15,8 @@
 use std::error;
 use std::fmt;
 
-use Request;
-use RequestBody;
+use crate::Request;
+use crate::RequestBody;
 
 use multipart::server::Multipart as InnerMultipart;
 

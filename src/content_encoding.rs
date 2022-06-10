@@ -25,9 +25,9 @@
 //!     content_encoding::apply(&request, response)
 //! }
 //! ```
-use input;
-use Request;
-use Response;
+use crate::input;
+use crate::Request;
+use crate::Response;
 
 /// Applies content encoding to the response.
 ///
@@ -110,7 +110,7 @@ fn gzip(response: &mut Response) {
     use deflate::deflate_bytes_gzip;
     use std::io;
     use std::mem;
-    use ResponseBody;
+    use crate::ResponseBody;
 
     response
         .headers
@@ -134,7 +134,7 @@ fn gzip(response: &mut Response) {}
 fn brotli(response: &mut Response) {
     use brotli::enc::reader::CompressorReader;
     use std::mem;
-    use ResponseBody;
+    use crate::ResponseBody;
 
     response
         .headers
@@ -151,9 +151,9 @@ fn brotli(response: &mut Response) {}
 
 #[cfg(test)]
 mod tests {
-    use content_encoding;
-    use Request;
-    use Response;
+    use crate::content_encoding;
+    use crate::Request;
+    use crate::Response;
 
     // TODO: more tests for encoding stuff
     #[test]

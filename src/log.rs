@@ -14,8 +14,8 @@ use std::time::Instant;
 
 use chrono;
 
-use Request;
-use Response;
+use crate::Request;
+use crate::Response;
 
 /// Adds a log entry to the given writer for each request.
 ///

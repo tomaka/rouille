@@ -89,10 +89,10 @@ pub const DEFAULT_ENCODE_SET: &percent_encoding::AsciiSet = &percent_encoding::C
     .add(b'{')
     .add(b'}');
 
-pub use assets::extension_to_mime;
-pub use assets::match_assets;
-pub use log::{log, log_custom};
-pub use response::{Response, ResponseBody};
+pub use crate::assets::extension_to_mime;
+pub use crate::assets::match_assets;
+pub use crate::log::{log, log_custom};
+pub use crate::response::{Response, ResponseBody};
 pub use tiny_http::ReadWrite;
 
 use std::error::Error;
@@ -1062,7 +1062,7 @@ impl<'a> Read for RequestBody<'a> {
 
 #[cfg(test)]
 mod tests {
-    use Request;
+    use crate::Request;
 
     #[test]
     fn header() {
