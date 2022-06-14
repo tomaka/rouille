@@ -7,12 +7,12 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+use crate::ReadWrite;
+use crate::Upgrade;
 use std::io;
 use std::io::Write;
 use std::mem;
 use std::sync::mpsc::Sender;
-use crate::ReadWrite;
-use crate::Upgrade;
 
 use crate::websocket::low_level;
 

@@ -34,12 +34,12 @@
 //! ```
 //!
 
+use crate::Request;
 use serde;
 use serde_json;
 use std::error;
 use std::fmt;
 use std::io::Error as IoError;
-use crate::Request;
 
 /// Error that can happen when parsing the JSON input.
 #[derive(Debug)]

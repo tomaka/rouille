@@ -7,6 +7,8 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+use crate::Request;
+use crate::Upgrade;
 use percent_encoding;
 use serde;
 use serde_json;
@@ -16,8 +18,6 @@ use std::fs::File;
 use std::io;
 use std::io::Cursor;
 use std::io::Read;
-use crate::Request;
-use crate::Upgrade;
 
 /// Contains a prototype of a response.
 ///

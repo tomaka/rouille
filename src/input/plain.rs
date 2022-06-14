@@ -7,11 +7,11 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
+use crate::Request;
 use std::error;
 use std::fmt;
 use std::io::Error as IoError;
 use std::io::Read;
-use crate::Request;
 
 /// Error that can happen when parsing the request body as plain text.
 #[derive(Debug)]

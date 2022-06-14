@@ -107,10 +107,10 @@ fn response_is_text(response: &Response) -> bool {
 
 #[cfg(feature = "gzip")]
 fn gzip(response: &mut Response) {
+    use crate::ResponseBody;
     use deflate::deflate_bytes_gzip;
     use std::io;
     use std::mem;
-    use crate::ResponseBody;
 
     response
         .headers
@@ -132,9 +132,9 @@ fn gzip(response: &mut Response) {}
 
 #[cfg(feature = "brotli")]
 fn brotli(response: &mut Response) {
+    use crate::ResponseBody;
     use brotli::enc::reader::CompressorReader;
     use std::mem;
-    use crate::ResponseBody;
 
     response
         .headers

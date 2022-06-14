@@ -17,8 +17,8 @@
 //! - In order to read a plain text body, see
 //!   [the `plain_text_body` function](fn.plain_text_body.html).
 
-use std::str::Split;
 use crate::Request;
+use std::str::Split;
 
 /// Attempts to parse the list of cookies from the request.
 ///

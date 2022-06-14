@@ -17,8 +17,8 @@
 //! - In order to read a plain text body, see
 //!   [the `plain_text_body` function](fn.plain_text_body.html).
 
-use base64;
 use crate::Request;
+use base64;
 
 /// Credentials returned by `basic_http_auth`.
 #[derive(Debug, Clone, PartialEq, Eq)]
