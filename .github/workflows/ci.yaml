@@ -32,7 +32,7 @@ jobs:
         rust:
           - stable
           - nightly
-          - 1.56
+          - 1.57
         features:
           - default
           - ssl
