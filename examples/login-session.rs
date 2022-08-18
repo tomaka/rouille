@@ -148,7 +148,7 @@ fn handle_route(request: &Request, session_data: &mut Option<SessionData>) -> Re
         _ => ()
     );
 
-    // We that we handled all the routes that are accessible in all circumstances, we check
+    // Now that we handled all the routes that are accessible in all circumstances, we check
     // that the user is logged in before proceeding.
     if let Some(session_data) = session_data.as_ref() {
         // Logged in.
