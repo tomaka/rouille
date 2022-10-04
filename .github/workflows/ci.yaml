@@ -4,6 +4,12 @@ jobs:
   clippy_rustfmt:
     name: Lint & Format
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        features:
+          - default
+          - ssl
+          - rustls
     steps:
       - uses: actions/checkout@v2
       - name: Install stable toolchain
@@ -16,7 +22,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all-features
+          args: --features ${{ matrix.features }}
 
       - name: Format
         uses: actions-rs/cargo@v1
@@ -36,6 +42,7 @@ jobs:
         features:
           - default
           - ssl
+          - rustls
     steps:
       - uses: actions/checkout@v2
       - name: Install stable toolchain
