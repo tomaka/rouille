@@ -21,7 +21,7 @@ base64 = "0.13"
 brotli = { version = "3.3.2", optional = true }
 chrono = { version = "0.4.19", default-features = false, features = ["clock"] }
 filetime = "0.2.0"
-deflate = { version = "=1.0.0", optional = true, features = ["gzip"] }
+deflate = { version = "1.0.0", optional = true, features = ["gzip"] }
 multipart = { version = "0.18", default-features = false, features = ["server"] }
 percent-encoding = "2"
 rand = "0.8"
@@ -29,7 +29,7 @@ serde = "1"
 serde_derive = "1"
 serde_json = "1"
 sha1 = "0.10.1"
-time = { version = "=0.3.7", features = [ "local-offset" ] }
+time = { version = "0.3.15", features = [ "local-offset" ] }
 tiny_http = "0.11.0"
 url = "2"
 threadpool = "1"
