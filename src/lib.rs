@@ -414,7 +414,10 @@ where
     /// Returns the address of the listening socket.
     #[inline]
     pub fn server_addr(&self) -> SocketAddr {
-        self.server.server_addr()
+        self.server
+            .server_addr()
+            .to_ip()
+            .expect("Unexpected Unix socket listener")
     }
 
     /// Runs the server forever, or until the listening socket is somehow force-closed by the
@@ -579,7 +582,7 @@ where
                     .iter()
                     .map(|h| (h.field.to_string(), h.value.clone().into()))
                     .collect();
-                let remote_addr = *request.remote_addr();
+                let remote_addr = request.remote_addr().copied();
 
                 tiny_http_request = Arc::new(Mutex::new(Some(request)));
                 let data = Arc::new(Mutex::new(Some(
@@ -678,7 +681,7 @@ pub struct Request {
     headers: Vec<(String, String)>,
     https: bool,
     data: Arc<Mutex<Option<Box<dyn Read + Send>>>>,
-    remote_addr: SocketAddr,
+    remote_addr: Option<SocketAddr>,
 }
 
 impl fmt::Debug for Request {
@@ -709,7 +712,7 @@ impl Request {
         M: Into<String>,
     {
         let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
-        let remote_addr = "127.0.0.1:12345".parse().unwrap();
+        let remote_addr = Some("127.0.0.1:12345".parse().unwrap());
 
         Request {
             url: url.into(),
@@ -741,7 +744,7 @@ impl Request {
             https: false,
             data,
             headers,
-            remote_addr: from,
+            remote_addr: Some(from),
         }
     }
 
@@ -760,7 +763,7 @@ impl Request {
         M: Into<String>,
     {
         let data = Arc::new(Mutex::new(Some(Box::new(Cursor::new(data)) as Box<_>)));
-        let remote_addr = "127.0.0.1:12345".parse().unwrap();
+        let remote_addr = Some("127.0.0.1:12345".parse().unwrap());
 
         Request {
             url: url.into(),
@@ -792,7 +795,7 @@ impl Request {
             https: true,
             data,
             headers,
-            remote_addr: from,
+            remote_addr: Some(from),
         }
     }
 
@@ -1030,7 +1033,9 @@ impl Request {
     /// ```
     #[inline]
     pub fn remote_addr(&self) -> &SocketAddr {
-        &self.remote_addr
+        self.remote_addr
+            .as_ref()
+            .expect("Unexpected Unix socket for request")
     }
 }
 
