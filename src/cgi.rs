@@ -151,9 +151,7 @@ impl CgiRun for Command {
                     break;
                 }
 
-                let mut splits = header.splitn(2, ':');
-                let header = splits.next().unwrap(); // TODO: return Err instead?
-                let val = splits.next().unwrap(); // TODO: return Err instead?
+                let (header, val) = header.split_once(':').unwrap();
                 let val = &val[1..];
 
                 if header == "Status" {
