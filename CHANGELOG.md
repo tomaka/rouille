@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 3.6.1
+
+Reverts [Added a number of default features](https://github.com/tomaka/rouille/pull/254) as it breaks any downstreams 
+who were specifying `default-features = false`.
+
 ## Version 3.6.0
 - Added [`rustls`](https://github.com/rustls/rustls) support (via `tiny-http`), if you're currently using the `ssl` feature
   you can switch from OpenSSL to Rustls by instead enabling the `rustls` feature in your `Cargo.toml`.
