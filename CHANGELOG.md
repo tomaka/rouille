@@ -1,6 +1,17 @@
 # Changelog
 
-## Version 3.5
+## Version 3.6.0
+- Added [`rustls`](https://github.com/rustls/rustls) support (via `tiny-http`), if you're currently using the `ssl` feature
+  you can switch from OpenSSL to Rustls by instead enabling the `rustls` feature in your `Cargo.toml`.
+- [Added a number of default features](https://github.com/tomaka/rouille/pull/254) to allow users to reduce
+  their dependency graph where they don't need all the functionality Rouille provides. `logging`, `assets`,
+  `post` and `session` are now optional, but enabled by default for backwards compatibility.
+- [Correctly support 'flag' type query parameters](https://github.com/tomaka/rouille/pull/259) where the parameter has no
+  associated value. Previously a query like `GET /?foo` would return `None` from `get_param`, instead of `Some("")`.
+- Updated `tiny-http` to 0.12.0, further reducing the dependency tree by breaking our hard requirement on `time-rs`. This
+  version of `tiny-http` also enables Unix socket listeners, which will be exposed in a future release of Rouille.
+
+## Version 3.5.0
 - Replaced our use of the `brotli2` crate with the alternative pure Rust implementation
   [`brotli`](https://github.com/dropbox/rust-brotli). This removes Rouille's vulnerability to
   [RUSTSEC-2021-0131](https://rustsec.org/advisories/RUSTSEC-2021-0131.html), which existed due to `brotli-sys`
@@ -8,7 +19,7 @@
 - Unpinned `time-rs` and as a result increased our MSRV to 1.51, we don't have a formal MSRV policy and the ecosystem
   is making it more and more difficult to support compiler versions more than about 6 months old.
 
-## Version 3.4
+## Version 3.4.0
 - Resolved a number of cleanup & refactoring TODOs
 - Correctly identify non-lowercase content types as text (e.g. `text/JSON`
   would be incorrectly identified as non-text).
