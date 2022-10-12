@@ -309,13 +309,18 @@ mod tests {
             .0
             .read_to_end(&mut encoded_content)
             .unwrap();
+
+        // The 10-byte Gzip header contains an OS ID and a 4 byte timestamp
+        // which are not stable, so we skip them in this comparison. Doing a
+        // literal compare here is slightly silly, but the `deflate` crate has
+        // no public decompressor functions for us to test a round-trip
         assert_eq!(
-            encoded_content,
+            encoded_content[10..],
             vec![
-                31, 139, 8, 0, 0, 0, 0, 0, 0, 3, 179, 201, 40, 201, 205, 177, 179, 201, 72, 77, 76,
-                177, 179, 41, 201, 44, 201, 73, 181, 243, 72, 205, 201, 201, 87, 40, 207, 47, 202,
-                73, 177, 209, 135, 8, 217, 36, 229, 167, 84, 218, 217, 20, 160, 202, 21, 216, 217,
-                232, 67, 36, 244, 193, 166, 0, 0, 202, 239, 44, 120, 76, 0, 0, 0
+                179, 201, 40, 201, 205, 177, 179, 201, 72, 77, 76, 177, 179, 41, 201, 44, 201, 73,
+                181, 243, 72, 205, 201, 201, 87, 40, 207, 47, 202, 73, 177, 209, 135, 8, 217, 36,
+                229, 167, 84, 218, 217, 20, 160, 202, 21, 216, 217, 232, 67, 36, 244, 193, 166, 0,
+                0, 202, 239, 44, 120, 76, 0, 0, 0
             ]
         ); // Applied proper gzip encoding
     }
