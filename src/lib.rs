@@ -928,7 +928,7 @@ impl Request {
         let name_pattern = &format!("{}=", param_name);
         let param_pairs = self.raw_query_string().split('&');
         param_pairs
-            .filter(|pair| pair.starts_with(name_pattern))
+            .filter(|pair| pair.starts_with(name_pattern) || pair == &param_name)
             .map(|pair| pair.split('=').nth(1).unwrap_or(""))
             .next()
             .map(|value| {
@@ -1110,9 +1110,39 @@ mod tests {
     }
 
     #[test]
-    fn get_param_partial_match() {
+    fn get_param_partial_suffix_match() {
         let request = Request::fake_http("GET", "/?hello=world", vec![], vec![]);
         assert_eq!(request.get_param("lo"), None);
+    }
+
+    #[test]
+    fn get_param_partial_prefix_match() {
+        let request = Request::fake_http("GET", "/?hello=world", vec![], vec![]);
+        assert_eq!(request.get_param("he"), None);
+    }
+
+    #[test]
+    fn get_param_superstring_match() {
+        let request = Request::fake_http("GET", "/?jan=01", vec![], vec![]);
+        assert_eq!(request.get_param("january"), None);
+    }
+
+    #[test]
+    fn get_param_flag_with_equals() {
+        let request = Request::fake_http("GET", "/?flag=", vec![], vec![]);
+        assert_eq!(request.get_param("flag"), Some("".to_owned()));
+    }
+
+    #[test]
+    fn get_param_flag_without_equals() {
+        let request = Request::fake_http("GET", "/?flag", vec![], vec![]);
+        assert_eq!(request.get_param("flag"), Some("".to_owned()));
+    }
+
+    #[test]
+    fn get_param_flag_with_multiple_params() {
+        let request = Request::fake_http("GET", "/?flag&foo=bar", vec![], vec![]);
+        assert_eq!(request.get_param("flag"), Some("".to_owned()));
     }
 
     #[test]
