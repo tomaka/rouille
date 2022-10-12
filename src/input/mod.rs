@@ -29,9 +29,7 @@ pub use self::priority_header::priority_header_preferred;
 pub use self::priority_header::PriorityHeaderIter;
 
 pub mod json;
-#[cfg(feature = "post")]
 pub mod multipart;
-#[cfg(feature = "post")]
 pub mod post;
 
 mod accept;

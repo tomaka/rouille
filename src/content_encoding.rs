@@ -128,7 +128,7 @@ fn gzip(response: &mut Response) {
 
 #[cfg(not(feature = "gzip"))]
 #[inline]
-fn gzip(_: &mut Response) {}
+fn gzip(response: &mut Response) {}
 
 #[cfg(feature = "brotli")]
 fn brotli(response: &mut Response) {
@@ -147,7 +147,7 @@ fn brotli(response: &mut Response) {
 
 #[cfg(not(feature = "brotli"))]
 #[inline]
-fn brotli(_: &mut Response) {}
+fn brotli(response: &mut Response) {}
 
 #[cfg(test)]
 mod tests {
