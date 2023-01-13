@@ -71,7 +71,7 @@ extern crate serde_derive;
 extern crate num_cpus;
 pub extern crate percent_encoding;
 extern crate serde_json;
-extern crate sha1;
+extern crate sha1_smol;
 extern crate threadpool;
 extern crate time;
 extern crate tiny_http;
