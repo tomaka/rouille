@@ -16,7 +16,7 @@ fn main() {
 
     rouille::start_server("localhost:8000", move |request| {
         rouille::proxy::full_proxy(
-            &request,
+            request,
             rouille::proxy::ProxyConfig {
                 addr: "example.com:80",
                 replace_host: Some("example.com".into()),

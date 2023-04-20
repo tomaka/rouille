@@ -22,7 +22,7 @@ fn main() {
     println!("Now listening on localhost:8000");
 
     rouille::start_server("localhost:8000", move |request| {
-        rouille::log(&request, io::stdout(), || {
+        rouille::log(request, io::stdout(), || {
             // When a request is received, we invoke the `git http-backend` command through CGI.
             let mut cmd = Command::new("git");
             cmd.arg("http-backend");
@@ -42,7 +42,7 @@ fn main() {
             // Note that an error is returned only if `git http-backend` fails to execute, and not
             // if the client sends bad data for example. In other words, an error can only occur
             // if the server was misconfigured. Therefore it's okay-ish to call `unwrap()` here.
-            cmd.start_cgi(&request).unwrap()
+            cmd.start_cgi(request).unwrap()
         })
     });
 }

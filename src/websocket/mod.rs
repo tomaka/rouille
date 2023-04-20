@@ -246,5 +246,5 @@ fn convert_key(input: &str) -> String {
     sha1.update(input.as_bytes());
     sha1.update(b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
-    base64::encode_config(&sha1.finalize(), base64::STANDARD)
+    base64::encode_config(sha1.finalize(), base64::STANDARD)
 }

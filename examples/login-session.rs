@@ -34,7 +34,7 @@ fn main() {
     let sessions_storage: Mutex<HashMap<String, SessionData>> = Mutex::new(HashMap::new());
 
     rouille::start_server("localhost:8000", move |request| {
-        rouille::log(&request, io::stdout(), || {
+        rouille::log(request, io::stdout(), || {
             // We call `session::session` in order to assign a unique identifier to each client.
             // This identifier is tracked through a cookie that is automatically appended to the
             // response.
@@ -48,11 +48,11 @@ fn main() {
                 //
                 // We thus obtain a `Option<SessionData>`.
                 let mut session_data = if session.client_has_sid() {
-                    if let Some(data) = sessions_storage.lock().unwrap().get(session.id()) {
-                        Some(data.clone())
-                    } else {
-                        None
-                    }
+                    sessions_storage
+                        .lock()
+                        .unwrap()
+                        .get(session.id())
+                        .map(|data| data.clone())
                 } else {
                     None
                 };
@@ -60,7 +60,7 @@ fn main() {
                 // Use a separate function to actually handle the request, for readability.
                 // We pass a mutable reference to the `Option<SessionData>` so that the function
                 // is free to modify it.
-                let response = handle_route(&request, &mut session_data);
+                let response = handle_route(request, &mut session_data);
 
                 // Since the function call to `handle_route` can modify the session data, we have
                 // to store it back in the `sessions_storage` when necessary.
@@ -117,7 +117,7 @@ fn handle_route(request: &Request, session_data: &mut Option<SessionData>) -> Re
             // In this example all login attempts are successful in the password starts with the
             // letter 'b'. Of course in a real website you should check the credentials in a proper
             // way.
-            if data.password.starts_with("b") {
+            if data.password.starts_with('b') {
                 // Logging the user in is done by writing the content of `session_data`.
                 //
                 // A minor warning here: in this demo we store in memory directly the data that

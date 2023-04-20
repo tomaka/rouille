@@ -934,8 +934,8 @@ impl Request {
     pub fn header(&self, key: &str) -> Option<&str> {
         self.headers
             .iter()
-            .find(|&&(ref k, _)| k.eq_ignore_ascii_case(key))
-            .map(|&(_, ref v)| &v[..])
+            .find(|&(k, _)| k.eq_ignore_ascii_case(key))
+            .map(|(_, v)| &v[..])
     }
 
     /// Returns a list of all the headers of the request.
@@ -1039,7 +1039,7 @@ impl<'a> Iterator for HeadersIter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|&(ref k, ref v)| (&k[..], &v[..]))
+        self.iter.next().map(|(k, v)| (&k[..], &v[..]))
     }
 
     #[inline]

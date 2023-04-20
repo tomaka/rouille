@@ -58,7 +58,7 @@ fn main() {
                 // function, and a `websocket` variable of type `Receiver<Websocket>`.
                 // Once the response has been sent back to the client, the `Receiver` will be
                 // filled by rouille with a `Websocket` object representing the websocket.
-                let (response, websocket) = try_or_400!(websocket::start(&request, Some("echo")));
+                let (response, websocket) = try_or_400!(websocket::start(request, Some("echo")));
 
                 // Because of the nature of I/O in Rust, we need to spawn a separate thread for
                 // each websocket.

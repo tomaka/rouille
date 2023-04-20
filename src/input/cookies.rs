@@ -109,7 +109,7 @@ mod test {
 
         assert_eq!(
             cookies(&request).collect::<Vec<_>>(),
-            vec![("a".into(), "b".into()), ("hello".into(), "world".into())]
+            vec![("a", "b"), ("hello", "world")]
         );
     }
 }

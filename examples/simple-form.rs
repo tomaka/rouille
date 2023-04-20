@@ -11,7 +11,7 @@ fn main() {
     println!("Now listening on localhost:8000");
 
     rouille::start_server("localhost:8000", move |request| {
-        rouille::log(&request, io::stdout(), || {
+        rouille::log(request, io::stdout(), || {
             router!(request,
                 (GET) (/) => {
                     // When viewing the home page, we return an HTML document described below.
@@ -46,7 +46,7 @@ fn main() {
 }
 
 // The HTML document of the home page.
-static FORM: &'static str = r#"
+static FORM: &str = r#"
 <html>
     <head>
         <title>Form</title>
