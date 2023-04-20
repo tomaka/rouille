@@ -51,7 +51,7 @@ macro_rules! try_read_entry {
     ($self_:expr; $try:expr) => (
         match $try {
             Ok(res) => res,
-            Err(err) => return ::server::ReadEntryResult::Error($self_, err),
+            Err(err) => return crate::server::ReadEntryResult::Error($self_, err),
         }
     )
 }

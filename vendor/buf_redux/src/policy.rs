@@ -22,8 +22,8 @@ pub struct DoRead(pub bool);
 /// Shorthand for `return DoRead(bool)` or `return DoRead(true)` (empty invocation)
 #[macro_export]
 macro_rules! do_read (
-    ($val:expr) => ( return $crate::policy::DoRead($val); );
-    () => ( do_read!(true); )
+    ($val:expr) => ( return $crate::policy::DoRead($val) );
+    () => ( do_read!(true) )
 );
 
 /// Default policy for both `BufReader` and `BufWriter` that reproduces the behaviors of their
