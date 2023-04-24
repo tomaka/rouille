@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 3.6.2
+- Expose `new_ssl` feature for `rustls` support from `tiny-http`.
+- Switch to `sha1-smol` for a smaller footprint, more stable hash library.
+- Remove dependency on `num_cpus` using `std::thread::available_parallelism` instead.
+
 ## Version 3.6.1
 
 Reverts [Added a number of default features](https://github.com/tomaka/rouille/pull/254) as it breaks any downstreams 
