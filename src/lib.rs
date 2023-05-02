@@ -219,7 +219,7 @@ macro_rules! assert_or_400 {
 ///
 /// # Panic
 ///
-/// This function will panic if the server starts to fail (for example if you use a port that is
+/// This function will panic if the server fails to start (for example if you use a port that is
 /// already occupied) or if the socket is force-closed by the operating system.
 ///
 /// If you need to handle these situations, please see `Server`.
