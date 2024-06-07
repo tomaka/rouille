@@ -17,7 +17,7 @@ ssl = ["tiny_http/ssl"]
 rustls = ["tiny_http/ssl-rustls"]
 
 [dependencies]
-base64 = "0.21"
+base64 = "0.22"
 brotli = { version = "3.3.2", optional = true }
 chrono = { version = "0.4.19", default-features = false, features = ["clock"] }
 filetime = "0.2.0"
