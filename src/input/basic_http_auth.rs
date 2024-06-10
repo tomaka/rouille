@@ -17,7 +17,7 @@
 //! - In order to read a plain text body, see
 //!   [the `plain_text_body` function](fn.plain_text_body.html).
 
-use base64;
+use base64::{Engine as _, prelude::BASE64_STANDARD};
 use Request;
 
 /// Credentials returned by `basic_http_auth`.
@@ -73,7 +73,7 @@ pub fn basic_http_auth(request: &Request) -> Option<HttpAuthCredentials> {
         return None;
     }
 
-    let authvalue = match split.next().and_then(|val| base64::decode(val).ok()) {
+    let authvalue = match split.next().and_then(|val| BASE64_STANDARD.decode(val).ok()) {
         Some(v) => v,
         None => return None,
     };
