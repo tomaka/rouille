@@ -49,7 +49,7 @@ where
     F: FnOnce(&Session<'r>) -> Response,
 {
     let mut cookie = input::cookies(request);
-    let cookie = cookie.find(|&(ref k, _)| k == &cookie_name);
+    let cookie = cookie.find(|(k, _)| k == &cookie_name);
     let cookie = cookie.map(|(_, v)| v);
 
     let session = if let Some(cookie) = cookie {
@@ -124,9 +124,7 @@ pub fn generate_session_id() -> String {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .map(char::from)
-        .filter(|&c| {
-            ('a'..='z').contains(&c) || ('A'..='Z').contains(&c) || ('0'..='9').contains(&c)
-        })
+        .filter(|&c| c.is_ascii_lowercase() || c.is_ascii_uppercase() || c.is_ascii_digit())
         .take(64)
         .collect::<String>()
 }

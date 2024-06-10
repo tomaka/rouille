@@ -19,6 +19,6 @@ fn main() {
         cmd.arg("-n"); // Don't use a php.ini.
         cmd.env("SCRIPT_FILENAME", "examples/php-test.php"); // The PHP script to use.
         cmd.env("REDIRECT_STATUS", "1"); // Necessary for security.
-        cmd.start_cgi(&request).unwrap()
+        cmd.start_cgi(request).unwrap()
     });
 }

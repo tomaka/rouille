@@ -85,7 +85,7 @@ fn main() {
         let mut db = db.transaction().unwrap();
 
         // For better readability, we handle the request in a separate function.
-        let response = note_routes(&request, &mut db);
+        let response = note_routes(request, &mut db);
 
         // If the response is a success, we commit the transaction before returning. It's only at
         // this point that data are actually written in the database.
@@ -148,7 +148,7 @@ fn note_routes(request: &Request, db: &mut Transaction) -> Response {
             // This route modifies the content of an existing note.
 
             // We start by reading the body of the HTTP request into a `String`.
-            let body = try_or_400!(rouille::input::plain_text_body(&request));
+            let body = try_or_400!(rouille::input::plain_text_body(request));
 
             // And write the content with a query. This line can only panic if the
             // SQL is malformed.
@@ -168,7 +168,7 @@ fn note_routes(request: &Request, db: &mut Transaction) -> Response {
             // This route creates a new note whose initial content is the body.
 
             // We start by reading the body of the HTTP request into a `String`.
-            let body = try_or_400!(rouille::input::plain_text_body(&request));
+            let body = try_or_400!(rouille::input::plain_text_body(request));
 
             // To do so, we first create a variable that will receive the content.
             let mut id: Option<i32> = None;

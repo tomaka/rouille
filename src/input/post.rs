@@ -802,7 +802,7 @@ mod tests {
 
         let input = post_input!(&request, { field: bool }).unwrap();
 
-        assert_eq!(input.field, true);
+        assert!(input.field);
     }
 
     #[test]
@@ -908,7 +908,7 @@ mod tests {
 
         let input = post_input!(&request, { field: bool }).unwrap();
 
-        assert_eq!(input.field, true);
+        assert!(input.field);
     }
 
     #[test]
@@ -1051,7 +1051,7 @@ mod tests {
 
         let input = post_input!(&request, { field: bool }).unwrap();
 
-        assert_eq!(input.field, false);
+        assert!(!input.field);
     }
 
     #[test]

@@ -64,7 +64,7 @@ pub fn apply(request: &Request, mut response: Response) -> Response {
     if response
         .headers
         .iter()
-        .any(|&(ref key, _)| key.eq_ignore_ascii_case("Content-Encoding"))
+        .any(|(key, _)| key.eq_ignore_ascii_case("Content-Encoding"))
     {
         return response;
     }
@@ -91,7 +91,7 @@ pub fn apply(request: &Request, mut response: Response) -> Response {
 // Since encoding is purely an optimization, it's not a problem if the function sometimes has
 // false positives or false negatives.
 fn response_is_text(response: &Response) -> bool {
-    response.headers.iter().any(|&(ref key, ref value)| {
+    response.headers.iter().any(|(key, value)| {
         if !key.eq_ignore_ascii_case("Content-Type") {
             return false;
         }

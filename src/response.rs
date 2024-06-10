@@ -503,7 +503,7 @@ impl Response {
     /// Removes all headers from the response that match `header`.
     pub fn without_header(mut self, header: &str) -> Response {
         self.headers
-            .retain(|&(ref h, _)| !h.eq_ignore_ascii_case(header));
+            .retain(|(h, _)| !h.eq_ignore_ascii_case(header));
         self
     }
 
@@ -534,7 +534,7 @@ impl Response {
         let header = header.into();
 
         let mut found_one = false;
-        self.headers.retain(|&(ref h, _)| {
+        self.headers.retain(|(h, _)| {
             if h.eq_ignore_ascii_case(&header) {
                 if !found_one {
                     found_one = true;
@@ -597,7 +597,7 @@ impl Response {
         }
 
         let mut not_modified = false;
-        for &(ref key, ref etag) in &self.headers {
+        for (key, etag) in &self.headers {
             if !key.eq_ignore_ascii_case("ETag") {
                 continue;
             }

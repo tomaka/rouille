@@ -69,7 +69,7 @@ pub use self::websocket::Message;
 pub use self::websocket::SendError;
 pub use self::websocket::Websocket;
 
-use base64::{Engine as _, prelude::BASE64_STANDARD};
+use base64::{prelude::BASE64_STANDARD, Engine as _};
 use sha1_smol::Sha1;
 use std::borrow::Cow;
 use std::error;
@@ -152,7 +152,7 @@ where
     // TODO: there are some version shenanigans to handle
     // see https://tools.ietf.org/html/rfc6455#section-4.4
     match request.header("Sec-WebSocket-Version") {
-        Some(h) if h == "13" => (),
+        Some("13") => (),
         _ => return Err(WebsocketError::InvalidWebsocketRequest),
     }
 
@@ -246,5 +246,5 @@ fn convert_key(input: &str) -> String {
     sha1.update(input.as_bytes());
     sha1.update(b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
-    BASE64_STANDARD.encode(&sha1.digest().bytes())
+    BASE64_STANDARD.encode(sha1.digest().bytes())
 }

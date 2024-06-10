@@ -77,9 +77,9 @@ use Response;
 /// In this example, a request made to `/static/test.txt` will return the file
 /// `public/test.txt` if it exists.
 ///
-pub fn match_assets<P: ?Sized>(request: &Request, path: &P) -> Response
+pub fn match_assets<P>(request: &Request, path: &P) -> Response
 where
-    P: AsRef<Path>,
+    P: AsRef<Path> + ?Sized,
 {
     let path = path.as_ref();
     let path = match path.canonicalize() {
