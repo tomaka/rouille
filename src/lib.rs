@@ -101,7 +101,6 @@ use std::io::Read;
 use std::io::Result as IoResult;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
-use std::net::ToSocketAddrs;
 use std::panic;
 use std::panic::AssertUnwindSafe;
 use std::slice::Iter as SliceIter;
@@ -225,7 +224,8 @@ macro_rules! assert_or_400 {
 /// If you need to handle these situations, please see `Server`.
 pub fn start_server<A, F>(addr: A, handler: F) -> !
 where
-    A: ToSocketAddrs,
+    A: tiny_http::ToConfigListenAddr,
+    A::Err: fmt::Debug,
     F: Send + Sync + 'static + Fn(&Request) -> Response,
 {
     Server::new(addr, handler)
@@ -240,7 +240,8 @@ where
 /// `pool_size` must be greater than zero or this function will panic.
 pub fn start_server_with_pool<A, F>(addr: A, pool_size: Option<usize>, handler: F) -> !
 where
-    A: ToSocketAddrs,
+    A: tiny_http::ToConfigListenAddr,
+    A::Err: fmt::Debug,
     F: Send + Sync + 'static + Fn(&Request) -> Response,
 {
     let pool_size = pool_size.unwrap_or_else(|| {
@@ -359,9 +360,10 @@ where
     /// the port is already in use.
     pub fn new<A>(addr: A, handler: F) -> Result<Server<F>, Box<dyn Error + Send + Sync + 'static>>
     where
-        A: ToSocketAddrs,
+        A: tiny_http::ToConfigListenAddr,
+        A::Err: fmt::Debug,
     {
-        let server = tiny_http::Server::http(addr)?;
+        let server = tiny_http::Server::new(tiny_http::ServerConfig { addr: addr.to_config_listen_addr().map_err(|e| format!("{e:?}"))?, ssl: None })?;
         Ok(Server {
             server,
             executor: Executor::default(),
@@ -383,7 +385,7 @@ where
         private_key: Vec<u8>,
     ) -> Result<Server<F>, Box<dyn Error + Send + Sync + 'static>>
     where
-        A: ToSocketAddrs,
+        A: tiny_http::ToConfigListenAddr,
     {
         let ssl_config = tiny_http::SslConfig {
             certificate,
