@@ -267,6 +267,9 @@ impl Response {
 
     /// Builds a 200 `Response` with the content of a file.
     ///
+    /// This is the bare bones solution to serve a file.  
+    /// Look at [`rouille::serve_asset`] for a function that automates the most
+    /// common tasks of serving files.
     /// # Example
     ///
     /// ```no_run
@@ -275,7 +278,7 @@ impl Response {
     ///
     /// let file = File::open("image.png").unwrap();
     /// let response = Response::from_file("image/png", file);
-    /// ```
+    /// ```  
     #[inline]
     pub fn from_file<C>(content_type: C, file: File) -> Response
     where

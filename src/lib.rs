@@ -88,8 +88,7 @@ pub const DEFAULT_ENCODE_SET: &percent_encoding::AsciiSet = &percent_encoding::C
     .add(b'{')
     .add(b'}');
 
-pub use assets::extension_to_mime;
-pub use assets::match_assets;
+pub use assets::{extension_to_mime, find_assets, match_assets, serve_asset, AssetMatch};
 pub use log::{log, log_custom};
 pub use response::{Response, ResponseBody};
 pub use tiny_http::ReadWrite;
