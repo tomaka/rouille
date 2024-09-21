@@ -8,7 +8,7 @@
 // according to those terms.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use filetime;
 use time;
@@ -16,15 +16,200 @@ use time;
 use Request;
 use Response;
 
+/// Enum describing possible matching assets or lack thereof.
+#[derive(Debug)]
+pub enum AssetMatch {
+    FoundAsset(PathBuf),
+    FoundDirectory(PathBuf),
+    FoundMultiple(Vec<PathBuf>),
+    FoundNone,
+}
+
+/// Identifies available resources for further processing.  
+/// Searches inside `path` for assets that match the given request.  
+/// Returns a [`AssetMatch`] enum that contains the result of the request.  
+/// All positive matches return a variant containing a `PathBuf` or a collection `Vec<PathBuf>`,
+/// otherwise it returns a [`AssetMatch::FoundNone`].
+///
+/// If the request points to a directory, the only result will be the valid path to the directory.  
+/// If the request is fully resolvable to a file, the only result will be the valid path to the file.  
+/// If it's unable to resolve the request directly it will try to list all resources matching the request at the requests location.  
+/// The path will be absolute, beginning from root.
+///
+/// ## Example
+/// Given the following example structure:
+///```
+///public/
+///├── res1/
+///│   ├── res2.txt
+///│   └── res2.html
+///├── single_res0.txt
+///├── res1.svg
+///├── res2.txt
+///└── res2.html
+///```
+///And boilerplate:
+/// ```no_run
+/// rouille::start_server("localhost:8000", move |request| {
+///     let assets = rouille::find_assets(&request, "public");
+///     handle_assets(assets)
+/// });
+/// ```
+/// A request made to `/res1.svg` will return `AssetMatch::FoundAsset("*from root*/public/res1.svg")`  
+/// A request made to `/res1` will return `AssetMatch::FoundDirectory("*from root*/public/res1")`  
+/// A request made to `/res2` will return `AssetMatch::FoundMultiple(["*from root*/public/res2.html","*from root*/public/res2.txt"])`  
+/// A request made to `/res1/res2` will return `AssetMatch::FoundMultiple(["*from root*/public/res1/res2.html","*from root*/public/res1/res2.txt"])`  
+/// A request made to `/res0` will return `AssetMatch::FoundNone`  
+/// A request made to `/single_res0` will return `AssetMatch::FoundAsset("*from root*/public/single_res0.txt")`  
+/// A request made to `/.txt` will return `AssetMatch::FoundNone`  
+///
+/// Please look at [`match_assets`] for additional information about file handling.
+///
+pub fn find_assets<P>(request: &Request, path: &P) -> AssetMatch
+where
+    P: AsRef<Path> + ?Sized,
+{
+    use self::AssetMatch::*;
+    let path = path.as_ref();
+    let path = match path.canonicalize() {
+        Ok(p) => p,
+        Err(_) => return FoundNone,
+    };
+
+    // The potential location of the file on the disk.
+    let (base_path, asset_name) = {
+        let mut base_path = path.to_path_buf();
+        let url = request.url();
+        let mut iterator = url.split('/');
+        let asset_name = PathBuf::from(iterator.next_back().unwrap()); //consume the last node as name
+        for component in iterator {
+            base_path.push(component);
+        }
+        (base_path, asset_name)
+    };
+
+    // We try to canonicalize the path. If this fails, then the path doesn't exist.
+    let base_path = match base_path.canonicalize() {
+        Ok(f) => f,
+        Err(_) => return FoundNone,
+    };
+
+    // Check that we're still within `path`. This should eliminate security issues with
+    // requests like `GET /../private_file`.
+    if !base_path.starts_with(&path) {
+        return FoundNone;
+    }
+
+    // Make final path for a potential asset
+    let potential_asset = base_path.join(&asset_name);
+
+    // Check if it's a file or a directory and return that, otherwise continue
+    match fs::metadata(&potential_asset) {
+        Ok(ref m) if m.is_file() => return FoundAsset(potential_asset),
+        Ok(ref m) if m.is_dir() => return FoundDirectory(potential_asset),
+        _ => (),
+    }
+
+    // try to get directory iterator
+    let files = match base_path.read_dir() {
+        Ok(files) => files,
+        Err(_) => return FoundNone,
+    };
+
+    // prepare collection
+    let mut entries: Vec<PathBuf> = Vec::new();
+
+    // find all assets with the resource name
+    for entry in files.flatten() {
+        let path = entry.path();
+        if path.file_stem() == Some(asset_name.as_os_str()) {
+            entries.push(path);
+        }
+    }
+
+    // sort collection for predictable listings
+    entries.sort();
+
+    // output collection, single file or none
+    if entries.is_empty() {
+        FoundNone
+    } else {
+        if entries.len() == 1 {
+            return FoundAsset(entries.first().unwrap().to_owned());
+        }
+        FoundMultiple(entries)
+    }
+}
+
+/// Tries to serve a file at the given path.  
+/// If a file is found, returns a `Response` that would serve this file.  
+/// If no file is found, a empty 404 response is returned instead.  
+///
+/// The value of the `Content-Type` header of the response is guessed based on the file's extension.  
+/// It also attaches an etag to avoid unnecessary traffic when the content hasn't changed.  
+/// The default caching time is set to 3600 seconds aka 1 hour.  
+/// You can change the default behavior by modifying the `Response`
+/// object returned by this function.
+///
+/// ## Example
+///
+/// This will always serve index.html or, when missing, a 404 at the location where it was executed.
+///
+/// ```no_run
+/// rouille::start_server("localhost:8000", move |request| {
+///     let response = rouille::serve_asset(&request, "./index.html");
+///     if response.is_success() {
+///         return response;
+///     }
+/// });
+/// ```
+///
+pub fn serve_asset<P>(request: &Request, path: &P) -> Response
+where
+    P: AsRef<Path> + ?Sized,
+{
+    let path = path.as_ref();
+    let path = match path.canonicalize() {
+        Ok(p) => p,
+        Err(_) => return Response::empty_404(),
+    };
+
+    // Check that it's a file and not a directory.
+    match fs::metadata(&path) {
+        Ok(ref m) if m.is_file() => (),
+        _ => return Response::empty_404(),
+    };
+
+    let extension = path.extension().and_then(|s| s.to_str());
+
+    let file = match fs::File::open(&path) {
+        Ok(f) => f,
+        Err(_) => return Response::empty_404(),
+    };
+
+    let now = time::OffsetDateTime::now_local().unwrap_or_else(|_| time::OffsetDateTime::now_utc());
+    let etag: String = (fs::metadata(&path)
+        .map(|meta| filetime::FileTime::from_last_modification_time(&meta).unix_seconds() as u64)
+        .unwrap_or(now.nanosecond() as u64)
+        ^ 0xd3f4_0305_c9f8_e911_u64)
+        .to_string();
+
+    Response::from_file(extension_to_mime_impl(extension), file)
+        .with_etag(request, etag)
+        .with_public_cache(3600) // TODO: is this a good idea? what if the file is private?
+}
+
 /// Searches inside `path` for a file that matches the given request. If a file is found,
 /// returns a `Response` that would serve this file if returned. If no file is found, a 404
 /// response is returned instead.
 ///
-/// The value of the `Content-Type` header of the response is guessed based on the file's
-/// extension. If you wish so, you can modify that `Content-Type` by modifying the `Response`
+/// The value of the `Content-Type` header of the response is guessed based on the file's extension.  ///
+/// It also attaches a etag to avoid unnecessary traffic when the content hasn't changed.  
+/// The default caching time is set to 3600 seconds aka 1 hour.  
+/// You can change the default behavior by modifying the `Response`
 /// object returned by this function.
 ///
-/// # Example
+/// ## Example
 ///
 /// In this example, a request made for example to `/test.txt` will return the file
 /// `public/test.txt` (relative to the current working directory, which is usually the location
@@ -42,7 +227,7 @@ use Response;
 /// });
 /// ```
 ///
-/// # Security
+/// ## Security
 ///
 /// Everything inside the directory that you pass as `path` is potentially accessible by any
 /// client. **Do not use assume that client won't be able to guess the URL of a sensitive file**.
@@ -110,29 +295,7 @@ where
         return Response::empty_404();
     }
 
-    // Check that it's a file and not a directory.
-    match fs::metadata(&potential_file) {
-        Ok(ref m) if m.is_file() => (),
-        _ => return Response::empty_404(),
-    };
-
-    let extension = potential_file.extension().and_then(|s| s.to_str());
-
-    let file = match fs::File::open(&potential_file) {
-        Ok(f) => f,
-        Err(_) => return Response::empty_404(),
-    };
-
-    let now = time::OffsetDateTime::now_local().unwrap_or_else(|_| time::OffsetDateTime::now_utc());
-    let etag: String = (fs::metadata(&potential_file)
-        .map(|meta| filetime::FileTime::from_last_modification_time(&meta).unix_seconds() as u64)
-        .unwrap_or(now.nanosecond() as u64)
-        ^ 0xd3f4_0305_c9f8_e911_u64)
-        .to_string();
-
-    Response::from_file(extension_to_mime_impl(extension), file)
-        .with_etag(request, etag)
-        .with_public_cache(3600) // TODO: is this a good idea? what if the file is private?
+    serve_asset(request, &potential_file)
 }
 
 /// Returns the mime type of a file based on its extension, or `application/octet-stream` if the
