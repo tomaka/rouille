@@ -870,6 +870,7 @@ impl ResponseBody {
         (self.data, self.data_length)
     }
 
+    /// Getter for chunked_threshold.
     #[inline]
     pub fn chunked_threshold(&self) -> Option<usize> {
         self.chunked_threshold
