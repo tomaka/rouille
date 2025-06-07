@@ -116,6 +116,7 @@ fn gzip(response: &mut Response) {
         .headers
         .push(("Content-Encoding".into(), "gzip".into()));
     let previous_body = mem::replace(&mut response.data, ResponseBody::empty());
+    let chunked_threshold = previous_body.chunked_threshold();
     let (mut raw_data, size) = previous_body.into_reader_and_size();
     let mut src = match size {
         Some(size) => Vec::with_capacity(size),
@@ -123,7 +124,11 @@ fn gzip(response: &mut Response) {
     };
     io::copy(&mut raw_data, &mut src).expect("Failed reading response body while gzipping");
     let zipped = deflate_bytes_gzip(&src);
-    response.data = ResponseBody::from_data(zipped);
+    let mut data = ResponseBody::from_data(zipped);
+    if let Some(len) = chunked_threshold {
+        data = data.with_chunked_threshold(len);
+    }
+    response.data = data;
 }
 
 #[cfg(not(feature = "gzip"))]
