@@ -18,11 +18,11 @@ use std::fmt;
 use Request;
 use RequestBody;
 
-use multipart::server::Multipart as InnerMultipart;
+use rouille_multipart::server::Multipart as InnerMultipart;
 
 // TODO: provide wrappers around these
-pub use multipart::server::MultipartData;
-pub use multipart::server::MultipartField;
+pub use rouille_multipart::server::MultipartData;
+pub use rouille_multipart::server::MultipartField;
 
 /// Error that can happen when decoding multipart data.
 #[derive(Clone, Debug)]

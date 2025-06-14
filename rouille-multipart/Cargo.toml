@@ -1,20 +1,12 @@
 [package]
-name = "multipart"
-
+name = "rouille-multipart"
 version = "0.18.0"
-
 authors = ["Austin Bonander <austin.bonander@gmail.com>"]
-
 description = "A backend-agnostic extension for HTTP libraries that provides support for POST multipart/form-data requests on both client and server."
-
 keywords = ["form-data", "hyper", "iron", "http", "upload"]
-
 repository = "http://github.com/abonander/multipart"
-
 documentation = "http://docs.rs/multipart/"
-
 license = "MIT OR Apache-2.0"
-
 readme = "README.md"
 autobins = false
 edition = "2021"
