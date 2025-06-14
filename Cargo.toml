@@ -2,7 +2,8 @@
 name = "rouille"
 version = "3.6.2"
 authors = ["Pierre Krieger <pierre.krieger1708@gmail.com>"]
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
+edition = "2021"
 repository = "https://github.com/tomaka/rouille"
 documentation = "http://docs.rs/rouille"
 description = "High-level idiomatic web framework."

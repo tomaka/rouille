@@ -1,7 +1,8 @@
-#[macro_use]
-extern crate rouille;
-
 use std::io;
+
+use rouille::post_input;
+use rouille::router;
+use rouille::try_or_400;
 
 fn main() {
     // This example demonstrates how to handle HTML forms.

@@ -15,14 +15,10 @@
 //! # Example
 //!
 //! ```
-//! # extern crate serde;
-//! # #[macro_use] extern crate serde_derive;
-//! # #[macro_use] extern crate rouille;
-//! # use rouille::{Request, Response};
-//! # fn main() {}
+//! use rouille::{Request, Response, try_or_400};
 //!
 //! fn route_handler(request: &Request) -> Response {
-//!     #[derive(Deserialize)]
+//!     #[derive(serde_derive::Deserialize)]
 //!     struct Json {
 //!         field1: String,
 //!         field2: i32,
@@ -32,14 +28,14 @@
 //!     Response::text(format!("field1's value is {}", json.field1))
 //! }
 //! ```
-//!
 
 use serde;
 use serde_json;
 use std::error;
 use std::fmt;
 use std::io::Error as IoError;
-use Request;
+
+use crate::Request;
 
 /// Error that can happen when parsing the JSON input.
 #[derive(Debug)]
@@ -103,14 +99,10 @@ impl fmt::Display for JsonError {
 /// # Example
 ///
 /// ```
-/// # extern crate serde;
-/// # #[macro_use] extern crate serde_derive;
-/// # #[macro_use] extern crate rouille;
-/// # use rouille::{Request, Response};
-/// fn main() {}
+/// use rouille::{Request, Response, try_or_400};
 ///
 /// fn route_handler(request: &Request) -> Response {
-///     #[derive(Deserialize)]
+///     #[derive(serde_derive::Deserialize)]
 ///     struct Json {
 ///         field1: String,
 ///         field2: i32,

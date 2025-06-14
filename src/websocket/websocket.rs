@@ -11,10 +11,10 @@ use std::io;
 use std::io::Write;
 use std::mem;
 use std::sync::mpsc::Sender;
-use ReadWrite;
-use Upgrade;
 
-use websocket::low_level;
+use crate::websocket::low_level;
+use crate::ReadWrite;
+use crate::Upgrade;
 
 /// A successful websocket. An open channel of communication. Implements `Read` and `Write`.
 pub struct Websocket {

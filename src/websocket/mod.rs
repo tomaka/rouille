@@ -47,14 +47,13 @@
 //! # Example
 //!
 //! ```
-//! # #[macro_use] extern crate rouille;
 //! use std::sync::Mutex;
 //! use std::sync::mpsc::Receiver;
 //!
 //! use rouille::Request;
 //! use rouille::Response;
+//! use rouille::try_or_400;
 //! use rouille::websocket;
-//! # fn main() {}
 //!
 //! fn handle_request(request: &Request, websockets: &Mutex<Vec<Receiver<websocket::Websocket>>>)
 //!                   -> Response
@@ -77,8 +76,8 @@ use std::fmt;
 use std::sync::mpsc;
 use std::vec::IntoIter as VecIntoIter;
 
-use Request;
-use Response;
+use crate::Request;
+use crate::Response;
 
 mod low_level;
 #[allow(clippy::module_inception)]

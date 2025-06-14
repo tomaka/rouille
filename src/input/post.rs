@@ -12,9 +12,10 @@
 //! In order to parse the body of a request, you can use the `post_input!` macro.
 //!
 //! ```
-//! # #[macro_use] extern crate rouille;
 //! use rouille::Request;
 //! use rouille::Response;
+//! use rouille::try_or_400;
+//! use rouille::post_input;
 //!
 //! fn handle_request(request: &Request) -> Response {
 //!     let input = try_or_400!(post_input!(request, {
@@ -24,7 +25,6 @@
 //!
 //!     Response::text(format!("the value of field1 is: {}", input.field1))
 //! }
-//! # fn main() {}
 //! ```
 //!
 //! In this example, the macro will read the body of the request and try to find fields whose
@@ -73,9 +73,10 @@
 //! Example:
 //!
 //! ```
-//! # #[macro_use] extern crate rouille;
 //! use rouille::Request;
 //! use rouille::Response;
+//! use rouille::post_input;
+//! use rouille::try_or_400;
 //! use rouille::input::post::BufferedFile;
 //!
 //! fn handle_request(request: &Request) -> Response {
@@ -85,7 +86,6 @@
 //!
 //!     Response::text("everything ok")
 //! }
-//! # fn main() {}
 //! ```
 //!
 //! # How it works internally
@@ -101,7 +101,7 @@
 //! `from_file` method. You should return `PostFieldError::WrongFieldType` if you're
 //! expecting a file and `from_field` was called, or vice-versa.
 
-use Request;
+use crate::Request;
 
 use std::borrow::Cow;
 use std::error;
@@ -698,9 +698,9 @@ pub fn raw_urlencoded_post_input(request: &Request) -> Result<Vec<(String, Strin
 
 #[cfg(test)]
 mod tests {
-    use input::post::PostError;
-    use input::post::PostFieldError;
-    use Request;
+    use crate::input::post::PostError;
+    use crate::input::post::PostFieldError;
+    use crate::Request;
 
     #[test]
     fn basic_int() {
@@ -837,6 +837,7 @@ mod tests {
             b"field=value".to_vec(),
         );
 
+        #[allow(dead_code)]
         let input = post_input!(&request, { field: String });
 
         match input {
@@ -880,6 +881,7 @@ mod tests {
             b"field=12&field=58".to_vec(),
         );
 
+        #[allow(dead_code)]
         let input = post_input!(&request, { field: u32 });
 
         match input {
@@ -949,6 +951,7 @@ mod tests {
             b"field=12&field=800".to_vec(),
         );
 
+        #[allow(dead_code)]
         let input = post_input!(&request, {
             field: Vec<u8>
         });
@@ -1000,6 +1003,7 @@ mod tests {
             b"wrong_field=value".to_vec(),
         );
 
+        #[allow(dead_code)]
         let input = post_input!(&request, { field: String });
 
         match input {
@@ -1092,6 +1096,7 @@ mod tests {
             b"field=12foo".to_vec(),
         );
 
+        #[allow(dead_code)]
         let input = post_input!(&request, { field: u32 });
 
         match input {
@@ -1141,6 +1146,7 @@ mod tests {
             b"field=800".to_vec(),
         );
 
+        #[allow(dead_code)]
         let input = post_input!(&request, { field: u8 });
 
         match input {
@@ -1169,6 +1175,7 @@ mod tests {
 
         let _ = request.data();
 
+        #[allow(dead_code)]
         let input = post_input!(&request, { field: u8 });
 
         match input {
@@ -1193,6 +1200,7 @@ mod tests {
             b"field=\xc3\x28".to_vec(),
         );
 
+        #[allow(dead_code)]
         let input = post_input!(&request, { field: String });
 
         match input {

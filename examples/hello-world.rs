@@ -8,8 +8,6 @@
 // according to those terms.
 
 #![allow(unreachable_code)]
-#[macro_use]
-extern crate rouille;
 
 fn main() {
     println!("Now listening on localhost:8000");
@@ -29,7 +27,7 @@ fn main() {
         // the `router!` macro is an expression whose value is the `Response` built by the block
         // that was called. Since `router!` is the last piece of code of this closure, the
         // `Response` is then passed back to the `start_server` function and sent to the client.
-        router!(request,
+        rouille::router!(request,
             (GET) (/) => {
                 // If the request's URL is `/`, we jump here.
                 // This block builds a `Response` object that redirects to the `/hello/world`.

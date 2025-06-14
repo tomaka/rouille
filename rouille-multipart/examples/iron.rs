@@ -1,12 +1,9 @@
-extern crate iron;
-extern crate multipart;
-
 extern crate env_logger;
 
 use iron::prelude::*;
 use iron::status;
-use multipart::mock::StdoutTee;
-use multipart::server::{Entries, Multipart, SaveResult};
+use rouille_multipart::mock::StdoutTee;
+use rouille_multipart::server::{Entries, Multipart, SaveResult};
 use std::io::{self, Write};
 
 fn main() {

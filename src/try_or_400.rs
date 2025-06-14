@@ -12,16 +12,19 @@
 
 use std::error::Error;
 
+use serde_derive::Serialize;
+
 /// This macro assumes that the current function returns a `Response` and takes a `Result`.
 /// If the expression you pass to the macro is an error, then a 400 response is returned.
 ///
 /// # Example
 ///
 /// ```
-/// # #[macro_use] extern crate rouille;
-/// # fn main() {
 /// use rouille::Request;
 /// use rouille::Response;
+/// use rouille::post_input;
+/// use rouille::assert_or_400;
+/// use rouille::try_or_400;
 ///
 /// fn handle_something(request: &Request) -> Response {
 ///     let data = try_or_400!(post_input!(request, {
@@ -31,7 +34,6 @@ use std::error::Error;
 ///
 ///     Response::text("hello")
 /// }
-/// # }
 /// ```
 #[macro_export]
 macro_rules! try_or_400 {

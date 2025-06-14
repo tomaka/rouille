@@ -7,17 +7,11 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-#[macro_use]
-extern crate rouille;
-extern crate postgres;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-
 use std::sync::Mutex;
 
 use postgres::{Client, NoTls, Transaction};
-
+use rouille::router;
+use rouille::try_or_400;
 use rouille::Request;
 use rouille::Response;
 
@@ -109,7 +103,7 @@ fn note_routes(request: &Request, db: &mut Transaction) -> Response {
         (GET) (/notes) => {
             // This route returns the list of notes. We perform the query and output it as JSON.
 
-            #[derive(Serialize)]
+            #[derive(serde_derive::Serialize)]
             struct Elem { id: String }
 
             let mut out = Vec::new();

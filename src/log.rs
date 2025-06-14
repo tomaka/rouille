@@ -14,8 +14,8 @@ use std::time::Instant;
 
 use chrono;
 
-use Request;
-use Response;
+use crate::Request;
+use crate::Response;
 
 /// Adds a log entry to the given writer for each request.
 ///
@@ -85,11 +85,8 @@ where
 /// # Example
 ///
 /// ```
-/// #[macro_use] extern crate log;
-/// extern crate chrono;
-/// # extern crate rouille;
+/// use log::{error, info};
 /// use rouille::{Request, Response};
-///
 ///
 /// fn handle(request: &Request) -> Response {
 ///     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S%.6f");
@@ -103,8 +100,6 @@ where
 ///         Response::text("hello world")
 ///     })
 /// }
-/// #
-/// # fn main() { }
 /// ```
 pub fn log_custom<L, E, F>(req: &Request, log_ok_f: L, log_err_f: E, handler: F) -> Response
 where

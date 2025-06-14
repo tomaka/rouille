@@ -18,7 +18,8 @@
 //!   [the `plain_text_body` function](fn.plain_text_body.html).
 
 use base64::{prelude::BASE64_STANDARD, Engine as _};
-use Request;
+
+use crate::Request;
 
 /// Credentials returned by `basic_http_auth`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -107,7 +108,7 @@ pub fn basic_http_auth(request: &Request) -> Option<HttpAuthCredentials> {
 mod test {
     use super::basic_http_auth;
     use super::HttpAuthCredentials;
-    use Request;
+    use crate::Request;
 
     #[test]
     fn basic_http_auth_no_header() {

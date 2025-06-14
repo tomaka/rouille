@@ -96,7 +96,7 @@ where
 /// assert_eq!(iter.next(), None);
 /// ```
 #[inline]
-pub fn parse_priority_header(input: &str) -> PriorityHeaderIter {
+pub fn parse_priority_header(input: &str) -> PriorityHeaderIter<'_> {
     PriorityHeaderIter {
         iter: input.split(','),
     }

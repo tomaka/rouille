@@ -4,9 +4,9 @@
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
-use mock::{ClientRequest, HttpBuffer};
+use crate::mock::{ClientRequest, HttpBuffer};
 
-use server::{FieldHeaders, MultipartField, ReadEntry};
+use crate::server::{FieldHeaders, MultipartField, ReadEntry};
 
 use mime::Mime;
 
@@ -226,7 +226,7 @@ impl fmt::Debug for PrintHex {
 
 macro_rules! do_test (
     ($client_test:ident, $server_test:ident) => (
-        ::init_log();
+        crate::init_log();
 
         info!("Client Test: {:?} Server Test: {:?}", stringify!($client_test),
               stringify!($server_test));
@@ -344,7 +344,7 @@ fn gen_bytes() -> Vec<u8> {
 }
 
 fn test_client(test_fields: &TestFields) -> HttpBuffer {
-    use client::Multipart;
+    use crate::client::Multipart;
 
     let request = ClientRequest::default();
 
@@ -392,7 +392,7 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
 }
 
 fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
-    use client::lazy::Multipart;
+    use crate::client::lazy::Multipart;
 
     let mut multipart = Multipart::new();
 
@@ -441,7 +441,7 @@ fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
 }
 
 fn test_server(buf: HttpBuffer, fields: &mut TestFields) {
-    use server::Multipart;
+    use crate::server::Multipart;
 
     let server_buf = buf.for_server();
 
@@ -461,7 +461,7 @@ fn test_server(buf: HttpBuffer, fields: &mut TestFields) {
 }
 
 fn test_server_entry_api(buf: HttpBuffer, fields: &mut TestFields) {
-    use server::Multipart;
+    use crate::server::Multipart;
 
     let server_buf = buf.for_server();
 

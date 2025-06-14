@@ -56,25 +56,8 @@
 
 #![deny(unsafe_code)]
 
-extern crate base64;
-#[cfg(feature = "brotli")]
-extern crate brotli;
-extern crate chrono;
-#[cfg(feature = "gzip")]
-extern crate deflate;
-extern crate filetime;
-extern crate rand;
-extern crate rouille_multipart;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-pub extern crate percent_encoding;
-extern crate serde_json;
-extern crate sha1_smol;
-extern crate threadpool;
-extern crate time;
-extern crate tiny_http;
-pub extern crate url;
+pub use percent_encoding;
+pub use url;
 
 // https://github.com/servo/rust-url/blob/e121d8d0aafd50247de5f5310a227ecb1efe6ffe/percent_encoding/lib.rs#L126
 pub const DEFAULT_ENCODE_SET: &percent_encoding::AsciiSet = &percent_encoding::CONTROLS
@@ -145,10 +128,11 @@ macro_rules! try_or_404 {
 /// # Example
 ///
 /// ```
-/// # #[macro_use] extern crate rouille;
-/// # fn main() {
 /// use rouille::Request;
 /// use rouille::Response;
+/// use rouille::post_input;
+/// use rouille::assert_or_400;
+/// use rouille::try_or_400;
 ///
 /// fn handle_something(request: &Request) -> Response {
 ///     let data = try_or_400!(post_input!(request, {
@@ -159,7 +143,6 @@ macro_rules! try_or_404 {
 ///     assert_or_400!(data.field1 >= 2);
 ///     Response::text("hello")
 /// }
-/// # }
 /// ```
 #[macro_export]
 macro_rules! assert_or_400 {
@@ -945,7 +928,7 @@ impl Request {
 
     /// Returns a list of all the headers of the request.
     #[inline]
-    pub fn headers(&self) -> HeadersIter {
+    pub fn headers(&self) -> HeadersIter<'_> {
         HeadersIter {
             iter: self.headers.iter(),
         }
@@ -1006,7 +989,7 @@ impl Request {
     ///     }
     /// }
     /// ```
-    pub fn data(&self) -> Option<RequestBody> {
+    pub fn data(&self) -> Option<RequestBody<'_>> {
         let reader = self.data.lock().unwrap().take();
         reader.map(|r| RequestBody {
             body: r,
@@ -1072,7 +1055,7 @@ impl<'a> Read for RequestBody<'a> {
 
 #[cfg(test)]
 mod tests {
-    use Request;
+    use crate::Request;
 
     #[test]
     fn header() {

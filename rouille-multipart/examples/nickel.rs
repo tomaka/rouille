@@ -1,13 +1,10 @@
-extern crate multipart;
-extern crate nickel;
-
 use nickel::status::StatusCode;
 use nickel::{Action, HttpRouter, MiddlewareResult, Nickel, Request, Response};
 use std::io::{self, Write};
 
-use multipart::mock::StdoutTee;
-use multipart::server::nickel::MultipartBody;
-use multipart::server::{Entries, SaveResult};
+use rouille_multipart::mock::StdoutTee;
+use rouille_multipart::server::nickel::MultipartBody;
+use rouille_multipart::server::{Entries, SaveResult};
 
 fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
     match (*req).multipart_body() {

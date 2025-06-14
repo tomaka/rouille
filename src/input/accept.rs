@@ -28,9 +28,9 @@
 /// # Basic example
 ///
 /// ```
-/// # #[macro_use] extern crate rouille;
 /// use rouille::Request;
 /// use rouille::Response;
+/// use rouille::accept;
 ///
 /// fn handle(request: &Request) -> Response {
 ///     accept!(request,
@@ -38,15 +38,14 @@
 ///         "text/plain" => Response::text("Hello world"),
 ///     )
 /// }
-/// # fn main() {}
 /// ```
 ///
 /// # Example with a default handler
 ///
 /// ```
-/// # #[macro_use] extern crate rouille;
 /// use rouille::Request;
 /// use rouille::Response;
+/// use rouille::accept;
 ///
 /// fn handle(request: &Request) -> Response {
 ///     accept!(request,
@@ -55,7 +54,6 @@
 ///         "*/*" => Response::empty_406()
 ///     )
 /// }
-/// # fn main() {}
 /// ```
 #[macro_export]
 macro_rules! accept {
@@ -92,7 +90,7 @@ macro_rules! accept {
 
 #[cfg(test)]
 mod tests {
-    use Request;
+    use crate::Request;
 
     #[test]
     fn basic() {

@@ -1,7 +1,9 @@
+#![allow(dead_code)]
 #![allow(unreachable_code)]
-#[macro_use]
-extern crate rouille;
 
+use rouille::post_input;
+use rouille::router;
+use rouille::try_or_400;
 use rouille::Request;
 use rouille::Response;
 use std::collections::HashMap;
@@ -95,7 +97,7 @@ fn main() {
 fn handle_route(request: &Request, session_data: &mut Option<SessionData>) -> Response {
     // First we handle the routes that are always accessible and always the same, no matter whether
     // the user is logged in or not.
-    router!(request,
+    rouille::router!(request,
         (POST) (/login) => {
             // This is the route that is called when the user wants to log in.
 

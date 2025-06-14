@@ -1,11 +1,8 @@
-extern crate hyper;
-extern crate multipart;
-
 use hyper::client::Request;
 use hyper::method::Method;
 use hyper::net::Streaming;
 
-use multipart::client::Multipart;
+use rouille_multipart::client::Multipart;
 
 use std::io::Read;
 

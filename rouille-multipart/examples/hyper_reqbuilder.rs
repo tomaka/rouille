@@ -1,9 +1,6 @@
-extern crate hyper;
-extern crate multipart;
-
 use hyper::Client;
 
-use multipart::client::lazy::Multipart;
+use rouille_multipart::client::lazy::Multipart;
 
 fn main() {
     let mut binary = "Hello world in binary!".as_bytes();

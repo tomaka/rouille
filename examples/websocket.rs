@@ -7,11 +7,10 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-#[macro_use]
-extern crate rouille;
-
 use std::thread;
 
+use rouille::router;
+use rouille::try_or_400;
 use rouille::websocket;
 use rouille::Response;
 
