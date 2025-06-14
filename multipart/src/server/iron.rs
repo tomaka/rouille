@@ -4,7 +4,7 @@
 //! iron::Request`.
 
 use iron::headers::ContentType;
-use iron::mime::{Mime, TopLevel, SubLevel};
+use iron::mime::{Mime, SubLevel, TopLevel};
 use iron::request::{Body as IronBody, Request as IronRequest};
 use iron::typemap::Key;
 use iron::{BeforeMiddleware, IronError, IronResult};
@@ -13,9 +13,9 @@ use std::path::PathBuf;
 use std::{error, fmt, io};
 use tempfile;
 
-use super::{FieldHeaders, HttpRequest, Multipart};
-use super::save::{Entries, PartialReason, TempDir};
 use super::save::SaveResult::*;
+use super::save::{Entries, PartialReason, TempDir};
+use super::{FieldHeaders, HttpRequest, Multipart};
 
 impl<'r, 'a, 'b> HttpRequest for &'r mut IronRequest<'a, 'b> {
     type Body = &'r mut IronBody<'a, 'b>;
@@ -101,22 +101,34 @@ pub struct Intercept {
 impl Intercept {
     /// Set the `temp_dir_path` for this middleware.
     pub fn temp_dir_path<P: Into<PathBuf>>(self, path: P) -> Self {
-        Intercept { temp_dir_path: Some(path.into()), .. self }
+        Intercept {
+            temp_dir_path: Some(path.into()),
+            ..self
+        }
     }
 
     /// Set the `file_size_limit` for this middleware.
     pub fn file_size_limit(self, limit: u64) -> Self {
-        Intercept { file_size_limit: limit, .. self }
+        Intercept {
+            file_size_limit: limit,
+            ..self
+        }
     }
 
     /// Set the `file_count_limit` for this middleware.
     pub fn file_count_limit(self, limit: u32) -> Self {
-        Intercept { file_count_limit: limit, .. self }
+        Intercept {
+            file_count_limit: limit,
+            ..self
+        }
     }
 
     /// Set the `limit_behavior` for this middleware.
     pub fn limit_behavior(self, behavior: LimitBehavior) -> Self {
-        Intercept { limit_behavior: behavior, .. self }
+        Intercept {
+            limit_behavior: behavior,
+            ..self
+        }
     }
 
     fn read_request(&self, req: &mut IronRequest) -> IronResult<Option<Entries>> {
@@ -125,12 +137,18 @@ impl Intercept {
             Err(_) => return Ok(None),
         };
 
-        let tempdir = self.temp_dir_path.as_ref()
-                .map_or_else(
-                    || tempfile::Builder::new().prefix("multipart-iron").tempdir(),
-                    |path| tempfile::Builder::new().prefix("multipart-iron").tempdir_in(path)
-                )
-                .map_err(|e| io_to_iron(e, "Error opening temporary directory for request."))?;
+        let tempdir = self
+            .temp_dir_path
+            .as_ref()
+            .map_or_else(
+                || tempfile::Builder::new().prefix("multipart-iron").tempdir(),
+                |path| {
+                    tempfile::Builder::new()
+                        .prefix("multipart-iron")
+                        .tempdir_in(path)
+                },
+            )
+            .map_err(|e| io_to_iron(e, "Error opening temporary directory for request."))?;
 
         match self.limit_behavior {
             LimitBehavior::ThrowError => self.read_request_strict(multipart, tempdir),
@@ -138,42 +156,66 @@ impl Intercept {
         }
     }
 
-    fn read_request_strict(&self, mut multipart: IronMultipart, tempdir: TempDir) -> IronResult<Option<Entries>> {
-        match multipart.save().size_limit(self.file_size_limit)
-                              .count_limit(self.file_count_limit)
-                              .with_temp_dir(tempdir) {
+    fn read_request_strict(
+        &self,
+        mut multipart: IronMultipart,
+        tempdir: TempDir,
+    ) -> IronResult<Option<Entries>> {
+        match multipart
+            .save()
+            .size_limit(self.file_size_limit)
+            .count_limit(self.file_count_limit)
+            .with_temp_dir(tempdir)
+        {
             Full(entries) => Ok(Some(entries)),
             Partial(_, PartialReason::Utf8Error(_)) => unreachable!(),
-            Partial(_, PartialReason::IoError(err)) => Err(io_to_iron(err, "Error midway through request")),
-            Partial(_, PartialReason::CountLimit) => Err(FileCountLimitError(self.file_count_limit).into()),
-            Partial(partial, PartialReason::SizeLimit) =>  {
+            Partial(_, PartialReason::IoError(err)) => {
+                Err(io_to_iron(err, "Error midway through request"))
+            }
+            Partial(_, PartialReason::CountLimit) => {
+                Err(FileCountLimitError(self.file_count_limit).into())
+            }
+            Partial(partial, PartialReason::SizeLimit) => {
                 let partial = partial.partial.expect(EXPECT_PARTIAL_FILE);
-                Err(
-                    FileSizeLimitError {
-                        field: partial.source.headers,
-                    }.into()
-                )
-            },
+                Err(FileSizeLimitError {
+                    field: partial.source.headers,
+                }
+                .into())
+            }
             Error(err) => Err(io_to_iron(err, "Error at start of request")),
         }
     }
 
-    fn read_request_lenient(&self, mut multipart: IronMultipart, tempdir: TempDir) -> IronResult<Option<Entries>> {
-        let mut entries = match multipart.save().size_limit(self.file_size_limit)
-                                                .count_limit(self.file_count_limit)
-                                                .with_temp_dir(tempdir) {
+    fn read_request_lenient(
+        &self,
+        mut multipart: IronMultipart,
+        tempdir: TempDir,
+    ) -> IronResult<Option<Entries>> {
+        let mut entries = match multipart
+            .save()
+            .size_limit(self.file_size_limit)
+            .count_limit(self.file_count_limit)
+            .with_temp_dir(tempdir)
+        {
             Full(entries) => return Ok(Some(entries)),
-            Partial(_, PartialReason::IoError(err)) => return Err(io_to_iron(err, "Error midway through request")),
-            Partial(partial, _) =>  partial.keep_partial(),
+            Partial(_, PartialReason::IoError(err)) => {
+                return Err(io_to_iron(err, "Error midway through request"))
+            }
+            Partial(partial, _) => partial.keep_partial(),
             Error(err) => return Err(io_to_iron(err, "Error at start of request")),
         };
 
         loop {
-            entries = match multipart.save().size_limit(self.file_size_limit)
-                                            .count_limit(self.file_count_limit)
-                                            .with_entries(entries) {
+            entries = match multipart
+                .save()
+                .size_limit(self.file_size_limit)
+                .count_limit(self.file_count_limit)
+                .with_entries(entries)
+            {
                 Full(entries) => return Ok(Some(entries)),
-                Partial(_, PartialReason::IoError(err)) => return Err(io_to_iron(err, "Error midway through request")),
+                Partial(_, PartialReason::IoError(err)) => {
+                    return Err(io_to_iron(err, "Error midway through request"))
+                }
                 Partial(partial, _) => partial.keep_partial(),
                 Error(err) => return Err(io_to_iron(err, "Error at start of request")),
             };
@@ -242,8 +284,16 @@ impl error::Error for FileSizeLimitError {
 impl fmt::Display for FileSizeLimitError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.field.filename {
-            Some(ref filename) => write!(f, "File size limit reached for field \"{}\" (filename: \"{}\")", self.field.name, filename),
-            None => write!(f, "File size limit reached for field \"{}\" (no filename)", self.field.name),
+            Some(ref filename) => write!(
+                f,
+                "File size limit reached for field \"{}\" (filename: \"{}\")",
+                self.field.name, filename
+            ),
+            None => write!(
+                f,
+                "File size limit reached for field \"{}\" (no filename)",
+                self.field.name
+            ),
         }
     }
 }

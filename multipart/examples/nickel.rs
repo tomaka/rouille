@@ -1,35 +1,33 @@
 extern crate multipart;
 extern crate nickel;
 
-use std::io::{self, Write};
-use nickel::{Action, HttpRouter, MiddlewareResult, Nickel, Request, Response};
 use nickel::status::StatusCode;
+use nickel::{Action, HttpRouter, MiddlewareResult, Nickel, Request, Response};
+use std::io::{self, Write};
 
+use multipart::mock::StdoutTee;
 use multipart::server::nickel::MultipartBody;
 use multipart::server::{Entries, SaveResult};
-use multipart::mock::StdoutTee;
 
 fn handle_multipart<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
     match (*req).multipart_body() {
-        Some(mut multipart) => {
-            match multipart.save().temp() {
-                SaveResult::Full(entries) => process_entries(res, entries),
+        Some(mut multipart) => match multipart.save().temp() {
+            SaveResult::Full(entries) => process_entries(res, entries),
 
-                SaveResult::Partial(entries, e) => {
-                    println!("Partial errors ... {:?}", e);
-                    return process_entries(res, entries.keep_partial());
-                },
-
-                SaveResult::Error(e) => {
-                    println!("There are errors in multipart POSTing ... {:?}", e);
-                    res.set(StatusCode::InternalServerError);
-                    return res.send(format!("Server could not handle multipart POST! {:?}", e));
-                },
+            SaveResult::Partial(entries, e) => {
+                println!("Partial errors ... {:?}", e);
+                return process_entries(res, entries.keep_partial());
             }
-        }
+
+            SaveResult::Error(e) => {
+                println!("There are errors in multipart POSTing ... {:?}", e);
+                res.set(StatusCode::InternalServerError);
+                return res.send(format!("Server could not handle multipart POST! {:?}", e));
+            }
+        },
         None => {
             res.set(StatusCode::BadRequest);
-            return res.send("Request seems not was a multipart request")
+            return res.send("Request seems not was a multipart request");
         }
     }
 }

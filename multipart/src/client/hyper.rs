@@ -4,7 +4,7 @@
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
-//! Client-side integration with [Hyper](https://github.com/hyperium/hyper). 
+//! Client-side integration with [Hyper](https://github.com/hyperium/hyper).
 //! Enabled with the `hyper` feature (on by default).
 //!
 //! Contains `impl HttpRequest for Request<Fresh>` and `impl HttpStream for Request<Streaming>`.
@@ -14,13 +14,13 @@
 //! (adaptors for `hyper::client::RequestBuilder`).
 use hyper::client::request::Request;
 use hyper::client::response::Response;
-use hyper::header::{ContentType, ContentLength};
+use hyper::header::{ContentLength, ContentType};
 use hyper::method::Method;
 use hyper::net::{Fresh, Streaming};
 
 use hyper::Error as HyperError;
 
-use hyper::mime::{Mime, TopLevel, SubLevel, Attr, Value};
+use hyper::mime::{Attr, Mime, SubLevel, TopLevel, Value};
 
 use super::{HttpRequest, HttpStream};
 
@@ -46,10 +46,10 @@ impl HttpRequest for Request<Fresh> {
         headers.set(ContentType(multipart_mime(boundary)));
 
         if let Some(size) = content_len {
-            headers.set(ContentLength(size));   
+            headers.set(ContentLength(size));
         }
 
-        debug!("Hyper headers: {}", headers); 
+        debug!("Hyper headers: {}", headers);
 
         true
     }
@@ -57,7 +57,7 @@ impl HttpRequest for Request<Fresh> {
     fn open_stream(self) -> Result<Self::Stream, Self::Error> {
         self.start()
     }
-} 
+}
 
 /// #### Feature: `hyper`
 impl HttpStream for Request<Streaming> {
@@ -77,7 +77,8 @@ pub fn content_type(bound: &str) -> ContentType {
 
 fn multipart_mime(bound: &str) -> Mime {
     Mime(
-        TopLevel::Multipart, SubLevel::Ext("form-data".into()),
-        vec![(Attr::Ext("boundary".into()), Value::Ext(bound.into()))]
-    )         
+        TopLevel::Multipart,
+        SubLevel::Ext("form-data".into()),
+        vec![(Attr::Ext("boundary".into()), Value::Ext(bound.into()))],
+    )
 }

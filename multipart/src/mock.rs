@@ -5,11 +5,11 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 //! Mocked types for client-side and server-side APIs.
-use std::io::{self, Read, Write};
 use std::fmt;
+use std::io::{self, Read, Write};
 
-use rand::{self, Rng};
 use rand::prelude::ThreadRng;
+use rand::{self, Rng};
 
 use crate::{client, server};
 
@@ -37,12 +37,13 @@ impl client::HttpRequest for ClientRequest {
     /// If `apply_headers()` was not called.
     fn open_stream(self) -> Result<HttpBuffer, io::Error> {
         debug!("ClientRequest::open_stream called! {:?}", self);
-        let boundary = self.boundary.expect("ClientRequest::set_headers() was not called!");
+        let boundary = self
+            .boundary
+            .expect("ClientRequest::set_headers() was not called!");
 
         Ok(HttpBuffer::new_empty(boundary, self.content_len))
     }
 }
-
 
 /// A writable buffer which stores the boundary and content-length, if provided.
 ///
@@ -69,7 +70,7 @@ impl HttpBuffer {
             buf,
             boundary,
             content_len,
-            rng: rand::thread_rng()
+            rng: rand::thread_rng(),
         }
     }
 
@@ -111,7 +112,9 @@ impl client::HttpStream for HttpBuffer {
     type Error = io::Error;
 
     /// Returns `Ok(self)`.
-    fn finish(self) -> Result<Self, io::Error> { Ok(self) }
+    fn finish(self) -> Result<Self, io::Error> {
+        Ok(self)
+    }
 }
 
 impl fmt::Debug for HttpBuffer {
@@ -170,7 +173,9 @@ impl<'a> Read for ServerRequest<'a> {
 impl<'a> server::HttpRequest for ServerRequest<'a> {
     type Body = Self;
 
-    fn multipart_boundary(&self) -> Option<&str> { Some(self.boundary) }
+    fn multipart_boundary(&self) -> Option<&str> {
+        Some(self.boundary)
+    }
 
     fn body(self) -> Self::Body {
         self
@@ -187,7 +192,8 @@ impl<'s, W> StdoutTee<'s, W> {
     /// Constructor
     pub fn new(inner: W, stdout: &'s io::Stdout) -> Self {
         Self {
-            inner, stdout: stdout.lock(),
+            inner,
+            stdout: stdout.lock(),
         }
     }
 }

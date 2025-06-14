@@ -10,39 +10,45 @@ extern crate multipart;
 extern crate rocket;
 
 use multipart::mock::StdoutTee;
-use multipart::server::Multipart;
 use multipart::server::save::Entries;
 use multipart::server::save::SaveResult::*;
+use multipart::server::Multipart;
 
-use rocket::Data;
 use rocket::http::{ContentType, Status};
-use rocket::response::Stream;
 use rocket::response::status::Custom;
+use rocket::response::Stream;
+use rocket::Data;
 
 use std::io::{self, Cursor, Write};
 
 #[post("/upload", data = "<data>")]
 // signature requires the request to have a `Content-Type`
-fn multipart_upload(cont_type: &ContentType, data: Data) -> Result<Stream<Cursor<Vec<u8>>>, Custom<String>> {
+fn multipart_upload(
+    cont_type: &ContentType,
+    data: Data,
+) -> Result<Stream<Cursor<Vec<u8>>>, Custom<String>> {
     // this and the next check can be implemented as a request guard but it seems like just
     // more boilerplate than necessary
     if !cont_type.is_form_data() {
         return Err(Custom(
             Status::BadRequest,
-            "Content-Type not multipart/form-data".into()
+            "Content-Type not multipart/form-data".into(),
         ));
     }
 
-    let (_, boundary) = cont_type.params().find(|&(k, _)| k == "boundary").ok_or_else(
-            || Custom(
+    let (_, boundary) = cont_type
+        .params()
+        .find(|&(k, _)| k == "boundary")
+        .ok_or_else(|| {
+            Custom(
                 Status::BadRequest,
-                "`Content-Type: multipart/form-data` boundary param not provided".into()
+                "`Content-Type: multipart/form-data` boundary param not provided".into(),
             )
-        )?;
+        })?;
 
     match process_upload(boundary, data) {
         Ok(resp) => Ok(Stream::from(Cursor::new(resp))),
-        Err(err) => Err(Custom(Status::InternalServerError, err.to_string()))
+        Err(err) => Err(Custom(Status::InternalServerError, err.to_string())),
     }
 }
 
@@ -61,7 +67,7 @@ fn process_upload(boundary: &str, data: Data) -> io::Result<Vec<u8>> {
             }
 
             process_entries(partial.entries, &mut out)?
-        },
+        }
         Error(e) => return Err(e),
     }
 
@@ -81,5 +87,7 @@ fn process_entries(entries: Entries, mut out: &mut Vec<u8>) -> io::Result<()> {
 }
 
 fn main() {
-    rocket::ignite().mount("/", routes![multipart_upload]).launch();
+    rocket::ignite()
+        .mount("/", routes![multipart_upload])
+        .launch();
 }
