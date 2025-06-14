@@ -207,7 +207,7 @@ impl HttpStream for io::Sink {
 }
 
 fn gen_boundary() -> String {
-    ::random_alphanumeric(BOUNDARY_LEN)
+    crate::random_alphanumeric(BOUNDARY_LEN)
 }
 
 fn open_stream<R: HttpRequest>(

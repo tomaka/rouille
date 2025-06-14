@@ -11,6 +11,8 @@ use std::fmt;
 use rand::{self, Rng};
 use rand::prelude::ThreadRng;
 
+use crate::{client, server};
+
 /// A mock implementation of `client::HttpRequest` which can spawn an `HttpBuffer`.
 ///
 /// `client::HttpRequest` impl requires the `client` feature.
@@ -21,7 +23,7 @@ pub struct ClientRequest {
 }
 
 #[cfg(feature = "client")]
-impl ::client::HttpRequest for ClientRequest {
+impl client::HttpRequest for ClientRequest {
     type Stream = HttpBuffer;
     type Error = io::Error;
 
@@ -103,7 +105,7 @@ impl Write for HttpBuffer {
 }
 
 #[cfg(feature = "client")]
-impl ::client::HttpStream for HttpBuffer {
+impl client::HttpStream for HttpBuffer {
     type Request = ClientRequest;
     type Response = HttpBuffer;
     type Error = io::Error;
@@ -165,7 +167,7 @@ impl<'a> Read for ServerRequest<'a> {
 }
 
 #[cfg(feature = "server")]
-impl<'a> ::server::HttpRequest for ServerRequest<'a> {
+impl<'a> server::HttpRequest for ServerRequest<'a> {
     type Body = Self;
 
     fn multipart_boundary(&self) -> Option<&str> { Some(self.boundary) }

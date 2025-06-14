@@ -486,6 +486,7 @@ fn cursor_at_end<T: AsRef<[u8]>>(cursor: &Cursor<T>) -> bool {
 mod hyper {
     use hyper::client::{Body, Client, IntoUrl, RequestBuilder, Response};
     use hyper::Result as HyperResult;
+    use crate::client;
 
     impl<'n, 'd> super::Multipart<'n, 'd> {
         /// #### Feature: `hyper`
@@ -522,7 +523,7 @@ mod hyper {
             };
 
             mut_fn(client.post(url))
-                .header(::client::hyper::content_type(fields.boundary()))
+                .header(client::hyper::content_type(fields.boundary()))
                 .body(fields.to_body())
                 .send()
         }
