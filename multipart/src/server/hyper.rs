@@ -9,16 +9,16 @@
 //!
 //! Also contains an implementation of [`HttpRequest`](../trait.HttpRequest.html)
 //! for `hyper::server::Request` and `&mut hyper::server::Request`.
-use hyper::net::Fresh;
 use hyper::header::ContentType;
 use hyper::method::Method;
+use hyper::net::Fresh;
 use hyper::server::{Handler, Request, Response};
 
 pub use hyper::server::Request as HyperRequest;
 
-use hyper::mime::{Mime, TopLevel, SubLevel, Attr, Value};
+use hyper::mime::{Attr, Mime, SubLevel, TopLevel, Value};
 
-use super::{Multipart, HttpRequest};
+use super::{HttpRequest, Multipart};
 
 /// A container that implements `hyper::server::Handler` which will switch
 /// the handler implementation depending on if the incoming request is multipart or not.
@@ -32,7 +32,11 @@ pub struct Switch<H, M> {
     multipart: M,
 }
 
-impl<H, M> Switch<H, M> where H: Handler, M: MultipartHandler {
+impl<H, M> Switch<H, M>
+where
+    H: Handler,
+    M: MultipartHandler,
+{
     /// Create a new `Switch` instance where
     /// `normal` handles normal Hyper requests and `multipart` handles Multipart requests
     pub fn new(normal: H, multipart: M) -> Switch<H, M> {
@@ -40,7 +44,11 @@ impl<H, M> Switch<H, M> where H: Handler, M: MultipartHandler {
     }
 }
 
-impl<H, M> Handler for Switch<H, M> where H: Handler, M: MultipartHandler {
+impl<H, M> Handler for Switch<H, M>
+where
+    H: Handler,
+    M: MultipartHandler,
+{
     fn handle<'a, 'k>(&'a self, req: Request<'a, 'k>, res: Response<'a, Fresh>) {
         match Multipart::from_request(req) {
             Ok(multi) => self.multipart.handle_multipart(multi, res),
@@ -55,16 +63,23 @@ impl<H, M> Handler for Switch<H, M> where H: Handler, M: MultipartHandler {
 /// and subsequently static functions.
 pub trait MultipartHandler: Send + Sync {
     /// Generate a response from this multipart request.
-    fn handle_multipart<'a, 'k>(&self, 
-                                multipart: Multipart<Request<'a, 'k>>, 
-                                response: Response<'a, Fresh>);
+    fn handle_multipart<'a, 'k>(
+        &self,
+        multipart: Multipart<Request<'a, 'k>>,
+        response: Response<'a, Fresh>,
+    );
 }
 
-impl<F> MultipartHandler for F 
-where F: Fn(Multipart<Request>, Response<Fresh>), F: Send + Sync {
-    fn handle_multipart<'a, 'k>(&self, 
-                                multipart: Multipart<Request<'a, 'k>>, 
-                                response: Response<'a, Fresh>) {
+impl<F> MultipartHandler for F
+where
+    F: Fn(Multipart<Request>, Response<Fresh>),
+    F: Send + Sync,
+{
+    fn handle_multipart<'a, 'k>(
+        &self,
+        multipart: Multipart<Request<'a, 'k>>,
+        response: Response<'a, Fresh>,
+    ) {
         (*self)(multipart, response);
     }
 }
@@ -84,17 +99,16 @@ impl<'a, 'b> HttpRequest for HyperRequest<'a, 'b> {
                 _ => return None,
             };
 
-            params.iter().find(|&&(ref name, _)|
-                match *name {
+            params
+                .iter()
+                .find(|&&(ref name, _)| match *name {
                     Attr::Boundary => true,
                     _ => false,
-                }
-            ).and_then(|&(_, ref val)|
-                match *val {
+                })
+                .and_then(|&(_, ref val)| match *val {
                     Value::Ext(ref val) => Some(&**val),
                     _ => None,
-                }
-            )
+                })
         })
     }
 
@@ -118,17 +132,16 @@ impl<'r, 'a, 'b> HttpRequest for &'r mut HyperRequest<'a, 'b> {
                 _ => return None,
             };
 
-            params.iter().find(|&&(ref name, _)|
-                match *name {
+            params
+                .iter()
+                .find(|&&(ref name, _)| match *name {
                     Attr::Boundary => true,
                     _ => false,
-                }
-            ).and_then(|&(_, ref val)|
-                match *val {
+                })
+                .and_then(|&(_, ref val)| match *val {
                     Value::Ext(ref val) => Some(&**val),
                     _ => None,
-                }
-            )
+                })
         })
     }
 
@@ -136,4 +149,3 @@ impl<'r, 'a, 'b> HttpRequest for &'r mut HyperRequest<'a, 'b> {
         self
     }
 }
-

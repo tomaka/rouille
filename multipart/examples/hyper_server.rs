@@ -1,13 +1,13 @@
 extern crate hyper;
 extern crate multipart;
 
-use std::io;
-use hyper::server::{Handler, Server, Request, Response};
-use hyper::status::StatusCode;
 use hyper::server::response::Response as HyperResponse;
-use multipart::server::hyper::{Switch, MultipartHandler, HyperRequest};
-use multipart::server::{Multipart, Entries, SaveResult};
+use hyper::server::{Handler, Request, Response, Server};
+use hyper::status::StatusCode;
 use multipart::mock::StdoutTee;
+use multipart::server::hyper::{HyperRequest, MultipartHandler, Switch};
+use multipart::server::{Entries, Multipart, SaveResult};
+use std::io;
 
 struct NonMultipart;
 impl Handler for NonMultipart {
@@ -28,7 +28,8 @@ impl MultipartHandler for EchoMultipart {
             }
             SaveResult::Error(error) => {
                 println!("Errors saving multipart:\n{:?}", error);
-                res.send(format!("An error occurred {}", error).as_bytes()).unwrap();
+                res.send(format!("An error occurred {}", error).as_bytes())
+                    .unwrap();
             }
         };
     }
@@ -43,9 +44,8 @@ fn process_entries(res: HyperResponse, entries: Entries) -> io::Result<()> {
 
 fn main() {
     println!("Listening on 0.0.0.0:3333");
-    Server::http("0.0.0.0:3333").unwrap().handle(
-        Switch::new(
-            NonMultipart,
-            EchoMultipart
-        )).unwrap();
+    Server::http("0.0.0.0:3333")
+        .unwrap()
+        .handle(Switch::new(NonMultipart, EchoMultipart))
+        .unwrap();
 }

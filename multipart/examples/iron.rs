@@ -1,18 +1,20 @@
-extern crate multipart;
 extern crate iron;
+extern crate multipart;
 
 extern crate env_logger;
 
-use std::io::{self, Write};
-use multipart::mock::StdoutTee;
-use multipart::server::{Multipart, Entries, SaveResult};
 use iron::prelude::*;
 use iron::status;
+use multipart::mock::StdoutTee;
+use multipart::server::{Entries, Multipart, SaveResult};
+use std::io::{self, Write};
 
 fn main() {
     env_logger::init();
 
-    Iron::new(process_request).http("localhost:80").expect("Could not bind localhost:80");
+    Iron::new(process_request)
+        .http("localhost:80")
+        .expect("Could not bind localhost:80");
 }
 
 /// Processes a request and returns response or an occured error.
@@ -29,18 +31,19 @@ fn process_request(request: &mut Request) -> IronResult<Response> {
                     process_entries(entries.keep_partial())?;
                     Ok(Response::with((
                         status::BadRequest,
-                        format!("error reading request: {}", reason.unwrap_err())
+                        format!("error reading request: {}", reason.unwrap_err()),
                     )))
                 }
                 SaveResult::Error(error) => Ok(Response::with((
                     status::BadRequest,
-                    format!("error reading request: {}", error)
+                    format!("error reading request: {}", error),
                 ))),
             }
         }
-        Err(_) => {
-            Ok(Response::with((status::BadRequest, "The request is not multipart")))
-        }
+        Err(_) => Ok(Response::with((
+            status::BadRequest,
+            "The request is not multipart",
+        ))),
     }
 }
 
@@ -55,7 +58,7 @@ fn process_entries(entries: Entries) -> IronResult<Response> {
         entries.write_debug(tee).map_err(|e| {
             IronError::new(
                 e,
-                (status::InternalServerError, "Error printing request fields")
+                (status::InternalServerError, "Error printing request fields"),
             )
         })?;
     }

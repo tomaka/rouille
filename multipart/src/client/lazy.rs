@@ -484,9 +484,9 @@ fn cursor_at_end<T: AsRef<[u8]>>(cursor: &Cursor<T>) -> bool {
 
 #[cfg(feature = "hyper")]
 mod hyper {
+    use crate::client;
     use hyper::client::{Body, Client, IntoUrl, RequestBuilder, Response};
     use hyper::Result as HyperResult;
-    use crate::client;
 
     impl<'n, 'd> super::Multipart<'n, 'd> {
         /// #### Feature: `hyper`

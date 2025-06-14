@@ -11,18 +11,20 @@ pub use crate::server::buffer_redux::BufReader;
 pub use crate::tempfile::TempDir;
 
 use std::collections::HashMap;
-use std::io::prelude::*;
 use std::fs::{self, File, OpenOptions};
+use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{cmp, env, io, mem, str, u32, u64};
 use tempfile;
 
-use crate::server::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry, ReadEntryResult};
+use crate::server::field::{
+    FieldHeaders, MultipartData, MultipartField, ReadEntry, ReadEntryResult,
+};
 
+use self::PartialReason::*;
 use self::SaveResult::*;
 use self::TextPolicy::*;
-use self::PartialReason::*;
 
 const RANDOM_FILENAME_LEN: usize = 12;
 
@@ -65,7 +67,7 @@ enum TextPolicy {
     /// Attempt to read a text field as text, returning any errors
     Force,
     /// Don't try to read text
-    Ignore
+    Ignore,
 }
 
 /// A builder for saving a file or files to the local filesystem.
@@ -185,7 +187,10 @@ impl<S> SaveBuilder<S> {
     /// If `0`, forces fields to save directly to the filesystem.
     /// If `u64::MAX`, effectively forces fields to always save to memory.
     pub fn memory_threshold(self, memory_threshold: u64) -> Self {
-        Self { memory_threshold, ..self }
+        Self {
+            memory_threshold,
+            ..self
+        }
     }
 
     /// When encountering a field that is apparently text, try to read it to a string or fall
@@ -196,7 +201,10 @@ impl<S> SaveBuilder<S> {
     ///
     /// Has no effect once `memory_threshold` has been reached.
     pub fn try_text(self) -> Self {
-        Self { text_policy: TextPolicy::Try, ..self }
+        Self {
+            text_policy: TextPolicy::Try,
+            ..self
+        }
     }
 
     /// When encountering a field that is apparently text, read it to a string or return an error.
@@ -206,17 +214,26 @@ impl<S> SaveBuilder<S> {
     ///
     /// (RFC: should this continue to validate UTF-8 when writing to the filesystem?)
     pub fn force_text(self) -> Self {
-        Self { text_policy: TextPolicy::Force, ..self}
+        Self {
+            text_policy: TextPolicy::Force,
+            ..self
+        }
     }
 
     /// Don't try to read or validate any field data as UTF-8.
     pub fn ignore_text(self) -> Self {
-        Self { text_policy: TextPolicy::Ignore, ..self }
+        Self {
+            text_policy: TextPolicy::Ignore,
+            ..self
+        }
     }
 }
 
 /// Save API for whole multipart requests.
-impl<M> SaveBuilder<M> where M: ReadEntry {
+impl<M> SaveBuilder<M>
+where
+    M: ReadEntry,
+{
     /// Set the maximum number of fields to process.
     ///
     /// Can be `u32` or `Option<u32>`. If `None` or `u32::MAX`, clears the limit.
@@ -287,8 +304,12 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
     /// reaches `u32::MAX`, but this would be an extremely degenerate case.
     pub fn with_entries(self, mut entries: Entries) -> EntriesSaveResult<M> {
         let SaveBuilder {
-            savable, open_opts, count_limit, size_limit,
-            memory_threshold, text_policy
+            savable,
+            open_opts,
+            count_limit,
+            size_limit,
+            memory_threshold,
+            text_policy,
         } = self;
 
         let mut res = ReadEntry::read_entry(savable);
@@ -299,8 +320,12 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
             let text_policy = if field.is_text() { text_policy } else { Ignore };
 
             let mut saver = SaveBuilder {
-                savable: &mut field.data, open_opts: open_opts.clone(),
-                count_limit, size_limit, memory_threshold, text_policy
+                savable: &mut field.data,
+                open_opts: open_opts.clone(),
+                count_limit,
+                size_limit,
+                memory_threshold,
+                text_policy,
             };
 
             saver.with_dir(entries.save_dir.as_path())
@@ -310,13 +335,15 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
             let mut field: MultipartField<M> = match res {
                 ReadEntryResult::Entry(field) => field,
                 ReadEntryResult::End(_) => return Full(entries), // normal exit point
-                ReadEntryResult::Error(_, e) => return Partial (
-                    PartialEntries {
-                        entries,
-                        partial: None,
-                    },
-                    e.into(),
-                )
+                ReadEntryResult::Error(_, e) => {
+                    return Partial(
+                        PartialEntries {
+                            entries,
+                            partial: None,
+                        },
+                        e.into(),
+                    )
+                }
             };
 
             let (dest, reason) = match save_field(&mut field, &entries) {
@@ -324,7 +351,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
                     entries.push_field(field.headers, saved);
                     res = ReadEntry::read_entry(field.data.into_inner());
                     continue;
-                },
+                }
                 Partial(saved, reason) => (Some(saved), reason),
                 Error(error) => (None, PartialReason::IoError(error)),
             };
@@ -337,7 +364,7 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
                         dest,
                     }),
                 },
-                reason
+                reason,
             );
         }
 
@@ -346,13 +373,16 @@ impl<M> SaveBuilder<M> where M: ReadEntry {
                 entries,
                 partial: None,
             },
-            PartialReason::CountLimit
+            PartialReason::CountLimit,
         )
     }
 }
 
 /// Save API for individual fields.
-impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: BufRead {
+impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>>
+where
+    MultipartData<M>: BufRead,
+{
     /// Save the field data, potentially using a file with a random name in the
     /// OS temporary directory.
     ///
@@ -407,7 +437,7 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
 
         match reason {
             SizeLimit if !self.cmp_size_limit(bytes.len()) => (),
-            other => return Partial(bytes.into(), other)
+            other => return Partial(bytes.into(), other),
         }
 
         let path = path.into();
@@ -417,14 +447,13 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
             Err(e) => return Error(e),
         };
 
-        let data = try_full!(
-            try_write_all(&bytes, &mut file)
-                .map(move |size| SavedData::File(path, size as u64))
-        );
+        let data =
+            try_full!(try_write_all(&bytes, &mut file)
+                .map(move |size| SavedData::File(path, size as u64)));
 
-        self.write_to(file).map(move |written| data.add_size(written))
+        self.write_to(file)
+            .map(move |written| data.add_size(written))
     }
-
 
     /// Write out the field data to `dest`, truncating if a limit was set.
     ///
@@ -434,7 +463,11 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
     /// Retries on interrupts.
     pub fn write_to<W: Write>(&mut self, mut dest: W) -> SaveResult<u64, u64> {
         if self.size_limit < u64::MAX {
-            try_copy_limited(&mut self.savable, |buf| try_write_all(buf, &mut dest), self.size_limit)
+            try_copy_limited(
+                &mut self.savable,
+                |buf| try_write_all(buf, &mut dest),
+                self.size_limit,
+            )
         } else {
             try_read_buf(&mut self.savable, |buf| try_write_all(buf, &mut dest))
         }
@@ -442,31 +475,49 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
 
     fn save_mem(&mut self, mut bytes: Vec<u8>) -> SaveResult<Vec<u8>, Vec<u8>> {
         let pre_read = bytes.len() as u64;
-        match self.read_mem(|buf| { bytes.extend_from_slice(buf); Full(buf.len()) }, pre_read) {
+        match self.read_mem(
+            |buf| {
+                bytes.extend_from_slice(buf);
+                Full(buf.len())
+            },
+            pre_read,
+        ) {
             Full(_) => Full(bytes),
             Partial(_, reason) => Partial(bytes, reason),
-            Error(e) => if !bytes.is_empty() { Partial(bytes, e.into()) }
-            else { Error(e) }
+            Error(e) => {
+                if !bytes.is_empty() {
+                    Partial(bytes, e.into())
+                } else {
+                    Error(e)
+                }
+            }
         }
-
     }
 
     fn save_text(&mut self) -> SaveResult<String, String> {
         let mut string = String::new();
 
         // incrementally validate UTF-8 to do as much work as possible during network activity
-        let res = self.read_mem(|buf| {
-            match str::from_utf8(buf) {
-                Ok(s) => { string.push_str(s); Full(buf.len()) },
-                // buffer should always be bigger
-                Err(e) => if buf.len() < 4 {
-                        Partial(0, e.into())
-                    } else {
-                        string.push_str(str::from_utf8(&buf[..e.valid_up_to()]).unwrap());
-                        Full(e.valid_up_to())
+        let res = self.read_mem(
+            |buf| {
+                match str::from_utf8(buf) {
+                    Ok(s) => {
+                        string.push_str(s);
+                        Full(buf.len())
                     }
-            }
-        }, 0);
+                    // buffer should always be bigger
+                    Err(e) => {
+                        if buf.len() < 4 {
+                            Partial(0, e.into())
+                        } else {
+                            string.push_str(str::from_utf8(&buf[..e.valid_up_to()]).unwrap());
+                            Full(e.valid_up_to())
+                        }
+                    }
+                }
+            },
+            0,
+        );
 
         match res {
             Full(_) => Full(string),
@@ -475,9 +526,12 @@ impl<'m, M: 'm> SaveBuilder<&'m mut MultipartData<M>> where MultipartData<M>: Bu
         }
     }
 
-    fn read_mem<Wb: FnMut(&[u8]) -> SaveResult<usize, usize>>(&mut self, with_buf: Wb, pre_read: u64) -> SaveResult<u64, u64> {
-        let limit = cmp::min(self.size_limit, self.memory_threshold)
-            .saturating_sub(pre_read);
+    fn read_mem<Wb: FnMut(&[u8]) -> SaveResult<usize, usize>>(
+        &mut self,
+        with_buf: Wb,
+        pre_read: u64,
+    ) -> SaveResult<u64, u64> {
+        let limit = cmp::min(self.size_limit, self.memory_threshold).saturating_sub(pre_read);
         try_copy_limited(&mut self.savable, with_buf, limit)
     }
 
@@ -549,7 +603,7 @@ impl SavedData {
 
         match self {
             File(path, size) => File(path, size.saturating_add(add)),
-            other => other
+            other => other,
         }
     }
 }
@@ -616,7 +670,7 @@ pub struct Entries {
     /// Each vector is guaranteed not to be empty unless externally modified.
     // Even though individual fields might only have one entry, it's better to limit the
     // size of a value type in `HashMap` to improve cache efficiency in lookups.
-        pub fields: HashMap<Arc<str>, Vec<SavedField>>,
+    pub fields: HashMap<Arc<str>, Vec<SavedField>>,
     /// The directory that the entries in `fields` were saved into.
     pub save_dir: SaveDir,
     fields_count: u32,
@@ -660,12 +714,14 @@ impl Entries {
         use std::collections::hash_map::Entry::*;
 
         match self.fields.entry(headers.name.clone()) {
-            Vacant(vacant) => { vacant.insert(vec![SavedField { headers, data }]); },
+            Vacant(vacant) => {
+                vacant.insert(vec![SavedField { headers, data }]);
+            }
             Occupied(occupied) => {
                 // dedup the field name by reusing the key's `Arc`
                 headers.name = occupied.key().clone();
                 occupied.into_mut().push(SavedField { headers, data });
-            },
+            }
         }
 
         self.fields_count = self.fields_count.saturating_add(1);
@@ -686,7 +742,11 @@ impl Entries {
             for (idx, field) in entries.iter().enumerate() {
                 let mut data = field.data.readable()?;
                 let headers = &field.headers;
-                writeln!(writer, "{}: {:?} ({:?}):", idx, headers.filename, headers.content_type)?;
+                writeln!(
+                    writer,
+                    "{}: {:?} ({:?}):",
+                    idx, headers.filename, headers.content_type
+                )?;
                 io::copy(&mut data, &mut writer)?;
             }
         }
@@ -907,7 +967,10 @@ impl<M: ReadEntry> EntriesSaveResult<M> {
     }
 }
 
-impl<S, P> SaveResult<S, P> where P: Into<S> {
+impl<S, P> SaveResult<S, P>
+where
+    P: Into<S>,
+{
     /// Convert `self` to `Option<S>`; there may still have been an error.
     pub fn okish(self) -> Option<S> {
         self.into_opt_both().0
@@ -915,7 +978,10 @@ impl<S, P> SaveResult<S, P> where P: Into<S> {
 
     /// Map the `Full` or `Partial` values to a new type, retaining the reason
     /// in the `Partial` case.
-    pub fn map<T, Map>(self, map: Map) -> SaveResult<T, T> where Map: FnOnce(S) -> T {
+    pub fn map<T, Map>(self, map: Map) -> SaveResult<T, T>
+    where
+        Map: FnOnce(S) -> T,
+    {
         match self {
             Full(full) => Full(map(full)),
             Partial(partial, reason) => Partial(map(partial.into()), reason),
@@ -926,7 +992,7 @@ impl<S, P> SaveResult<S, P> where P: Into<S> {
     /// Decompose `self` to `(Option<S>, Option<io::Error>)`
     pub fn into_opt_both(self) -> (Option<S>, Option<io::Error>) {
         match self {
-            Full(full)  => (Some(full), None),
+            Full(full) => (Some(full), None),
             Partial(partial, IoError(e)) => (Some(partial.into()), Some(e)),
             Partial(partial, _) => (Some(partial.into()), None),
             Error(error) => (None, Some(error)),
@@ -964,23 +1030,35 @@ fn create_dir_all(path: &Path) -> io::Result<()> {
         fs::create_dir_all(parent)
     } else {
         // RFC: return an error instead?
-        warn!("Attempting to save file in what looks like a root directory. File path: {:?}", path);
+        warn!(
+            "Attempting to save file in what looks like a root directory. File path: {:?}",
+            path
+        );
         Ok(())
     }
 }
 
-fn try_copy_limited<R: BufRead, Wb: FnMut(&[u8]) -> SaveResult<usize, usize>>(src: R, mut with_buf: Wb, limit: u64) -> SaveResult<u64, u64> {
+fn try_copy_limited<R: BufRead, Wb: FnMut(&[u8]) -> SaveResult<usize, usize>>(
+    src: R,
+    mut with_buf: Wb,
+    limit: u64,
+) -> SaveResult<u64, u64> {
     let mut copied = 0u64;
     try_read_buf(src, |buf| {
         let new_copied = copied.saturating_add(buf.len() as u64);
-        if new_copied > limit { return Partial(0, PartialReason::SizeLimit) }
+        if new_copied > limit {
+            return Partial(0, PartialReason::SizeLimit);
+        }
         copied = new_copied;
 
         with_buf(buf)
     })
 }
 
-fn try_read_buf<R: BufRead, Wb: FnMut(&[u8]) -> SaveResult<usize, usize>>(mut src: R, mut with_buf: Wb) -> SaveResult<u64, u64> {
+fn try_read_buf<R: BufRead, Wb: FnMut(&[u8]) -> SaveResult<usize, usize>>(
+    mut src: R,
+    mut with_buf: Wb,
+) -> SaveResult<u64, u64> {
     let mut total_copied = 0u64;
 
     macro_rules! try_here (
@@ -997,16 +1075,22 @@ fn try_read_buf<R: BufRead, Wb: FnMut(&[u8]) -> SaveResult<usize, usize>>(mut sr
     loop {
         let res = {
             let buf = try_here!(src.fill_buf());
-            if buf.is_empty() { break; }
+            if buf.is_empty() {
+                break;
+            }
             with_buf(buf)
         };
 
         match res {
-            Full(copied) => { src.consume(copied); total_copied += copied as u64; }
+            Full(copied) => {
+                src.consume(copied);
+                total_copied += copied as u64;
+            }
             Partial(copied, reason) => {
-                src.consume(copied); total_copied += copied as u64;
+                src.consume(copied);
+                total_copied += copied as u64;
                 return Partial(total_copied, reason);
-            },
+            }
             Error(err) => {
                 return Partial(total_copied, err.into());
             }
@@ -1032,12 +1116,14 @@ fn try_write_all<W: Write>(mut buf: &[u8], mut dest: W) -> SaveResult<usize, usi
 
     while !buf.is_empty() {
         match try_here!(dest.write(buf)) {
-            0 => try_here!(Err(io::Error::new(io::ErrorKind::WriteZero,
-                                          "failed to write whole buffer"))),
+            0 => try_here!(Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "failed to write whole buffer"
+            ))),
             copied => {
                 buf = &buf[copied..];
                 total_copied += copied;
-            },
+            }
         }
     }
 
