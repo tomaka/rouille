@@ -63,7 +63,7 @@ extern crate chrono;
 #[cfg(feature = "gzip")]
 extern crate deflate;
 extern crate filetime;
-extern crate multipart;
+extern crate rouille_multipart;
 extern crate rand;
 extern crate serde;
 #[macro_use]
