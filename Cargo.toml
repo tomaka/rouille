@@ -9,6 +9,7 @@ description = "High-level idiomatic web framework."
 readme = "README.md"
 keywords = ["web", "framework", "http", "rest"]
 categories = ["web-programming::http-server", "web-programming::websocket"]
+rust-version = "1.82"
 
 [features]
 default = ["gzip", "brotli"]
