@@ -9,8 +9,8 @@
 
 use ::safemem;
 
-use super::buf_redux::BufReader;
-use super::buf_redux::policy::MinBuffered;
+use super::buffer_redux::BufReader;
+use super::buffer_redux::policy::MinBuffered;
 use super::twoway;
 
 use std::cmp;
