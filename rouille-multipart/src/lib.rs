@@ -16,16 +16,6 @@
 //! * `mock`: Provides mock implementations of core `client` and `server` traits for debugging
 //! or non-standard use.
 //!
-//! * `hyper`: Integration with the [Hyper](https://crates.io/crates/hyper) HTTP library
-//! for client and/or server depending on which other feature flags are set.
-//!
-//! * `iron`: Integration with the [Iron](http://crates.io/crates/iron) web application
-//! framework. See the [`server::iron`](server/iron/index.html) module for more information.
-//!
-//! * `nickel` (returning in 0.14!): Integration with the [Nickel](https://crates.io/crates/nickel)
-//! web application framework. See the [`server::nickel`](server/nickel/index.html) module for more
-//! information.
-//!
 //! * `tiny_http`: Integration with the [`tiny_http`](https://crates.io/crates/tiny_http)
 //! crate. See the [`server::tiny_http`](server/tiny_http/index.html) module for more information.
 //!
@@ -39,7 +29,6 @@
 #![cfg_attr(feature = "clippy", feature(plugin))]
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 #![cfg_attr(feature = "clippy", deny(clippy))]
-#![cfg_attr(feature = "bench", feature(test))]
 #![deny(missing_docs)]
 
 #[macro_use]
@@ -57,12 +46,6 @@ extern crate quick_error;
 #[cfg(feature = "server")]
 extern crate safemem;
 
-#[cfg(feature = "hyper")]
-extern crate hyper;
-
-#[cfg(feature = "iron")]
-extern crate iron;
-
 #[cfg(feature = "tiny_http")]
 extern crate tiny_http;
 
@@ -77,8 +60,6 @@ use rand::Rng;
 /// Chain a series of results together, with or without previous results.
 ///
 /// ```
-/// #[macro_use] extern crate multipart;
-///
 /// fn try_add_one(val: u32) -> Result<u32, u32> {
 ///     if val < 5 {
 ///         Ok(val + 1)
@@ -88,7 +69,7 @@ use rand::Rng;
 /// }
 ///
 /// fn main() {
-///     let res = chain_result! {
+///     let res = rouille_multipart::chain_result! {
 ///         try_add_one(1),
 ///         prev -> try_add_one(prev),
 ///         prev -> try_add_one(prev),

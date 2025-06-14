@@ -1,10 +1,8 @@
-extern crate multipart;
-extern crate tiny_http;
-
 use multipart::mock::StdoutTee;
 use multipart::server::{Entries, Multipart, SaveResult};
 use std::io::{self, Cursor, Write};
 use tiny_http::{Request, Response, StatusCode};
+
 fn main() {
     // Starting a server on `localhost:80`
     let server = tiny_http::Server::http("localhost:80").expect("Could not bind localhost:80");

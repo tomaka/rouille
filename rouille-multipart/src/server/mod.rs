@@ -59,17 +59,8 @@ macro_rules! try_read_entry {
 mod boundary;
 mod field;
 
-#[cfg(feature = "hyper")]
-pub mod hyper;
-
-#[cfg(feature = "iron")]
-pub mod iron;
-
 #[cfg(feature = "tiny_http")]
 pub mod tiny_http;
-
-#[cfg(feature = "nickel")]
-pub mod nickel;
 
 pub mod save;
 
@@ -203,7 +194,7 @@ pub trait HttpRequest {
 
 #[test]
 fn issue_104() {
-    ::init_log();
+    crate::init_log();
 
     use std::io::Cursor;
 
@@ -226,7 +217,7 @@ fn issue_104() {
 
 #[test]
 fn issue_114() {
-    ::init_log();
+    crate::init_log();
 
     fn consume_all<R: BufRead>(mut rdr: R) {
         loop {

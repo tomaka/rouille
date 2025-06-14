@@ -240,20 +240,6 @@ fn find_boundary(buf: &[u8], boundary: &[u8]) -> Result<usize, usize> {
     Err(buf.len())
 }
 
-#[cfg(feature = "bench")]
-impl<'a> BoundaryReader<io::Cursor<&'a [u8]>> {
-    fn new_with_bytes(bytes: &'a [u8], boundary: &str) -> Self {
-        Self::from_reader(io::Cursor::new(bytes), boundary)
-    }
-
-    fn reset(&mut self) {
-        // Dump buffer and reset cursor
-        self.source.seek(io::SeekFrom::Start(0));
-        self.state = Searching;
-        self.search_idx = 0;
-    }
-}
-
 impl<R> Borrow<R> for BoundaryReader<R> {
     fn borrow(&self) -> &R {
         self.source.get_ref()
@@ -310,7 +296,7 @@ mod test {
 
     #[test]
     fn test_boundary() {
-        ::init_log();
+        crate::init_log();
 
         debug!("Testing boundary (no split)");
 
@@ -356,7 +342,7 @@ mod test {
 
     #[test]
     fn test_split_boundary() {
-        ::init_log();
+        crate::init_log();
 
         debug!("Testing boundary (split)");
 
@@ -406,7 +392,7 @@ mod test {
 
     #[test]
     fn test_empty_body() {
-        ::init_log();
+        crate::init_log();
 
         // empty body contains closing boundary only
         let mut body: &[u8] = b"--boundary--";
@@ -428,7 +414,7 @@ mod test {
 
     #[test]
     fn test_leading_crlf() {
-        ::init_log();
+        crate::init_log();
 
         let mut body: &[u8] = b"\r\n\r\n--boundary\r\n\
                          asdf1234\
@@ -455,7 +441,7 @@ mod test {
 
     #[test]
     fn test_trailing_crlf() {
-        ::init_log();
+        crate::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
@@ -499,7 +485,7 @@ mod test {
     // https://github.com/abonander/multipart/issues/93#issuecomment-343610587
     #[test]
     fn test_trailing_lflf() {
-        ::init_log();
+        crate::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
@@ -542,7 +528,7 @@ mod test {
     // https://github.com/abonander/multipart/issues/104
     #[test]
     fn test_unterminated_body() {
-        ::init_log();
+        crate::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
@@ -606,24 +592,5 @@ mod test {
         assert_eq!(buf, "field2");
 
         assert_eq!(reader.consume_boundary().unwrap(), false);
-    }
-
-    #[cfg(feature = "bench")]
-    mod bench {
-        extern crate test;
-        use self::test::Bencher;
-
-        use super::*;
-
-        #[bench]
-        fn bench_boundary_reader(b: &mut Bencher) {
-            let mut reader = BoundaryReader::new_with_bytes(TEST_VAL.as_bytes(), BOUNDARY);
-            let mut buf = String::with_capacity(256);
-
-            b.iter(|| {
-                reader.reset();
-                test_boundary_reader(&mut reader, &mut buf);
-            });
-        }
     }
 }
