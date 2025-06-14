@@ -6,7 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 //! Sized/buffered wrapper around `HttpRequest`.
 
-use client::{HttpRequest, HttpStream};
+use super::{HttpRequest, HttpStream};
 
 use std::io;
 use std::io::prelude::*;

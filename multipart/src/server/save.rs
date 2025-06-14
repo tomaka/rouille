@@ -6,9 +6,9 @@
 // copied, modified, or distributed except according to those terms.
 //! Utilities for saving request entries to the filesystem.
 
-pub use server::buf_redux::BufReader;
+pub use crate::server::buf_redux::BufReader;
 
-pub use tempfile::TempDir;
+pub use crate::tempfile::TempDir;
 
 use std::collections::HashMap;
 use std::io::prelude::*;
@@ -18,7 +18,7 @@ use std::sync::Arc;
 use std::{cmp, env, io, mem, str, u32, u64};
 use tempfile;
 
-use server::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry, ReadEntryResult};
+use crate::server::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry, ReadEntryResult};
 
 use self::SaveResult::*;
 use self::TextPolicy::*;
@@ -27,7 +27,7 @@ use self::PartialReason::*;
 const RANDOM_FILENAME_LEN: usize = 12;
 
 fn rand_filename() -> String {
-    ::random_alphanumeric(RANDOM_FILENAME_LEN)
+    crate::random_alphanumeric(RANDOM_FILENAME_LEN)
 }
 
 macro_rules! try_start (
@@ -664,7 +664,7 @@ impl Entries {
             Occupied(occupied) => {
                 // dedup the field name by reusing the key's `Arc`
                 headers.name = occupied.key().clone();
-                occupied.into_mut().push({ SavedField { headers, data }});
+                occupied.into_mut().push(SavedField { headers, data });
             },
         }
 

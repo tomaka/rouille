@@ -8,7 +8,6 @@
 //! `multipart` field header parsing.
 use mime::Mime;
 
-use std::error::Error;
 use std::io::{self, BufRead, Read};
 use std::{fmt, str};
 
@@ -27,7 +26,7 @@ macro_rules! invalid_cont_disp {
         return Err(ParseHeaderError::InvalidContDisp(
             $reason,
             $cause.to_string(),
-        ));
+        ))
     };
 }
 
@@ -531,30 +530,28 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
     }
 }
 
-const GENERIC_PARSE_ERR: &str = "an error occurred while parsing field headers";
-
 quick_error! {
     #[derive(Debug)]
     enum ParseHeaderError {
         /// The `Content-Disposition` header was not found
         MissingContentDisposition(headers: String) {
-            display(x) -> ("{}:\n{}", x.description(), headers)
+            display(x) -> ("{}:\n{}", x, headers)
             description("\"Content-Disposition\" header not found in field headers")
         }
         InvalidContDisp(reason: &'static str, cause: String) {
-            display(x) -> ("{}: {}: {}", x.description(), reason, cause)
+            display(x) -> ("{}: {}: {}", x, reason, cause)
             description("invalid \"Content-Disposition\" header")
         }
         /// The header was found but could not be parsed
         TokenizeError(err: HttparseError) {
-            description(GENERIC_PARSE_ERR)
-            display(x) -> ("{}: {}", x.description(), err)
+            description("an error occurred while parsing field headers")
+            display(x) -> ("{}: {}", x, err)
             cause(err)
             from()
         }
         MimeError(cont_type: String) {
             description("Failed to parse Content-Type")
-            display(this) -> ("{}: {}", this.description(), cont_type)
+            display(this) -> ("{}: {}", this, cont_type)
         }
         TooLarge {
             description("field headers section ridiculously long or missing trailing CRLF-CRLF")
@@ -562,7 +559,7 @@ quick_error! {
         /// IO error
         Io(err: io::Error) {
             description("an io error occurred while parsing the headers")
-            display(x) -> ("{}: {}", x.description(), err)
+            display(x) -> ("{}: {}", x, err)
             cause(err)
             from()
         }

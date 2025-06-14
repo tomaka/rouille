@@ -7,7 +7,7 @@ use self::hyper::header::ContentType;
 pub use self::nickel::Request as NickelRequest;
 pub use self::nickel::hyper::server::Request as HyperRequest;
 
-use server::{HttpRequest, Multipart};
+use crate::server::{HttpRequest, Multipart};
 
 /// A wrapper for `&mut nickel::Request` which implements `multipart::server::HttpRequest`.
 ///
