@@ -25,7 +25,7 @@ thiserror = { version = "2.0.12", optional = true }
 memchr = { version = "2.7.5", optional = true }
 
 # Optional Integrations
-tiny_http = { version = "0.6", optional = true }
+tiny_http = { version = "0.12", optional = true }
 
 [dev-dependencies]
 env_logger = "0.5"
