@@ -75,8 +75,8 @@ pub mod server;
 mod local_test;
 
 fn random_alphanumeric(len: usize) -> String {
-    rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
+    rand::rng()
+        .sample_iter(&rand::distr::Alphanumeric)
         .take(len)
         .map(|c| c as char)
         .collect()

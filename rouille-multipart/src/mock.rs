@@ -71,7 +71,7 @@ impl HttpBuffer {
             buf,
             boundary,
             content_len,
-            rng: rand::thread_rng(),
+            rng: rand::rng(),
         }
     }
 
@@ -81,7 +81,7 @@ impl HttpBuffer {
             data: &self.buf,
             boundary: &self.boundary,
             content_len: self.content_len,
-            rng: rand::thread_rng(),
+            rng: rand::rng(),
         }
     }
 }
@@ -96,7 +96,7 @@ impl Write for HttpBuffer {
         }
 
         // Simulate the randomness of a network connection by not always reading everything
-        let len = self.rng.gen_range(1..=buf.len());
+        let len = self.rng.random_range(1..=buf.len());
 
         self.buf.write(&buf[..len])
     }
@@ -150,7 +150,7 @@ impl<'a> ServerRequest<'a> {
             data,
             boundary,
             content_len: None,
-            rng: rand::thread_rng(),
+            rng: rand::rng(),
         }
     }
 }
@@ -165,7 +165,7 @@ impl<'a> Read for ServerRequest<'a> {
         }
 
         // Simulate the randomness of a network connection by not always reading everything
-        let len = self.rng.gen_range(1..=out.len());
+        let len = self.rng.random_range(1..=out.len());
         self.data.read(&mut out[..len])
     }
 }
