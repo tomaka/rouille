@@ -1,12 +1,5 @@
-#![no_main]
-extern crate libfuzzer_sys;
-extern crate multipart;
-
-#[macro_use]
-extern crate log;
-
-use multipart::server::{Multipart, MultipartData};
-use multipart::mock::ServerRequest;
+use rouille_multipart::mock::ServerRequest;
+use rouille_multipart::server::{Multipart, MultipartData};
 
 mod logger;
 
@@ -14,8 +7,8 @@ use std::io::BufRead;
 
 const BOUNDARY: &'static str = "--12--34--56";
 
-#[export_name="rust_fuzzer_test_input"]
-pub extern fn go(data: &[u8]) {
+#[export_name = "rust_fuzzer_test_input"]
+pub extern "C" fn go(data: &[u8]) {
     logger::init();
 
     info!("Fuzzing started! Data len: {}", data.len());
@@ -26,8 +19,9 @@ pub extern fn go(data: &[u8]) {
 }
 
 fn do_fuzz(data: &[u8]) {
-
-    if data.len() < BOUNDARY.len() { return; }
+    if data.len() < BOUNDARY.len() {
+        return;
+    }
 
     let req = ServerRequest::new(data, BOUNDARY);
 
@@ -41,7 +35,7 @@ fn do_fuzz(data: &[u8]) {
 
     // A lot of requests will be malformed
     while let Ok(Some(entry)) = multipart.read_entry() {
-	    info!("read_entry() loop!");
+        info!("read_entry() loop!");
         match entry.data {
             MultipartData::Text(_) => (),
             MultipartData::File(mut file) => loop {
@@ -49,9 +43,11 @@ fn do_fuzz(data: &[u8]) {
 
                 info!("Consume amt: {}", consume);
 
-                if consume == 0 { break; }
+                if consume == 0 {
+                    break;
+                }
                 file.consume(consume);
-            }
+            },
         }
     }
 }

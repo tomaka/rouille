@@ -11,22 +11,17 @@
 //!
 //! See the `Multipart` struct for more info.
 
-pub extern crate buffer_redux;
-extern crate httparse;
-extern crate twoway;
-
 use std::borrow::Borrow;
 use std::io;
 use std::io::prelude::*;
 
+pub use buffer_redux;
+use log::{debug, info};
+
 use self::boundary::BoundaryReader;
-
 use self::field::PrivReadEntry;
-
 pub use self::field::{FieldHeaders, MultipartData, MultipartField, ReadEntry, ReadEntryResult};
-
 use self::save::SaveBuilder;
-
 pub use self::save::{Entries, SaveResult, SavedField};
 
 macro_rules! try_opt (
@@ -59,17 +54,8 @@ macro_rules! try_read_entry {
 mod boundary;
 mod field;
 
-#[cfg(feature = "hyper")]
-pub mod hyper;
-
-#[cfg(feature = "iron")]
-pub mod iron;
-
 #[cfg(feature = "tiny_http")]
 pub mod tiny_http;
-
-#[cfg(feature = "nickel")]
-pub mod nickel;
 
 pub mod save;
 
@@ -203,7 +189,7 @@ pub trait HttpRequest {
 
 #[test]
 fn issue_104() {
-    ::init_log();
+    crate::init_log();
 
     use std::io::Cursor;
 
@@ -226,7 +212,7 @@ fn issue_104() {
 
 #[test]
 fn issue_114() {
-    ::init_log();
+    crate::init_log();
 
     fn consume_all<R: BufRead>(mut rdr: R) {
         loop {

@@ -1,5 +1,4 @@
 //! Multipart requests which write out their data in one fell swoop.
-use mime::Mime;
 
 use std::borrow::Cow;
 use std::error::Error;
@@ -9,6 +8,9 @@ use std::path::{Path, PathBuf};
 use std::io::prelude::*;
 use std::io::Cursor;
 use std::{fmt, io};
+
+use log::debug;
+use mime::Mime;
 
 use super::{HttpRequest, HttpStream};
 
@@ -480,68 +482,4 @@ impl<'a> IntoCowPath<'a> for &'a str {
 
 fn cursor_at_end<T: AsRef<[u8]>>(cursor: &Cursor<T>) -> bool {
     cursor.position() == (cursor.get_ref().as_ref().len() as u64)
-}
-
-#[cfg(feature = "hyper")]
-mod hyper {
-    use crate::client;
-    use hyper::client::{Body, Client, IntoUrl, RequestBuilder, Response};
-    use hyper::Result as HyperResult;
-
-    impl<'n, 'd> super::Multipart<'n, 'd> {
-        /// #### Feature: `hyper`
-        /// Complete a POST request with the given `hyper::client::Client` and URL.
-        ///
-        /// Supplies the fields in the body, optionally setting the content-length header if
-        /// applicable (all added fields were text or files, i.e. no streams).
-        pub fn client_request<U: IntoUrl>(
-            &mut self,
-            client: &Client,
-            url: U,
-        ) -> HyperResult<Response> {
-            self.client_request_mut(client, url, |r| r)
-        }
-
-        /// #### Feature: `hyper`
-        /// Complete a POST request with the given `hyper::client::Client` and URL;
-        /// allows mutating the `hyper::client::RequestBuilder` via the passed closure.
-        ///
-        /// Note that the body, and the `ContentType` and `ContentLength` headers will be
-        /// overwritten, either by this method or by Hyper.
-        pub fn client_request_mut<U: IntoUrl, F: FnOnce(RequestBuilder) -> RequestBuilder>(
-            &mut self,
-            client: &Client,
-            url: U,
-            mut_fn: F,
-        ) -> HyperResult<Response> {
-            let mut fields = match self.prepare() {
-                Ok(fields) => fields,
-                Err(err) => {
-                    error!("Error preparing request: {}", err);
-                    return Err(err.error.into());
-                }
-            };
-
-            mut_fn(client.post(url))
-                .header(client::hyper::content_type(fields.boundary()))
-                .body(fields.to_body())
-                .send()
-        }
-    }
-
-    impl<'d> super::PreparedFields<'d> {
-        /// #### Feature: `hyper`
-        /// Convert `self` to `hyper::client::Body`.
-        #[cfg_attr(feature = "clippy", warn(wrong_self_convention))]
-        pub fn to_body<'b>(&'b mut self) -> Body<'b>
-        where
-            'd: 'b,
-        {
-            if let Some(content_len) = self.content_len {
-                Body::SizedBody(self, content_len)
-            } else {
-                Body::ChunkedBody(self)
-            }
-        }
-    }
 }

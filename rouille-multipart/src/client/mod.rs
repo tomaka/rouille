@@ -16,9 +16,6 @@ use std::io::prelude::*;
 
 use std::path::Path;
 
-#[cfg(feature = "hyper")]
-pub mod hyper;
-
 pub mod lazy;
 
 mod sized;
