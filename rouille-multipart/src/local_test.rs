@@ -4,14 +4,8 @@
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
-use mock::{ClientRequest, HttpBuffer};
-
-use server::{FieldHeaders, MultipartField, ReadEntry};
-
-use mime::Mime;
-
-use rand::seq::SliceRandom;
-use rand::{self, Rng};
+use crate::mock::{ClientRequest, HttpBuffer};
+use crate::server::{FieldHeaders, MultipartField, ReadEntry};
 
 use std::collections::hash_map::{Entry, OccupiedEntry};
 use std::collections::{HashMap, HashSet};
@@ -19,6 +13,10 @@ use std::fmt;
 use std::io::prelude::*;
 use std::io::Cursor;
 use std::iter::{self, FromIterator};
+
+use mime::Mime;
+use rand::seq::SliceRandom;
+use rand::{self, Rng};
 
 const MIN_FIELDS: usize = 1;
 const MAX_FIELDS: usize = 3;
@@ -226,18 +224,18 @@ impl fmt::Debug for PrintHex {
 
 macro_rules! do_test (
     ($client_test:ident, $server_test:ident) => (
-        ::init_log();
+        crate::init_log();
 
-        info!("Client Test: {:?} Server Test: {:?}", stringify!($client_test),
+        log::info!("Client Test: {:?} Server Test: {:?}", stringify!($client_test),
               stringify!($server_test));
 
         let mut test_fields = TestFields::gen();
 
-        trace!("Fields for test: {:?}", test_fields);
+        log::trace!("Fields for test: {:?}", test_fields);
 
         let buf = $client_test(&test_fields);
 
-        trace!(
+        log::trace!(
             "\n==Test Buffer Begin==\n{}\n==Test Buffer End==",
             String::from_utf8_lossy(&buf.buf)
         );
@@ -269,9 +267,9 @@ fn lazy_client_entry_server() {
 }
 
 mod extended {
-    use super::{test_client, test_client_lazy, test_server, test_server_entry_api, TestFields};
-
     use std::time::Instant;
+
+    use super::{test_client, test_client_lazy, test_server, test_server_entry_api, TestFields};
 
     const TIME_LIMIT_SECS: u64 = 600;
 
@@ -344,7 +342,7 @@ fn gen_bytes() -> Vec<u8> {
 }
 
 fn test_client(test_fields: &TestFields) -> HttpBuffer {
-    use client::Multipart;
+    use crate::client::Multipart;
 
     let request = ClientRequest::default();
 
@@ -392,7 +390,7 @@ fn test_client(test_fields: &TestFields) -> HttpBuffer {
 }
 
 fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
-    use client::lazy::Multipart;
+    use crate::client::lazy::Multipart;
 
     let mut multipart = Multipart::new();
 
@@ -441,7 +439,7 @@ fn test_client_lazy(test_fields: &TestFields) -> HttpBuffer {
 }
 
 fn test_server(buf: HttpBuffer, fields: &mut TestFields) {
-    use server::Multipart;
+    use crate::server::Multipart;
 
     let server_buf = buf.for_server();
 
@@ -461,7 +459,7 @@ fn test_server(buf: HttpBuffer, fields: &mut TestFields) {
 }
 
 fn test_server_entry_api(buf: HttpBuffer, fields: &mut TestFields) {
-    use server::Multipart;
+    use crate::server::Multipart;
 
     let server_buf = buf.for_server();
 

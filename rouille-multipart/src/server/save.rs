@@ -6,17 +6,17 @@
 // copied, modified, or distributed except according to those terms.
 //! Utilities for saving request entries to the filesystem.
 
-pub use crate::server::buffer_redux::BufReader;
-
-pub use crate::tempfile::TempDir;
-
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{cmp, env, io, mem, str, u32, u64};
-use tempfile;
+
+use log::warn;
+pub use tempfile::TempDir;
+
+pub use crate::server::buffer_redux::BufReader;
 
 use crate::server::field::{
     FieldHeaders, MultipartData, MultipartField, ReadEntry, ReadEntryResult,

@@ -55,10 +55,10 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --features ${{ matrix.features }}
+          args: --features ${{ matrix.features }} --workspace
 
       - name: Test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --features ${{ matrix.features }}
+          args: --features ${{ matrix.features }} --workspace
