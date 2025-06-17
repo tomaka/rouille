@@ -1,5 +1,5 @@
-use multipart::mock::StdoutTee;
-use multipart::server::{Entries, Multipart, SaveResult};
+use rouille_multipart::mock::StdoutTee;
+use rouille_multipart::server::{Entries, Multipart, SaveResult};
 use std::io::{self, Cursor, Write};
 use tiny_http::{Request, Response, StatusCode};
 
