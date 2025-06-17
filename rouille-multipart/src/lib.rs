@@ -26,9 +26,6 @@
 //! I have opened an issue as a place to collect responses and discussions for these questions
 //! [on Github](https://github.com/abonander/multipart/issues/96). Please quote the RFC-statement
 //! (and/or link to its source line) and provide your feedback there.
-#![cfg_attr(feature = "clippy", feature(plugin))]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
-#![cfg_attr(feature = "clippy", deny(clippy))]
 #![deny(missing_docs)]
 
 #[cfg(any(feature = "mock", test))]
