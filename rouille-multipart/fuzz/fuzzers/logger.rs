@@ -1,6 +1,4 @@
-extern crate log;
-
-use self::log::{LogLevelFilter, Log, LogMetadata, LogRecord};
+use self::log::{Log, LogLevelFilter, LogMetadata, LogRecord};
 
 const MAX_LOG_LEVEL: LogLevelFilter = LogLevelFilter::Off;
 

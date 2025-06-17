@@ -6,18 +6,17 @@
 // copied, modified, or distributed except according to those terms.
 
 //! `multipart` field header parsing.
-use mime::Mime;
 
 use std::io::{self, BufRead, Read};
+use std::sync::Arc;
 use std::{fmt, str};
 
-use std::sync::Arc;
-
-use super::httparse::{self, Header, Status, EMPTY_HEADER};
-
-use self::ReadEntryResult::*;
+use httparse::{self, Header, Status, EMPTY_HEADER};
+use log::{debug, info};
 
 use super::save::SaveBuilder;
+use mime::Mime;
+use ReadEntryResult::*;
 
 const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader { name: "", val: "" };
 

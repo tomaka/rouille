@@ -8,6 +8,7 @@
 use std::fmt;
 use std::io::{self, Read, Write};
 
+use log::debug;
 use rand::prelude::ThreadRng;
 use rand::{self, Rng};
 

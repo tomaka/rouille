@@ -7,19 +7,16 @@
 
 //! Boundary parsing for `multipart` requests.
 
-use ::safemem;
-
-use super::buffer_redux::policy::MinBuffered;
-use super::buffer_redux::BufReader;
-use super::twoway;
-
 use std::borrow::Borrow;
 use std::cmp;
-
 use std::io;
 use std::io::prelude::*;
 
-use self::State::*;
+use buffer_redux::policy::MinBuffered;
+use buffer_redux::BufReader;
+use log::{debug, trace};
+
+use State::*;
 
 pub const MIN_BUF_SIZE: usize = 1024;
 
@@ -282,10 +279,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::BoundaryReader;
-
     use std::io;
     use std::io::prelude::*;
+
+    use log::debug;
+
+    use super::BoundaryReader;
 
     const BOUNDARY: &'static str = "boundary";
     const TEST_VAL: &'static str = "--boundary\r\n\

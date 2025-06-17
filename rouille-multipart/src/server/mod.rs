@@ -11,22 +11,17 @@
 //!
 //! See the `Multipart` struct for more info.
 
-pub extern crate buffer_redux;
-extern crate httparse;
-extern crate twoway;
-
 use std::borrow::Borrow;
 use std::io;
 use std::io::prelude::*;
 
+pub use buffer_redux;
+use log::{debug, info};
+
 use self::boundary::BoundaryReader;
-
 use self::field::PrivReadEntry;
-
 pub use self::field::{FieldHeaders, MultipartData, MultipartField, ReadEntry, ReadEntryResult};
-
 use self::save::SaveBuilder;
-
 pub use self::save::{Entries, SaveResult, SavedField};
 
 macro_rules! try_opt (

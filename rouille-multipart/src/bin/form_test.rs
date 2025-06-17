@@ -1,13 +1,9 @@
-extern crate hyper;
-extern crate multipart;
-
-use multipart::server::Multipart;
+use std::fs::File;
+use std::io;
 
 use hyper::header::ContentType;
 use hyper::server::*;
-
-use std::fs::File;
-use std::io;
+use rouille_multipart::server::Multipart;
 
 fn main() {
     let listening = Server::http("127.0.0.1:0")

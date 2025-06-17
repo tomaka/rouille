@@ -31,23 +31,6 @@
 #![cfg_attr(feature = "clippy", deny(clippy))]
 #![deny(missing_docs)]
 
-#[macro_use]
-extern crate log;
-
-extern crate mime;
-extern crate mime_guess;
-extern crate rand;
-extern crate tempfile;
-
-#[cfg(feature = "server")]
-extern crate safemem;
-
-#[cfg(feature = "tiny_http")]
-extern crate tiny_http;
-
-#[cfg(test)]
-extern crate env_logger;
-
 #[cfg(any(feature = "mock", test))]
 pub mod mock;
 

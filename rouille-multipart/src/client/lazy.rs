@@ -1,5 +1,4 @@
 //! Multipart requests which write out their data in one fell swoop.
-use mime::Mime;
 
 use std::borrow::Cow;
 use std::error::Error;
@@ -9,6 +8,9 @@ use std::path::{Path, PathBuf};
 use std::io::prelude::*;
 use std::io::Cursor;
 use std::{fmt, io};
+
+use log::debug;
+use mime::Mime;
 
 use super::{HttpRequest, HttpStream};
 
