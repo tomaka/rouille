@@ -221,7 +221,7 @@ where
 
 /// Find the boundary occurrence or the highest length to safely yield
 fn find_boundary(buf: &[u8], boundary: &[u8]) -> Result<usize, usize> {
-    if let Some(idx) = twoway::find_bytes(buf, boundary) {
+    if let Some(idx) = memchr::memmem::find(buf, boundary) {
         return Ok(idx);
     }
 
