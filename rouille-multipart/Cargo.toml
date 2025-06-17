@@ -10,6 +10,7 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 autobins = false
 edition = "2021"
+publish = false # Don't publish this until we do the necessary cleanup
 
 [dependencies]
 lazy_static = { version = "1.2.0", optional = true }
