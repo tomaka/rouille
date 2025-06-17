@@ -62,3 +62,16 @@ jobs:
         with:
           command: test
           args: --features ${{ matrix.features }}
+
+  msrv:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@master
+      - name: Install Rust
+        run: |
+          msrv="$(cargo metadata --format-version=1 |
+            jq -r '.packages[] | select(.name == "rouille").rust_version'
+          )"
+          rustup update "$msrv" && rustup default "$msrv"
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check
