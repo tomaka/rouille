@@ -43,7 +43,7 @@ where
     /// Internal API
     pub fn from_reader<B: Into<Vec<u8>>>(reader: R, boundary: B) -> BoundaryReader<R> {
         let mut boundary = boundary.into();
-        safemem::prepend(b"--", &mut boundary);
+        boundary.splice(0..0, *b"--");
         let source = BufReader::new(reader).set_policy(MinBuffered(MIN_BUF_SIZE));
 
         BoundaryReader {

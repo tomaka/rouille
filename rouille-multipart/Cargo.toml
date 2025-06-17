@@ -16,7 +16,6 @@ log = "0.4"
 mime = "0.3.14"
 mime_guess = "2.0.1"
 rand = "0.8"
-safemem = { version = "0.3", optional = true }
 tempfile = "3"
 
 #Server Dependencies
@@ -34,5 +33,5 @@ env_logger = "0.5"
 [features]
 client = []
 default = ["client", "mock", "server", "tiny_http"]
-server = ["buffer-redux", "httparse", "safemem", "dep:memchr", "dep:thiserror"]
+server = ["buffer-redux", "httparse", "dep:memchr", "dep:thiserror"]
 mock = []
