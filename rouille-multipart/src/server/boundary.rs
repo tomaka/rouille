@@ -310,7 +310,7 @@ mod test {
 
     #[test]
     fn test_boundary() {
-        ::init_log();
+        crate::init_log();
 
         debug!("Testing boundary (no split)");
 
@@ -356,7 +356,7 @@ mod test {
 
     #[test]
     fn test_split_boundary() {
-        ::init_log();
+        crate::init_log();
 
         debug!("Testing boundary (split)");
 
@@ -406,7 +406,7 @@ mod test {
 
     #[test]
     fn test_empty_body() {
-        ::init_log();
+        crate::init_log();
 
         // empty body contains closing boundary only
         let mut body: &[u8] = b"--boundary--";
@@ -428,7 +428,7 @@ mod test {
 
     #[test]
     fn test_leading_crlf() {
-        ::init_log();
+        crate::init_log();
 
         let mut body: &[u8] = b"\r\n\r\n--boundary\r\n\
                          asdf1234\
@@ -455,7 +455,7 @@ mod test {
 
     #[test]
     fn test_trailing_crlf() {
-        ::init_log();
+        crate::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
@@ -499,7 +499,7 @@ mod test {
     // https://github.com/abonander/multipart/issues/93#issuecomment-343610587
     #[test]
     fn test_trailing_lflf() {
-        ::init_log();
+        crate::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\
@@ -542,7 +542,7 @@ mod test {
     // https://github.com/abonander/multipart/issues/104
     #[test]
     fn test_unterminated_body() {
-        ::init_log();
+        crate::init_log();
 
         let mut body: &[u8] = b"--boundary\r\n\
                          asdf1234\

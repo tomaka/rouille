@@ -1,12 +1,9 @@
-extern crate hyper;
-extern crate multipart;
-
 use hyper::server::response::Response as HyperResponse;
 use hyper::server::{Handler, Request, Response, Server};
 use hyper::status::StatusCode;
-use multipart::mock::StdoutTee;
-use multipart::server::hyper::{HyperRequest, MultipartHandler, Switch};
-use multipart::server::{Entries, Multipart, SaveResult};
+use rouille_multipart::mock::StdoutTee;
+use rouille_multipart::server::hyper::{HyperRequest, MultipartHandler, Switch};
+use rouille_multipart::server::{Entries, Multipart, SaveResult};
 use std::io;
 
 struct NonMultipart;

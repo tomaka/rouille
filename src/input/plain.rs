@@ -11,7 +11,8 @@ use std::error;
 use std::fmt;
 use std::io::Error as IoError;
 use std::io::Read;
-use Request;
+
+use crate::Request;
 
 /// Error that can happen when parsing the request body as plain text.
 #[derive(Debug)]
@@ -79,9 +80,8 @@ impl fmt::Display for PlainTextError {
 /// # Example
 ///
 /// ```
-/// # #[macro_use] extern crate rouille;
-/// # use rouille::{Request, Response};
-/// # fn main() {}
+/// use rouille::{Request, Response, try_or_400};
+///
 /// fn route_handler(request: &Request) -> Response {
 ///     let text = try_or_400!(rouille::input::plain_text_body(request));
 ///     Response::text(format!("you sent: {}", text))
@@ -138,7 +138,7 @@ mod test {
     use super::plain_text_body;
     use super::plain_text_body_with_limit;
     use super::PlainTextError;
-    use Request;
+    use crate::Request;
 
     #[test]
     fn ok() {

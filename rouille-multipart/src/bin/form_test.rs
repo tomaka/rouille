@@ -1,7 +1,4 @@
-extern crate hyper;
-extern crate multipart;
-
-use multipart::server::Multipart;
+use rouille_multipart::server::Multipart;
 
 use hyper::header::ContentType;
 use hyper::server::*;

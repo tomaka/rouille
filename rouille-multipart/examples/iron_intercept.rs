@@ -1,10 +1,7 @@
-extern crate iron;
-extern crate multipart;
-
 use iron::prelude::*;
 
-use multipart::server::iron::Intercept;
-use multipart::server::Entries;
+use rouille_multipart::server::iron::Intercept;
+use rouille_multipart::server::Entries;
 
 fn main() {
     // We start with a basic request handler chain.

@@ -12,9 +12,8 @@
 /// # Example
 ///
 /// ```no_run
-/// # #[macro_use] extern crate rouille; fn main() {
 /// # let request: rouille::Request = unsafe { std::mem::uninitialized() };
-/// let _result = router!(request,
+/// let _result = rouille::router!(request,
 ///     // first route
 ///     (GET) (/) => {
 ///         12
@@ -30,7 +29,6 @@
 ///     // default route
 ///     _ => 5
 /// );
-/// # }
 /// ```
 ///
 /// # Details
@@ -296,6 +294,7 @@ macro_rules! router {
             let pat_end = url.find('/').unwrap_or(url.len());
             let rest_url = &url[pat_end..];
 
+            #[allow(irrefutable_let_patterns, reason = "`.parse()` to `String` params can't error")]
             if let Ok($p) = $crate::percent_encoding::percent_decode(url[0 .. pat_end].as_bytes())
                 .decode_utf8_lossy().parse() {
                 let $p: $t = $p;
@@ -352,7 +351,7 @@ macro_rules! router {
 #[allow(unused_variables)]
 #[cfg(test)]
 mod tests {
-    use Request;
+    use crate::Request;
 
     // -- old-style tests --
     #[test]

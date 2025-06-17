@@ -15,14 +15,14 @@
 use std::error;
 use std::fmt;
 
-use Request;
-use RequestBody;
-
 use rouille_multipart::server::Multipart as InnerMultipart;
 
 // TODO: provide wrappers around these
 pub use rouille_multipart::server::MultipartData;
 pub use rouille_multipart::server::MultipartField;
+
+use crate::Request;
+use crate::RequestBody;
 
 /// Error that can happen when decoding multipart data.
 #[derive(Clone, Debug)]
@@ -55,7 +55,7 @@ impl fmt::Display for MultipartError {
 }
 
 /// Attempts to decode the content of the request as `multipart/form-data` data.
-pub fn get_multipart_input(request: &Request) -> Result<Multipart, MultipartError> {
+pub fn get_multipart_input(request: &Request) -> Result<Multipart<'_>, MultipartError> {
     let boundary = match multipart_boundary(request) {
         Some(b) => b,
         None => return Err(MultipartError::WrongContentType),

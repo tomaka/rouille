@@ -7,8 +7,6 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-extern crate rouille;
-
 fn main() {
     // This example shows how to create a reverse proxy with rouille.
 

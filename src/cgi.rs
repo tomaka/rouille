@@ -46,9 +46,9 @@ use std::io::Read;
 use std::process::Command;
 use std::process::Stdio;
 
-use Request;
-use Response;
-use ResponseBody;
+use crate::Request;
+use crate::Response;
+use crate::ResponseBody;
 
 /// Error that can happen when parsing the JSON input.
 #[derive(Debug)]

@@ -13,8 +13,8 @@ use std::path::Path;
 use filetime;
 use time;
 
-use Request;
-use Response;
+use crate::Request;
+use crate::Response;
 
 /// Searches inside `path` for a file that matches the given request. If a file is found,
 /// returns a `Response` that would serve this file if returned. If no file is found, a 404

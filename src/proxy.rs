@@ -70,9 +70,9 @@ use std::net::TcpStream;
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 
-use Request;
-use Response;
-use ResponseBody;
+use crate::Request;
+use crate::Response;
+use crate::ResponseBody;
 
 /// Error that can happen when dispatching the request to another server.
 #[derive(Debug)]

@@ -16,8 +16,9 @@ use std::fs::File;
 use std::io;
 use std::io::Cursor;
 use std::io::Read;
-use Request;
-use Upgrade;
+
+use crate::Request;
+use crate::Upgrade;
 
 /// Contains a prototype of a response.
 ///
@@ -357,13 +358,9 @@ impl Response {
     /// # Example
     ///
     /// ```
-    /// extern crate serde;
-    /// #[macro_use] extern crate serde_derive;
-    /// #[macro_use] extern crate rouille;
     /// use rouille::Response;
-    /// # fn main() {
     ///
-    /// #[derive(Serialize)]
+    /// #[derive(serde_derive::Serialize)]
     /// struct MyStruct {
     ///     field1: String,
     ///     field2: i32,
@@ -371,7 +368,6 @@ impl Response {
     ///
     /// let response = Response::json(&MyStruct { field1: "hello".to_owned(), field2: 5 });
     /// // The Response will contain something like `{ field1: "hello", field2: 5 }`
-    /// # }
     /// ```
     #[inline]
     pub fn json<T>(content: &T) -> Response
@@ -867,7 +863,7 @@ impl ResponseBody {
 
 #[cfg(test)]
 mod tests {
-    use Response;
+    use crate::Response;
 
     #[test]
     fn unique_header_adds() {

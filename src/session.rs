@@ -40,9 +40,9 @@ use std::borrow::Cow;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
-use input;
-use Request;
-use Response;
+use crate::input;
+use crate::Request;
+use crate::Response;
 
 pub fn session<'r, F>(request: &'r Request, cookie_name: &str, timeout_s: u64, inner: F) -> Response
 where

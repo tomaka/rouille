@@ -7,8 +7,6 @@
 // notice may not be copied, modified, or distributed except
 // according to those terms.
 
-extern crate rouille;
-
 use rouille::Response;
 
 fn main() {

@@ -79,10 +79,6 @@ impl<'a> Into<io::Error> for LazyError<'a, io::Error> {
 }
 
 impl<'a, E: Error> Error for LazyError<'a, E> {
-    fn description(&self) -> &str {
-        self.error.description()
-    }
-
     fn cause(&self) -> Option<&dyn Error> {
         Some(&self.error)
     }
