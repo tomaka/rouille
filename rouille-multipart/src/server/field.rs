@@ -13,22 +13,13 @@ use std::{fmt, str};
 
 use std::sync::Arc;
 
-use super::httparse::{self, Error as HttparseError, Header, Status, EMPTY_HEADER};
+use super::httparse::{self, Header, Status, EMPTY_HEADER};
 
 use self::ReadEntryResult::*;
 
 use super::save::SaveBuilder;
 
 const EMPTY_STR_HEADER: StrHeader<'static> = StrHeader { name: "", val: "" };
-
-macro_rules! invalid_cont_disp {
-    ($reason: expr, $cause: expr) => {
-        return Err(ParseHeaderError::InvalidContDisp(
-            $reason,
-            $cause.to_string(),
-        ))
-    };
-}
 
 /// Not exposed
 #[derive(Copy, Clone, Debug)]
@@ -67,7 +58,7 @@ where
 
         // buffer has stopped growing
         if buf.len() == last_len {
-            return Err(ParseHeaderError::TooLarge);
+            return Err(ParseHeaderError::TooLarge(buf.len()));
         }
 
         let mut raw_headers = [EMPTY_HEADER; HEADER_LEN];
@@ -155,9 +146,15 @@ impl ContentDisp {
         let header = if let Some(header) = find_header(headers, "Content-Disposition") {
             header
         } else {
-            return Err(ParseHeaderError::MissingContentDisposition(
-                DisplayHeaders(headers).to_string(),
-            ));
+            return Err(ParseHeaderError::MissingContentDisposition {
+                headers: DisplayHeaders(headers).to_string(),
+            });
+        };
+
+        let make_err = || {
+            Err(ParseHeaderError::InvalidContentDisposition(format!(
+                "{header:?}"
+            )))
         };
 
         // Content-Disposition: ?
@@ -166,22 +163,17 @@ impl ContentDisp {
                 // assert Content-Disposition: form-data
                 // but needs to be parsed out to trim the spaces (allowed by spec IIRC)
                 if disp_type.trim() != "form-data" {
-                    invalid_cont_disp!("unexpected Content-Disposition value", disp_type);
+                    return make_err();
+                    // invalid_cont_disp!("unexpected Content-Disposition value", disp_type);
                 }
                 after_disp_type
             }
-            None => invalid_cont_disp!(
-                "expected additional data after Content-Disposition type",
-                header.val
-            ),
+            None => return make_err(),
         };
 
         // Content-Disposition: form-data; name=?
         let (field_name, filename) = match get_str_after("name=", ';', after_disp_type) {
-            None => invalid_cont_disp!(
-                "expected field name and maybe filename, got",
-                after_disp_type
-            ),
+            None => return make_err(),
             // Content-Disposition: form-data; name={field_name}; filename=?
             Some((field_name, after_field_name)) => {
                 let field_name = trim_quotes(field_name);
@@ -530,40 +522,34 @@ impl<M: ReadEntry, Entry> ReadEntryResult<M, Entry> {
     }
 }
 
-quick_error! {
-    #[derive(Debug)]
-    enum ParseHeaderError {
-        /// The `Content-Disposition` header was not found
-        MissingContentDisposition(headers: String) {
-            display(x) -> ("{}:\n{}", x, headers)
-            description("\"Content-Disposition\" header not found in field headers")
-        }
-        InvalidContDisp(reason: &'static str, cause: String) {
-            display(x) -> ("{}: {}: {}", x, reason, cause)
-            description("invalid \"Content-Disposition\" header")
-        }
-        /// The header was found but could not be parsed
-        TokenizeError(err: HttparseError) {
-            description("an error occurred while parsing field headers")
-            display(x) -> ("{}: {}", x, err)
-            cause(err)
-            from()
-        }
-        MimeError(cont_type: String) {
-            description("Failed to parse Content-Type")
-            display(this) -> ("{}: {}", this, cont_type)
-        }
-        TooLarge {
-            description("field headers section ridiculously long or missing trailing CRLF-CRLF")
-        }
-        /// IO error
-        Io(err: io::Error) {
-            description("an io error occurred while parsing the headers")
-            display(x) -> ("{}: {}", x, err)
-            cause(err)
-            from()
-        }
-    }
+#[derive(thiserror::Error, Debug)]
+enum ParseHeaderError {
+    /// No `Content-Disposiition` header
+    #[error(r"Content-disposition not found. Headers: {headers}")]
+    MissingContentDisposition { headers: String },
+
+    /// The `Content-Disposition` header was not found
+    #[error(
+        "invalid \"Content-Disposition\" header: {0}. Expected format \
+        `Content-Disposition: form-data; name=field_name; filename=?`"
+    )]
+    InvalidContentDisposition(String),
+
+    /// The header was found but could not be parsed
+    #[error("an error occurred while parsing headers: {0}")]
+    HeaderParse(#[from] httparse::Error),
+
+    /// Error parsing the mime type.
+    #[error("Failed to parse Content-Type `{0}`")]
+    MimeError(String),
+
+    /// Buffer stopped growing
+    #[error("field headers section ridiculously long or missing trailing CRLF-CRLF. Stopped at {0} bytes.")]
+    TooLarge(usize),
+
+    /// IO error
+    #[error("io error: {0}")]
+    Io(#[from] io::Error),
 }
 
 #[test]
