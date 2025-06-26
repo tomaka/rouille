@@ -615,9 +615,14 @@ where
             };
 
             // writing the response
+            let chunked_threshold = rouille_response.data.chunked_threshold();
             let (res_data, res_len) = rouille_response.data.into_reader_and_size();
             let mut response = tiny_http::Response::empty(rouille_response.status_code)
                 .with_data(res_data, res_len);
+
+            if let Some(value) = chunked_threshold {
+                response = response.with_chunked_threshold(value);
+            }
 
             let mut upgrade_header = "".into();
 
