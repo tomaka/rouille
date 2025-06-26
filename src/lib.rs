@@ -256,6 +256,38 @@ where
     panic!("The server socket closed unexpectedly")
 }
 
+#[cfg(feature = "ssl")]
+/// Starts a new server with given local SSL context,
+/// similar to `start_server`.
+/// Certificate: loaded binary certificate,  
+/// Private key: loaded binary key,  
+/// Refer to tiny-http SSL config class for more details 
+pub fn start_ssl_server<A, F>(addr: A, handler: F, certificate: Vec<u8>, key: Vec<u8>) -> !
+where
+    A: ToSocketAddrs,
+    F: Send + Sync + 'static + Fn(&Request) -> Response,
+{
+    Server::new_ssl(addr, handler, certificate, key)
+        .expect("Failed to start ssl server")
+        .run();
+    panic!("The server socket closed unexpectedly")
+}
+
+#[cfg(feature = "ssl")]
+/// Similar to `start_server_with_pool` but with
+/// a local SSL context for HTTPs server
+pub fn start_ssl_server_with_pool<A, F>(addr: A, pool_size: Option<usize>, handler: F, certificate: Vec<u8>, key: Vec<u8>) -> !
+where
+    A: ToSocketAddrs,
+    F: Send + Sync + 'static + Fn(&Request) -> Response,
+{
+    Server::new_ssl(addr, handler, certificate, key)
+        .expect("Failed to start server")
+        .pool_size(pool_size.unwrap_or_else(|| 8 * num_cpus::get()))
+        .run();
+    panic!("The server socket closed unexpectedly")
+}
+
 struct AtomicCounter(Arc<AtomicUsize>);
 
 impl AtomicCounter {
