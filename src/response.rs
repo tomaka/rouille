@@ -726,6 +726,7 @@ impl Response {
 pub struct ResponseBody {
     data: Box<dyn Read + Send>,
     data_length: Option<usize>,
+    chunked_threshold: Option<usize>,
 }
 
 impl ResponseBody {
@@ -742,6 +743,7 @@ impl ResponseBody {
         ResponseBody {
             data: Box::new(io::empty()),
             data_length: Some(0),
+            chunked_threshold: None,
         }
     }
 
@@ -767,6 +769,7 @@ impl ResponseBody {
         ResponseBody {
             data: Box::new(data),
             data_length: None,
+            chunked_threshold: None,
         }
     }
 
@@ -793,6 +796,7 @@ impl ResponseBody {
         ResponseBody {
             data: Box::new(data),
             data_length: Some(size),
+            chunked_threshold: None,
         }
     }
 
@@ -815,6 +819,7 @@ impl ResponseBody {
         ResponseBody {
             data: Box::new(Cursor::new(data)),
             data_length: Some(len),
+            chunked_threshold: None,
         }
     }
 
@@ -836,6 +841,7 @@ impl ResponseBody {
         ResponseBody {
             data: Box::new(file),
             data_length: len,
+            chunked_threshold: None,
         }
     }
 
@@ -863,11 +869,25 @@ impl ResponseBody {
     pub fn into_reader_and_size(self) -> (Box<dyn Read + Send>, Option<usize>) {
         (self.data, self.data_length)
     }
+
+    /// Getter for chunked_threshold.
+    #[inline]
+    pub fn chunked_threshold(&self) -> Option<usize> {
+        self.chunked_threshold
+    }
+
+    /// Defines the chunked threshold for the data in this request, overriding the default.
+    #[inline]
+    pub fn with_chunked_threshold(mut self, len: usize) -> ResponseBody {
+        self.chunked_threshold = Some(len);
+        self
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use Response;
+    use ResponseBody;
 
     #[test]
     fn unique_header_adds() {
@@ -912,4 +932,13 @@ mod tests {
         assert_eq!(r.headers.len(), 1);
         assert_eq!(r.headers[0], ("foo".into(), "Bar".into()));
     }
+
+    #[test]
+    fn can_set_chunked_threshold() {
+        let r = ResponseBody::empty();
+
+        assert_eq!(r.chunked_threshold(), None);
+        assert_eq!(r.with_chunked_threshold(123).chunked_threshold(), Some(123));
+    }
 }
+
