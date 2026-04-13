@@ -596,7 +596,7 @@ macro_rules! post_input {
                                 let config = $config;
                             )*
 
-                            if multipart_entry.is_text() {
+                            if multipart_entry.headers.filename.is_none() {
                                 let mut text = String::new();
                                 multipart_entry.data.read_to_string(&mut text)?;
                                 let decoded = match DecodePostField::from_field(config, &text) {
