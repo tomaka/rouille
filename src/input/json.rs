@@ -39,6 +39,8 @@ use serde_json;
 use std::error;
 use std::fmt;
 use std::io::Error as IoError;
+use std::str::FromStr;
+use std::io::Read;
 use Request;
 
 /// Error that can happen when parsing the JSON input.
@@ -125,8 +127,6 @@ pub fn json_input<O>(request: &Request) -> Result<O, JsonError>
 where
     O: serde::de::DeserializeOwned,
 {
-    // TODO: add an optional bytes limit
-
     if let Some(header) = request.header("Content-Type") {
         if !header.starts_with("application/json") {
             return Err(JsonError::WrongContentType);
@@ -135,8 +135,16 @@ where
         return Err(JsonError::WrongContentType);
     }
 
-    if let Some(b) = request.data() {
-        serde_json::from_reader::<_, O>(b).map_err(From::from)
+    if let Some(mut b) = request.data() {
+        // In the content length is specified, read exactly as many bytes
+        if let Some(length) = request.header("Content-Length") {
+            let length = usize::from_str(length).map_err(|_| JsonError::WrongContentType)?;
+            let mut buf = vec![0; length];
+            b.read_exact(&mut buf)?;
+            serde_json::from_slice(&buf).map_err(From::from)
+        } else {
+            serde_json::from_reader::<_, O>(b).map_err(From::from)
+        }
     } else {
         Err(JsonError::BodyAlreadyExtracted)
     }
